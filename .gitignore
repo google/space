@@ -1,0 +1,11 @@
+.DS_Store
+.cache
+
+# Python build
+__pycache__/
+*.egg-info/
+build/
+dist/
+
+# VSCode files
+.vscode/
