@@ -1,0 +1,3 @@
+[submodule "substrait"]
+	path = substrait
+	url = https://github.com/substrait-io/substrait.git
