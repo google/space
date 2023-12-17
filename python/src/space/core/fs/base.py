@@ -15,8 +15,11 @@
 """Abstract base file system."""
 
 from abc import ABC, abstractmethod
+from typing import TypeVar
 
 from google.protobuf import message
+
+ProtoT = TypeVar("ProtoT", bound=message.Message)
 
 
 class BaseFileSystem(ABC):
@@ -27,10 +30,9 @@ class BaseFileSystem(ABC):
     """Create a new directory."""
 
   @abstractmethod
-  def write_proto(self, file_path: str, msg: message.Message) -> None:
+  def write_proto(self, file_path: str, msg: ProtoT) -> None:
     """Write a proto message in text format to a file."""
 
   @abstractmethod
-  def read_proto(self, file_path: str,
-                 empty_msg: message.Message) -> message.Message:
+  def read_proto(self, file_path: str, empty_msg: ProtoT) -> ProtoT:
     """Read a proto message in text format from a file."""

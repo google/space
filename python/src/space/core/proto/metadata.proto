@@ -43,18 +43,18 @@ message StorageMetadata {
   // The storage type.
   enum Type {
     TYPE_UNSPECIFIED = 0;
-    // A Space dataset.
+    // The dataset type supports fully managed storage features.
     DATASET = 1;
   }
   Type type = 3;
 
-  // The dataset schema.
+  // The storage schema.
   Schema schema = 4;
 
   // The current snapshot ID.
   int64 current_snapshot_id = 5;
 
-  // All alive snapshots.
+  // All alive snapshots with snapshot ID as key.
   map<int64, Snapshot> snapshots = 6;
 }
 

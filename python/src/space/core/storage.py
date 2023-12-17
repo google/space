@@ -60,7 +60,9 @@ class Storage(paths.StoragePaths):
     return self._metadata
 
   def snapshot(self, snapshot_id: Optional[int] = None) -> meta.Snapshot:
-    """Return the snapshot specified by a snapshot ID."""
+    """Return the snapshot specified by a snapshot ID, or current snapshot ID
+    if not specified.
+    """
     if snapshot_id is None:
       snapshot_id = self._metadata.current_snapshot_id
 

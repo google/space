@@ -74,14 +74,14 @@ class StorageMetadata(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         TYPE_UNSPECIFIED: StorageMetadata._Type.ValueType  # 0
         DATASET: StorageMetadata._Type.ValueType  # 1
-        """A Space dataset."""
+        """The dataset type supports fully managed storage features."""
 
     class Type(_Type, metaclass=_TypeEnumTypeWrapper):
         """The storage type."""
 
     TYPE_UNSPECIFIED: StorageMetadata.Type.ValueType  # 0
     DATASET: StorageMetadata.Type.ValueType  # 1
-    """A Space dataset."""
+    """The dataset type supports fully managed storage features."""
 
     @typing_extensions.final
     class SnapshotsEntry(google.protobuf.message.Message):
@@ -116,12 +116,12 @@ class StorageMetadata(google.protobuf.message.Message):
     type: global___StorageMetadata.Type.ValueType
     @property
     def schema(self) -> global___Schema:
-        """The dataset schema."""
+        """The storage schema."""
     current_snapshot_id: builtins.int
     """The current snapshot ID."""
     @property
     def snapshots(self) -> google.protobuf.internal.containers.MessageMap[builtins.int, global___Snapshot]:
-        """All alive snapshots."""
+        """All alive snapshots with snapshot ID as key."""
     def __init__(
         self,
         *,

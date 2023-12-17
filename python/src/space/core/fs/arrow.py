@@ -16,11 +16,10 @@
 
 from abc import abstractmethod
 
-from google.protobuf import message
 from google.protobuf import text_format
 from pyarrow import fs
 
-from space.core.fs.base import BaseFileSystem
+from space.core.fs.base import BaseFileSystem, ProtoT
 from space.core.utils.protos import proto_to_text
 from space.core.utils.uuids import random_id
 
@@ -39,7 +38,7 @@ class ArrowFileSystem(BaseFileSystem):
   def create_dir(self, dir_path: str) -> None:
     self._fs.create_dir(dir_path)
 
-  def write_proto(self, file_path: str, msg: message.Message) -> None:
+  def write_proto(self, file_path: str, msg: ProtoT) -> None:
     # TODO: the current implement overwrite an existing file; to support an
     # to disallow overwrite.
     tmp_file_path = f"{file_path}.{random_id()}.tmp"
@@ -49,8 +48,7 @@ class ArrowFileSystem(BaseFileSystem):
 
     self._fs.move(tmp_file_path, file_path)
 
-  def read_proto(self, file_path: str,
-                 empty_msg: message.Message) -> message.Message:
+  def read_proto(self, file_path: str, empty_msg: ProtoT) -> ProtoT:
     with self._fs.open_input_file(file_path) as f:
       result = text_format.Parse(f.readall(), empty_msg)
     return result
