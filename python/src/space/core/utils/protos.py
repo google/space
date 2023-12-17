@@ -11,25 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+"""Utility methods for protos."""
 
-#!/bin/bash
+from google.protobuf import message
+from google.protobuf import text_format
+from google.protobuf.timestamp_pb2 import Timestamp
 
-set -e
 
-PY_FOLDER=`pwd`
-SRC_FOLDER="${PY_FOLDER}/src"
+def proto_to_text(msg: message.Message) -> bytes:
+  """Return the text format of a proto."""
+  return text_format.MessageToString(msg).encode("utf-8")
 
-# Build Substrait protos.
-cd "${PY_FOLDER}/../substrait/proto"
-protoc --python_out="${SRC_FOLDER}" \
-  --mypy_out="${SRC_FOLDER}" \
-  substrait/*.proto substrait/extensions/*.proto \
-  --proto_path=.
 
-# Build Space protos.
-cd "${SRC_FOLDER}"
-protoc --python_out=. \
-  --mypy_out=. \
-  space/core/proto/*.proto \
-  --proto_path=. \
-  --proto_path=../../substrait/proto
+def proto_now() -> Timestamp:
+  """Return the current time in the proto format."""
+  timestamp = Timestamp()
+  timestamp.GetCurrentTime()
+  return timestamp

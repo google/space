@@ -35,11 +35,11 @@ jobs:
     - name: Install test dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install mypy pylint pytest pyarrow-stubs
+        pip install mypy pylint pytest mock
     - name: Install runtime dependencies
       working-directory: ./python
       run: |
-        pip install .
+        pip install .[dev]
     - name: Analysing the code with pylint
       working-directory: ./python/src
       run: |

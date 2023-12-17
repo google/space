@@ -11,25 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+"""Utility methods for UUIDs."""
 
-#!/bin/bash
+import uuid
 
-set -e
 
-PY_FOLDER=`pwd`
-SRC_FOLDER="${PY_FOLDER}/src"
+def uuid_() -> str:
+  """Return a new UUID."""
+  return str(uuid.uuid4())
 
-# Build Substrait protos.
-cd "${PY_FOLDER}/../substrait/proto"
-protoc --python_out="${SRC_FOLDER}" \
-  --mypy_out="${SRC_FOLDER}" \
-  substrait/*.proto substrait/extensions/*.proto \
-  --proto_path=.
 
-# Build Space protos.
-cd "${SRC_FOLDER}"
-protoc --python_out=. \
-  --mypy_out=. \
-  space/core/proto/*.proto \
-  --proto_path=. \
-  --proto_path=../../substrait/proto
+def random_id() -> str:
+  """Return a short random ID."""
+  return uuid_().split("-", maxsplit=1)[0]

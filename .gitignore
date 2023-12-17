@@ -6,6 +6,10 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+.pytype/
+out/
+.mypy_cache/
+.pytest_cache/
 
 # VSCode files
 .vscode/

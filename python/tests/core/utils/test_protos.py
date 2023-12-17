@@ -12,24 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/bin/bash
+from space.core.utils import protos
+import space.core.proto.metadata_pb2 as meta
 
-set -e
 
-PY_FOLDER=`pwd`
-SRC_FOLDER="${PY_FOLDER}/src"
-
-# Build Substrait protos.
-cd "${PY_FOLDER}/../substrait/proto"
-protoc --python_out="${SRC_FOLDER}" \
-  --mypy_out="${SRC_FOLDER}" \
-  substrait/*.proto substrait/extensions/*.proto \
-  --proto_path=.
-
-# Build Space protos.
-cd "${SRC_FOLDER}"
-protoc --python_out=. \
-  --mypy_out=. \
-  space/core/proto/*.proto \
-  --proto_path=. \
-  --proto_path=../../substrait/proto
+def test_proto_to_text():
+  text = protos.proto_to_text(meta.StorageMetadata(current_snapshot_id=100))
+  assert text.decode("utf-8") == "current_snapshot_id: 100\n"
