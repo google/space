@@ -25,46 +25,46 @@ def _mocked_uuid() -> str:
 
 
 @patch(_UUID_PATH, side_effect=_mocked_uuid)
-def test_new_index_file_path(mock_uuid):
+def test_new_index_file_path(mock_uuid):  # pylint: disable=unused-argument
   assert paths.new_index_file_path("data") == "data/index_<uuid>.parquet"
 
 
 @patch(_UUID_PATH, side_effect=_mocked_uuid)
-def test_new_record_file_path(mock_uuid):
+def test_new_record_file_path(mock_uuid):  # pylint: disable=unused-argument
   assert paths.new_record_file_path("data",
                                     "field") == "data/field_<uuid>.arrowrecord"
 
 
 @patch(_UUID_PATH, side_effect=_mocked_uuid)
-def test_new_index_manifest_path(mock_uuid):
+def test_new_index_manifest_path(mock_uuid):  # pylint: disable=unused-argument
   assert paths.new_index_manifest_path(
       "metadata") == "metadata/index_manifest_<uuid>.parquet"
 
 
 @patch(_UUID_PATH, side_effect=_mocked_uuid)
-def test_new_record_manifest_path(mock_uuid):
+def test_new_record_manifest_path(mock_uuid):  # pylint: disable=unused-argument
   assert paths.new_record_manifest_path(
       "metadata") == "metadata/record_manifest_<uuid>.parquet"
 
 
 @patch(_UUID_PATH, side_effect=_mocked_uuid)
-def test_data_dir(mock_uuid):
+def test_data_dir(mock_uuid):  # pylint: disable=unused-argument
   assert paths.data_dir("location") == "location/data"
 
 
 @patch(_UUID_PATH, side_effect=_mocked_uuid)
-def test_metadata_dir(mock_uuid):
+def test_metadata_dir(mock_uuid):  # pylint: disable=unused-argument
   assert paths.metadata_dir("location") == "location/metadata"
 
 
 @patch(_UUID_PATH, side_effect=_mocked_uuid)
-def test_entry_point_path(mock_uuid):
+def test_entry_point_path(mock_uuid):  # pylint: disable=unused-argument
   assert paths.entry_point_path(
       "location") == "location/metadata/entrypoint.txtpb"
 
 
 @patch(_UUID_PATH, side_effect=_mocked_uuid)
-def test_new_metadata_path(mock_uuid):
+def test_new_metadata_path(mock_uuid):  # pylint: disable=unused-argument
   assert paths.new_metadata_path(
       "metadata") == "metadata/metadata_<uuid>.txtpb"
 

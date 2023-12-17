@@ -40,10 +40,14 @@ jobs:
       working-directory: ./python
       run: |
         pip install .[dev]
-    - name: Analysing the code with pylint
+    - name: Analysing code with pylint
       working-directory: ./python/src
       run: |
         pylint space
+    - name: Analysing test code with pylint
+      working-directory: ./python
+      run: |
+        pylint tests/**/* --disable="missing-module-docstring,missing-function-docstring,missing-class-docstring"
     - name: Checking type with mypy
       working-directory: ./python/src
       run: |

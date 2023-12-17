@@ -14,9 +14,7 @@
 
 from google.protobuf.timestamp_pb2 import Timestamp
 import pytest
-from pathlib import Path
 
-from space.core.fs.arrow import ArrowLocalFileSystem
 import space.core.proto.metadata_pb2 as meta
 from space.core.storage import Storage
 from space.core.utils.paths import _ENTRY_POINT_FILE
@@ -74,7 +72,8 @@ class TestStorage:
     assert metadata.current_snapshot_id == 0
     assert metadata.type == meta.StorageMetadata.DATASET
     assert snapshot.snapshot_id == 0
-    assert metadata.create_time == metadata.last_update_time == snapshot.create_time
+    assert (metadata.create_time == metadata.last_update_time ==
+            snapshot.create_time)
 
   def test_load_storage(self, tmp_path):
     dir_path = tmp_path / "test_create_storage" / "dataset"
