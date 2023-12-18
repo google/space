@@ -16,13 +16,17 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies = [
+  "numpy",
   "protobuf",
   "pyarrow >= 14.0.0",
+  "tensorflow_datasets",
+  "typing_extensions"
 ]
 
 [project.optional-dependencies]
 dev = [
   "pyarrow-stubs",
+  "tensorflow",
   "types-protobuf"
 ]
 

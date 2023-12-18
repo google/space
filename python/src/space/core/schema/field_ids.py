@@ -19,24 +19,41 @@ import pyarrow as pa
 
 from space.core.schema import arrow
 
-_INIT_FIELD_ID = 0
+# The start value of field IDs.
+_START_FIELD_ID = 0
 
 
 # pylint: disable=too-few-public-methods
 class FieldIdManager:
-  """Assign field IDs to schema fields."""
+  """Assign field IDs to schema fields using Depth First Search.
+
+  Rules for nested fields:
+  - For a list field with ID i, its element is assigned i+1.
+  - For a struct field with ID i, its fields are assigned starting from i+1.
+
+  Not thread safe.
+  """
 
   def __init__(self, next_field_id: Optional[int] = None):
-    self._next_field_id = (next_field_id
-                           if next_field_id is not None else _INIT_FIELD_ID)
+    if next_field_id is None:
+      self._next_field_id = _START_FIELD_ID
+    else:
+      assert next_field_id >= _START_FIELD_ID
+      self._next_field_id = next_field_id
+
+  def assign_field_ids(self, schema: pa.Schema) -> pa.Schema:
+    """Return a new schema with field IDs assigned."""
+    return pa.schema(self._assign_field_ids(list(schema)))
+
+  def _assign_field_ids(self, fields: List[pa.Field]) -> List[pa.Field]:
+    return [self._assign_field_id(f) for f in fields]
 
   def _assign_field_id(self, field: pa.Field) -> pa.Field:
-    this_field_id = self._next_field_id
-    metadata = arrow.field_metadata(this_field_id)
+    metadata = arrow.field_metadata(self._next_field_id)
     self._next_field_id += 1
 
-    name = field.name
-    type_ = field.type
+    name, type_ = field.name, field.type
+
     if pa.types.is_list(type_):
       return pa.field(
           name,
@@ -50,12 +67,6 @@ class FieldIdManager:
               [type_.field(i) for i in range(type_.num_fields)]))
       return pa.field(name, struct_type, metadata=metadata)
 
-    return field.with_metadata(metadata)
+    # TODO: to support more types, e.g., fixed_size_list, map.
 
-  def _assign_field_ids(self, fields: List[pa.Field]) -> List[pa.Field]:
-    return [self._assign_field_id(f) for f in fields]
-
-  def assign_field_ids(self, schema: pa.Schema) -> pa.Schema:
-    """Assign field IDs to schema fields."""
-    return pa.schema(
-        self._assign_field_ids([schema.field(i) for i in range(len(schema))]))
+    return field.with_metadata(metadata)  # type: ignore[arg-type]

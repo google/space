@@ -15,15 +15,16 @@
 """Utilities for schemas in the Arrow format."""
 
 from typing import Dict
-
 import pyarrow as pa
 
-_PARQUET_FIELD_ID_KEY = "PARQUET:field_id"
+from space.core.utils.constants import UTF_8
+
+_PARQUET_FIELD_ID_KEY = b"PARQUET:field_id"
 
 
-def field_metadata(field_id_: int) -> Dict[str, str]:
+def field_metadata(field_id_: int) -> Dict[bytes, bytes]:
   """Return Arrow field metadata for a field."""
-  return {_PARQUET_FIELD_ID_KEY: str(field_id_)}
+  return {_PARQUET_FIELD_ID_KEY: str(field_id_).encode(UTF_8)}
 
 
 def field_id(field: pa.Field) -> int:

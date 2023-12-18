@@ -14,4 +14,4 @@
 #
 """Serializers (and deserializers) for unstructured record fields."""
 
-from space.core.serializers.base import DictSerializer, TypeSerializer
+from space.core.serializers.base import DeserializedData, FieldSerializer

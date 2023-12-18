@@ -13,21 +13,24 @@
 # limitations under the License.
 
 from google.protobuf.timestamp_pb2 import Timestamp
+import pyarrow as pa
 import pytest
+from substrait.type_pb2 import NamedStruct, Type
 
 import space.core.proto.metadata_pb2 as meta
 from space.core.storage import Storage
 from space.core.utils.paths import _ENTRY_POINT_FILE
 
+_LOCATION = "location"
+_SNAPSHOT_ID = 100
+_SCHEMA = pa.schema([pa.field("a", pa.int64()), pa.field("b", pa.string())])
+
 
 class TestStorage:
 
-  _LOCATION = "location"
-  _SNAPSHOT_ID = 100
-
   @pytest.fixture
   def metadata(self):
-    current_snapshot_id = self._SNAPSHOT_ID
+    current_snapshot_id = _SNAPSHOT_ID
     now = Timestamp(seconds=123456)
     metadata = meta.StorageMetadata(create_time=now,
                                     last_update_time=now,
@@ -45,14 +48,14 @@ class TestStorage:
 
   @pytest.fixture
   def storage(self, metadata):
-    return Storage(self._LOCATION, metadata)
+    return Storage(_LOCATION, metadata)
 
   def test_create_dir(self, storage, metadata):
     assert storage.metadata == metadata
 
   def test_snapshot(self, storage):
     # Test current snapshot ID.
-    current_snapshot_id = self._SNAPSHOT_ID
+    current_snapshot_id = _SNAPSHOT_ID
     assert storage.snapshot().snapshot_id == current_snapshot_id
     assert storage.snapshot(
         snapshot_id=current_snapshot_id).snapshot_id == current_snapshot_id
@@ -62,7 +65,7 @@ class TestStorage:
 
   def test_create_storage(self, tmp_path):
     dir_path = tmp_path / "test_create_storage" / "dataset"
-    storage = Storage.create(location=str(dir_path), logical_schema=None)
+    storage = Storage.create(location=str(dir_path), logical_schema=_SCHEMA)
 
     entry_point_file = dir_path / "metadata" / _ENTRY_POINT_FILE
     assert entry_point_file.exists()
@@ -75,9 +78,16 @@ class TestStorage:
     assert (metadata.create_time == metadata.last_update_time ==
             snapshot.create_time)
 
+    assert metadata.schema.fields == NamedStruct(
+        names=["a", "b"],
+        struct=Type.Struct(types=[
+            Type(i64=Type.I64(type_variation_reference=0)),
+            Type(string=Type.String(type_variation_reference=1))
+        ]))
+
   def test_load_storage(self, tmp_path):
     dir_path = tmp_path / "test_create_storage" / "dataset"
-    storage = Storage.create(location=str(dir_path), logical_schema=None)
+    storage = Storage.create(location=str(dir_path), logical_schema=_SCHEMA)
 
     loaded_storage = Storage.load(str(dir_path))
     assert loaded_storage.metadata == storage.metadata

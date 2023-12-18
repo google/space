@@ -15,41 +15,46 @@
 """Define a custom Arrow type for Tensorflow Dataset Features."""
 
 from __future__ import annotations
-from typing import Any, Union
+from typing import Any
+
 import json
 import pyarrow as pa
 import tensorflow_datasets as tfds  # type: ignore[import-untyped]
-from tensorflow_datasets import features as tf_features
+from tensorflow_datasets import features as f  # type: ignore[import-untyped]
 
-from space.core.serializers import TypeSerializer
-from space.core.utils import constants
+from space.core.serializers import DeserializedData, FieldSerializer
+from space.core.utils.constants import UTF_8
 
 
-class TfFeatures(pa.ExtensionType, TypeSerializer):
+class TfFeatures(pa.ExtensionType, FieldSerializer):
   """A custom Arrow type for Tensorflow Dataset Features."""
 
-  def __init__(self, features: tf_features.FeaturesDict):
-    self._features = features
-    self._serialized = json.dumps(features.to_json())
+  def __init__(self, features_dict: f.FeaturesDict):
+    """
+    Args:
+      features_dict: a Tensorflow Dataset features dict providing serializers
+        for a nested dict of Tensors or Numpy arrays, see
+        https://www.tensorflow.org/datasets/api_docs/python/tfds/features/FeaturesDict
+    """
+    self._features_dict = features_dict
+    self._serialized = json.dumps(features_dict.to_json())
     pa.ExtensionType.__init__(self, pa.binary(), self._serialized)
 
   def __arrow_ext_serialize__(self) -> bytes:
-    return self._serialized.encode(constants.UTF_8)
+    return self._serialized.encode(UTF_8)
 
   @classmethod
   def __arrow_ext_deserialize__(
       cls,
       storage_type: pa.DataType,  # pylint: disable=unused-argument
-      serialized: Union[bytes, str]
-  ) -> TfFeatures:
-    if isinstance(serialized, bytes):
-      serialized = serialized.decode(constants.UTF_8)
-
-    features = tf_features.FeaturesDict.from_json(json.loads(serialized))
-    return TfFeatures(features)
+      serialized: bytes) -> TfFeatures:
+    return TfFeatures(
+        f.FeaturesDict.from_json(json.loads(serialized.decode(UTF_8))))
 
   def serialize(self, value: Any) -> bytes:
-    return self._features.serialize_example(value)
+    """Serialize value using the provided features_dict."""
+    return self._features_dict.serialize_example(value)
 
-  def deserialize(self, value_bytes: bytes) -> Any:
-    return tfds.as_numpy(self._features.deserialize_example(value_bytes))
+  def deserialize(self, value_bytes: bytes) -> DeserializedData:
+    """Deserialize value using the provided features_dict."""
+    return tfds.as_numpy(self._features_dict.deserialize_example(value_bytes))

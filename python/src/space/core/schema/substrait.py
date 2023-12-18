@@ -15,40 +15,40 @@
 """Utilities for schemas in the Substrait format."""
 
 from __future__ import annotations
-from typing import List
+from typing import Any, List
 
 import pyarrow as pa
-
 from substrait.type_pb2 import NamedStruct, Type
 
 import space.core.schema.arrow as arrow_schema
 from space.core.schema.types import TfFeatures
-from space.core.utils import constants
+from space.core.utils.constants import UTF_8
 
 # Substrait type name of Arrow custom type TfFeatures.
 TF_FEATURES_TYPE = "TF_FEATURES"
 
 
 def substrait_fields(schema: pa.Schema) -> NamedStruct:
-  """Convert Arrow schema to equivalent Substrait fields."""
+  """Convert Arrow schema to equivalent Substrait fields.
+
+  According to the Substrait spec, traverse schema fields in the Depth First
+  Search order. The field names are persisted in `mutable_names` in the same
+  order.
+  """
   mutable_names: List[str] = []
-  types = _substrait_fields([schema.field(i) for i in range(len(schema))],
-                            mutable_names)
+  types = _substrait_fields(list(schema), mutable_names)
   return NamedStruct(names=mutable_names, struct=Type.Struct(types=types))
 
 
 def _substrait_fields(fields: List[pa.Field],
                       mutable_names: List[str]) -> List[Type]:
-  """Convert a list of Arrow fields to Substrait types, and record field names.
-  """
   return [_substrait_field(f, mutable_names) for f in fields]
 
 
 def _substrait_field(field: pa.Field,
                      mutable_names: List[str],
-                     skip_name=False) -> Type:
-  """Convert an Arrow fields to a Substrait type, and record its field name."""
-  if not skip_name:
+                     is_list_item=False) -> Type:
+  if not is_list_item:
     mutable_names.append(field.name)
 
   type_ = Type()
@@ -74,24 +74,27 @@ def _substrait_field(field: pa.Field,
         _substrait_field(
             field.type.value_field,  # type: ignore[attr-defined]
             mutable_names,
-            skip_name=True))
-    # TODO: to support fixed_size_list in substrait.
+            is_list_item=True))
+    # TODO: to support more types in Substrait, e.g., fixed_size_list, map.
   elif pa.types.is_struct(field.type):
     _set_field_id(type_.struct, field_id)
-    subfields = [field.type.field(i) for i in range(field.type.num_fields)]
+    subfields = list(field.type)  # type: ignore[call-overload]
     type_.struct.types.extend(_substrait_fields(subfields, mutable_names))
   elif isinstance(field.type, TfFeatures):
+    # TfFeatures is persisted in Substrait as a user defined type, with
+    # parameters [TF_FEATURES_TYPE, __arrow_ext_serialize__()].
     _set_field_id(type_.user_defined, field_id)
     type_.user_defined.type_parameters.extend([
         Type.Parameter(string=TF_FEATURES_TYPE),
-        Type.Parameter(string=field.type.__arrow_ext_serialize__().decode(
-            constants.UTF_8))
+        Type.Parameter(
+            string=field.type.__arrow_ext_serialize__().decode(UTF_8))
     ])
   else:
-    raise ValueError(f"Type is not supported: {field.type}")
+    raise ValueError(
+        f"Type {field.type} of field {field.name} is not supported")
 
   return type_
 
 
-def _set_field_id(msg, field_id: int) -> None:
+def _set_field_id(msg: Any, field_id: int) -> None:
   msg.type_variation_reference = field_id

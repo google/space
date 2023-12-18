@@ -11,23 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-"""Utility methods for protos."""
 
-from google.protobuf import message
-from google.protobuf import text_format
-from google.protobuf.timestamp_pb2 import Timestamp
+import pyarrow as pa
 
-from space.core.utils.constants import UTF_8
+import space.core.schema.arrow as arrow_schema
 
 
-def proto_to_text(msg: message.Message) -> bytes:
-  """Return the text format of a proto."""
-  return text_format.MessageToString(msg).encode(UTF_8)
+def test_field_metadata():
+  assert arrow_schema.field_metadata(123) == {b"PARQUET:field_id": b"123"}
 
 
-def proto_now() -> Timestamp:
-  """Return the current time in the proto format."""
-  timestamp = Timestamp()
-  timestamp.GetCurrentTime()
-  return timestamp
+def test_field_id():
+  assert arrow_schema.field_id(
+      pa.field("name", pa.int64(), metadata={b"PARQUET:field_id":
+                                             b"123"})) == 123
