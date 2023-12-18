@@ -11,25 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+"""File system factory implementation."""
 
-#!/bin/bash
+from space.core.fs.arrow import ArrowLocalFileSystem
+from space.core.fs.base import BaseFileSystem
 
-set -e
 
-PY_FOLDER=`pwd`
-SRC_FOLDER="${PY_FOLDER}/src"
-
-# Build Substrait protos.
-cd "${PY_FOLDER}/../substrait/proto"
-protoc --python_out="${SRC_FOLDER}" \
-  --mypy_out="${SRC_FOLDER}" \
-  substrait/*.proto substrait/extensions/*.proto \
-  --proto_path=.
-
-# Build Space protos.
-cd "${SRC_FOLDER}"
-protoc --python_out=. \
-  --mypy_out=. \
-  space/core/proto/*.proto \
-  --proto_path=. \
-  --proto_path=../../substrait/proto
+def create_fs(path: str) -> BaseFileSystem:  # pylint: disable=unused-argument
+  """Create a file system based on the path."""
+  # TODO: to support more file systems.
+  return ArrowLocalFileSystem()

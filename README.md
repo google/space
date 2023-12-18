@@ -1,4 +1,4 @@
-# Space: LakeHouse for Machine Learning Datasets
+# Space: Storage Framework for Machine Learning Datasets
 
 [![Python CI](https://github.com/google/space/actions/workflows/python-ci.yml/badge.svg?branch=main)](https://github.com/google/space/actions/workflows/python-ci.yml)
 

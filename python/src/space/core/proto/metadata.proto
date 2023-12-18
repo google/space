@@ -1,0 +1,78 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package space.proto;
+
+import "google/protobuf/timestamp.proto";
+import "substrait/type.proto";
+
+// Record the current storage metadata path in a static local file.
+// A mutation to storage generates a new metadata file. The current metadata
+// file path is either persisted in the entry point file, or an external
+// catalog (not implemented yet).
+// NEXT_ID: 2
+message EntryPoint {
+  // File path of the current storage metadata file.
+  string metadata_file = 1;
+}
+
+// Metadata persisting the current status of a storage, including logical
+// metadata such as schema, and physical metadata persisted as a history of
+// snapshots
+// NEXT_ID: 7
+message StorageMetadata {
+  // Create time of the storage.
+  google.protobuf.Timestamp create_time = 1;
+
+  // Last update time of the storage.
+  google.protobuf.Timestamp last_update_time = 2;
+
+  // The storage type.
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    // The dataset type supports fully managed storage features.
+    DATASET = 1;
+  }
+  Type type = 3;
+
+  // The storage schema.
+  Schema schema = 4;
+
+  // The current snapshot ID.
+  int64 current_snapshot_id = 5;
+
+  // All alive snapshots with snapshot ID as key.
+  map<int64, Snapshot> snapshots = 6;
+}
+
+// The storage logical schema where user provided types are persisted instead
+// of their physical storage format.
+// NEXT_ID: 2
+message Schema {
+  // Fields persisted as Substrait named struct.
+  substrait.NamedStruct fields = 1;
+}
+
+// Storage snapshot persisting physical metadata such as manifest file paths.
+// It is used for obtaining all alive data file paths for a given snapshot.
+// NEXT_ID: 3
+message Snapshot {
+  // The snapshot ID.
+  int64 snapshot_id = 1;
+
+  // The create time of the snapshot.
+  google.protobuf.Timestamp create_time = 2;
+}
