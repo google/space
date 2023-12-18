@@ -12,21 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Utility methods for protos."""
+"""Defines custom types."""
 
-from google.protobuf import message
-from google.protobuf import text_format
-from google.protobuf.timestamp_pb2 import Timestamp
-from space.core.utils import constants
-
-
-def proto_to_text(msg: message.Message) -> bytes:
-  """Return the text format of a proto."""
-  return text_format.MessageToString(msg).encode(constants.UTF_8)
-
-
-def proto_now() -> Timestamp:
-  """Return the current time in the proto format."""
-  timestamp = Timestamp()
-  timestamp.GetCurrentTime()
-  return timestamp
+from space.core.schema.types.tf_features import TfFeatures

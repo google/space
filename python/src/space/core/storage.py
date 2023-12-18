@@ -20,6 +20,8 @@ from typing import Optional
 
 import pyarrow as pa
 
+from space.core.schema import FieldIdManager
+from space.core.schema import substrait as substrait_schema
 from space.core.fs.factory import create_fs
 import space.core.proto.metadata_pb2 as meta
 from space.core.utils import paths
@@ -75,14 +77,19 @@ class Storage(paths.StoragePaths):
   def create(cls, location: str, logical_schema: pa.Schema) -> Storage:  # pylint: disable=unused-argument
     """Create a new empty storage."""
     # TODO: to verify that location is an empty directory.
-    # TODO: to assign field IDs to schema fields.
+
+    field_id_mgr = FieldIdManager()
+    logical_schema = field_id_mgr.assign_field_ids(logical_schema)
 
     now = proto_now()
     # TODO: to convert Arrow schema to Substrait schema.
-    metadata = meta.StorageMetadata(create_time=now,
-                                    last_update_time=now,
-                                    current_snapshot_id=_INIT_SNAPSHOT_ID,
-                                    type=meta.StorageMetadata.DATASET)
+    metadata = meta.StorageMetadata(
+        create_time=now,
+        last_update_time=now,
+        schema=meta.Schema(
+            fields=substrait_schema.substrait_fields(logical_schema)),
+        current_snapshot_id=_INIT_SNAPSHOT_ID,
+        type=meta.StorageMetadata.DATASET)
 
     new_metadata_path = paths.new_metadata_path(paths.metadata_dir(location))
 

@@ -12,21 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Utility methods for protos."""
+"""Utilities for schemas in the Arrow format."""
 
-from google.protobuf import message
-from google.protobuf import text_format
-from google.protobuf.timestamp_pb2 import Timestamp
-from space.core.utils import constants
+from typing import Dict
 
+import pyarrow as pa
 
-def proto_to_text(msg: message.Message) -> bytes:
-  """Return the text format of a proto."""
-  return text_format.MessageToString(msg).encode(constants.UTF_8)
+_PARQUET_FIELD_ID_KEY = "PARQUET:field_id"
 
 
-def proto_now() -> Timestamp:
-  """Return the current time in the proto format."""
-  timestamp = Timestamp()
-  timestamp.GetCurrentTime()
-  return timestamp
+def field_metadata(field_id_: int) -> Dict[str, str]:
+  """Return Arrow field metadata for a field."""
+  return {_PARQUET_FIELD_ID_KEY: str(field_id_)}
+
+
+def field_id(field: pa.Field) -> int:
+  """Return field ID of an Arrow field."""
+  return int(field.metadata[_PARQUET_FIELD_ID_KEY])

@@ -45,4 +45,4 @@ disable = ['fixme']
 
 [tool.pylint.MAIN]
 ignore = 'space/core/proto'
-ignored-modules = ['space.core.proto', 'google.protobuf']
+ignored-modules = ['space.core.proto', 'google.protobuf', 'substrait']
