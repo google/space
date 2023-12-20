@@ -65,7 +65,9 @@ class TestStorage:
 
   def test_create_storage(self, tmp_path):
     dir_path = tmp_path / "test_create_storage" / "dataset"
-    storage = Storage.create(location=str(dir_path), logical_schema=_SCHEMA)
+    storage = Storage.create(location=str(dir_path),
+                             schema=_SCHEMA,
+                             primary_keys=["a"])
 
     entry_point_file = dir_path / "metadata" / _ENTRY_POINT_FILE
     assert entry_point_file.exists()
@@ -87,7 +89,9 @@ class TestStorage:
 
   def test_load_storage(self, tmp_path):
     dir_path = tmp_path / "test_create_storage" / "dataset"
-    storage = Storage.create(location=str(dir_path), logical_schema=_SCHEMA)
+    storage = Storage.create(location=str(dir_path),
+                             schema=_SCHEMA,
+                             primary_keys=["a"])
 
     loaded_storage = Storage.load(str(dir_path))
     assert loaded_storage.metadata == storage.metadata

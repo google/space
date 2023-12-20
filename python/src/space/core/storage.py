@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 from os import path
-from typing import Optional
+from typing import List, Optional
 
 import pyarrow as pa
 
@@ -74,20 +74,31 @@ class Storage(paths.StoragePaths):
     raise RuntimeError(f"Snapshot {snapshot_id} is not found")
 
   @classmethod
-  def create(cls, location: str, logical_schema: pa.Schema) -> Storage:  # pylint: disable=unused-argument
-    """Create a new empty storage."""
+  def create(
+      cls,
+      location: str,
+      schema: pa.Schema,
+      primary_keys: List[str],
+  ) -> Storage:  # pylint: disable=unused-argument
+    """Create a new empty storage.
+    
+    Args:
+      location: the directory path to the storage.
+      schema: the schema of the storage.
+      primary_keys: un-enforced primary keys.
+    """
     # TODO: to verify that location is an empty directory.
 
     field_id_mgr = FieldIdManager()
-    logical_schema = field_id_mgr.assign_field_ids(logical_schema)
+    schema = field_id_mgr.assign_field_ids(schema)
 
     now = proto_now()
     # TODO: to convert Arrow schema to Substrait schema.
     metadata = meta.StorageMetadata(
         create_time=now,
         last_update_time=now,
-        schema=meta.Schema(
-            fields=substrait_schema.substrait_fields(logical_schema)),
+        schema=meta.Schema(fields=substrait_schema.substrait_fields(schema),
+                           primary_keys=primary_keys),
         current_snapshot_id=_INIT_SNAPSHOT_ID,
         type=meta.StorageMetadata.DATASET)
 

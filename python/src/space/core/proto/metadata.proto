@@ -32,7 +32,7 @@ message EntryPoint {
 // Metadata persisting the current status of a storage, including logical
 // metadata such as schema, and physical metadata persisted as a history of
 // snapshots
-// NEXT_ID: 7
+// NEXT_ID: 8
 message StorageMetadata {
   // Create time of the storage.
   google.protobuf.Timestamp create_time = 1;
@@ -56,6 +56,9 @@ message StorageMetadata {
 
   // All alive snapshots with snapshot ID as key.
   map<int64, Snapshot> snapshots = 6;
+
+  // Statistics of all data in the storage.
+  StorageStatistics storage_statistics = 7;
 }
 
 // The storage logical schema where user provided types are persisted instead
@@ -64,6 +67,9 @@ message StorageMetadata {
 message Schema {
   // Fields persisted as Substrait named struct.
   substrait.NamedStruct fields = 1;
+
+  // Primary key field names. Required but primary keys are un-enforced.
+  repeated string primary_keys = 2;
 }
 
 // Storage snapshot persisting physical metadata such as manifest file paths.
@@ -75,4 +81,17 @@ message Snapshot {
 
   // The create time of the snapshot.
   google.protobuf.Timestamp create_time = 2;
+}
+
+// Statistics of storage data.
+// NEXT_ID: 4
+message StorageStatistics {
+  // Number of rows.
+  int64 num_rows = 1;
+
+  // Compressed bytes of index data.
+  int64 index_compressed_bytes = 2;
+
+  // Uncompressed bytes of index data.
+  int64 index_uncompressed_bytes = 3;
 }

@@ -1,0 +1,48 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+import "space/core/proto/metadata.proto";
+
+package space.proto;
+
+// A patch describing metadata changes to the storage.
+// NEXT_ID: 4
+message Patch {
+  // Index manifest file paths newly added to the storage.
+  repeated string added_index_manifest_files = 1;
+
+  // Index manifest file paths to be removed from the storage.
+  repeated string deleted_index_manifest_files = 2;
+
+  // The change of the storage statistics.
+  StorageStatistics storage_statistics_update = 3;
+}
+
+// Result of a job.
+// NEXT_ID: 2
+message JobResult {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    SUCCEEDED = 1;
+    FAILED = 2;
+    SKIPPED = 3;
+  }
+
+  State state = 1;
+
+  // The change of the storage statistics.
+  StorageStatistics storage_statistics_update = 2;
+}
