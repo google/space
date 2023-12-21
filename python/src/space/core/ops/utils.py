@@ -14,10 +14,14 @@
 #
 """Utilities for operation classes."""
 
+import numpy as np
+import pyarrow as pa
+
+from space.core.schema import arrow
 from space.core.proto import metadata_pb2 as meta
 
 
-def update_index_storage_statistics(
+def update_index_storage_stats(
     base: meta.StorageStatistics,
     update: meta.StorageStatistics,
 ) -> None:
@@ -25,3 +29,20 @@ def update_index_storage_statistics(
   base.num_rows += update.num_rows
   base.index_compressed_bytes += update.index_compressed_bytes
   base.index_uncompressed_bytes += update.index_uncompressed_bytes
+
+
+def update_record_stats_bytes(base: meta.StorageStatistics,
+                              update: meta.StorageStatistics) -> None:
+  """Update record storage statistics."""
+  base.record_uncompressed_bytes += update.record_uncompressed_bytes
+
+
+def address_column(file_path: str, start_row: int,
+                   num_rows: int) -> pa.StructArray:
+  """Construct an record address column by a file path and row ID range."""
+  return pa.StructArray.from_arrays(
+      [
+          [file_path] * num_rows,  # type: ignore[arg-type]
+          np.arange(start_row, start_row + num_rows, dtype=np.int32)
+      ],
+      fields=arrow.record_address_types())  # type: ignore[arg-type]

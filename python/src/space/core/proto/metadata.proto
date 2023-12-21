@@ -70,6 +70,9 @@ message Schema {
 
   // Primary key field names. Required but primary keys are un-enforced.
   repeated string primary_keys = 2;
+
+  // Names of record fields that are stored in row formats (ArrayRecord).
+  repeated string record_fields = 3;
 }
 
 // Storage snapshot persisting physical metadata such as manifest file paths.
@@ -84,7 +87,7 @@ message Snapshot {
 }
 
 // Statistics of storage data.
-// NEXT_ID: 4
+// NEXT_ID: 5
 message StorageStatistics {
   // Number of rows.
   int64 num_rows = 1;
@@ -94,4 +97,7 @@ message StorageStatistics {
 
   // Uncompressed bytes of index data.
   int64 index_uncompressed_bytes = 3;
+
+  // Uncompressed bytes of record data.
+  int64 record_uncompressed_bytes = 4;
 }

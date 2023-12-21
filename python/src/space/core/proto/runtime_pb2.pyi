@@ -42,6 +42,7 @@ class Patch(google.protobuf.message.Message):
 
     ADDED_INDEX_MANIFEST_FILES_FIELD_NUMBER: builtins.int
     DELETED_INDEX_MANIFEST_FILES_FIELD_NUMBER: builtins.int
+    ADDED_RECORD_MANIFEST_FILES_FIELD_NUMBER: builtins.int
     STORAGE_STATISTICS_UPDATE_FIELD_NUMBER: builtins.int
     @property
     def added_index_manifest_files(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
@@ -50,6 +51,9 @@ class Patch(google.protobuf.message.Message):
     def deleted_index_manifest_files(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """Index manifest file paths to be removed from the storage."""
     @property
+    def added_record_manifest_files(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Record manifest file paths newly added to the storage."""
+    @property
     def storage_statistics_update(self) -> space.core.proto.metadata_pb2.StorageStatistics:
         """The change of the storage statistics."""
     def __init__(
@@ -57,10 +61,11 @@ class Patch(google.protobuf.message.Message):
         *,
         added_index_manifest_files: collections.abc.Iterable[builtins.str] | None = ...,
         deleted_index_manifest_files: collections.abc.Iterable[builtins.str] | None = ...,
+        added_record_manifest_files: collections.abc.Iterable[builtins.str] | None = ...,
         storage_statistics_update: space.core.proto.metadata_pb2.StorageStatistics | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["storage_statistics_update", b"storage_statistics_update"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["added_index_manifest_files", b"added_index_manifest_files", "deleted_index_manifest_files", b"deleted_index_manifest_files", "storage_statistics_update", b"storage_statistics_update"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["added_index_manifest_files", b"added_index_manifest_files", "added_record_manifest_files", b"added_record_manifest_files", "deleted_index_manifest_files", b"deleted_index_manifest_files", "storage_statistics_update", b"storage_statistics_update"]) -> None: ...
 
 global___Patch = Patch
 

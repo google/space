@@ -17,7 +17,7 @@ from typing import Any, Dict, List
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from space.core.manifests.index import IndexManifestWriter
+from space.core.manifests import IndexManifestWriter
 from space.core.schema.arrow import field_metadata
 
 _SCHEMA = pa.schema([

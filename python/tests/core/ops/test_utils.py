@@ -16,12 +16,12 @@ from space.core.ops import utils
 from space.core.proto import metadata_pb2 as meta
 
 
-def test_update_index_storage_statistics_positive():
+def test_update_index_storage_stats_positive():
   base = meta.StorageStatistics(num_rows=100,
                                 index_compressed_bytes=200,
                                 index_uncompressed_bytes=300)
 
-  utils.update_index_storage_statistics(
+  utils.update_index_storage_stats(
       base,
       meta.StorageStatistics(num_rows=10,
                              index_compressed_bytes=20,
@@ -31,12 +31,12 @@ def test_update_index_storage_statistics_positive():
                                         index_uncompressed_bytes=330)
 
 
-def test_update_index_storage_statistics_negative():
+def test_update_index_storage_stats_negative():
   base = meta.StorageStatistics(num_rows=100,
                                 index_compressed_bytes=200,
                                 index_uncompressed_bytes=300)
 
-  utils.update_index_storage_statistics(
+  utils.update_index_storage_stats(
       base,
       meta.StorageStatistics(num_rows=-10,
                              index_compressed_bytes=-20,

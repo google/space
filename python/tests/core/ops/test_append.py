@@ -32,7 +32,8 @@ class TestLocalAppendOp:
     ])
     storage = Storage.create(location=str(location),
                              schema=schema,
-                             primary_keys=["int64"])
+                             primary_keys=["int64"],
+                             record_fields=[])
 
     op = LocalAppendOp(str(location), storage.metadata)
 
@@ -79,7 +80,8 @@ class TestLocalAppendOp:
     schema = pa.schema([pa.field("int64", pa.int64())])
     storage = Storage.create(location=str(location),
                              schema=schema,
-                             primary_keys=["int64"])
+                             primary_keys=["int64"],
+                             record_fields=[])
 
     op = LocalAppendOp(str(location), storage.metadata)
     assert op.finish() is None

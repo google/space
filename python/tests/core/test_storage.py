@@ -68,7 +68,8 @@ class TestStorage:
     location = tmp_path / "dataset"
     storage = Storage.create(location=str(location),
                              schema=_SCHEMA,
-                             primary_keys=["int64"])
+                             primary_keys=["int64"],
+                             record_fields=["string"])
 
     entry_point_file = location / "metadata" / _ENTRY_POINT_FILE
     assert entry_point_file.exists()
@@ -87,13 +88,15 @@ class TestStorage:
             Type(i64=Type.I64(type_variation_reference=0)),
             Type(string=Type.String(type_variation_reference=1))
         ])),
-                                          primary_keys=["int64"])
+                                          primary_keys=["int64"],
+                                          record_fields=["string"])
 
   def test_load_storage(self, tmp_path):
     location = tmp_path / "dataset"
     storage = Storage.create(location=str(location),
                              schema=_SCHEMA,
-                             primary_keys=["int64"])
+                             primary_keys=["int64"],
+                             record_fields=[])
 
     loaded_storage = Storage.load(str(location))
     assert loaded_storage.metadata == storage.metadata

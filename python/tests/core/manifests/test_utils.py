@@ -11,15 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-"""Constants for schema."""
 
-# Substrait type name of Arrow custom type TfFeatures.
-TF_FEATURES_TYPE = "TF_FEATURES"
+import pyarrow as pa
 
-FILE_PATH_FIELD = "_FILE"
-ROW_ID_FIELD = "_ROW_ID"
-FIELD_ID_FIELD = "_FIELD_ID"
+from space.core.manifests import utils
 
-NUM_ROWS_FIELD = "_NUM_ROWS"
-UNCOMPRESSED_BYTES_FIELD = "_UNCOMPRESSED_BYTES"
+
+def test_write_parquet_file(tmp_path):
+  data_dir = tmp_path / "file.parquet"
+
+  file_path = str(data_dir)
+  returned_path = utils.write_parquet_file(
+      file_path, pa.schema([("int64", pa.int64())]),
+      pa.Table.from_pydict({"int64": [1, 2]}))
+
+  assert data_dir.exists()
+  assert returned_path == file_path

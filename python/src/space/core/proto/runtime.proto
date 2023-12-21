@@ -27,8 +27,11 @@ message Patch {
   // Index manifest file paths to be removed from the storage.
   repeated string deleted_index_manifest_files = 2;
 
+  // Record manifest file paths newly added to the storage.
+  repeated string added_record_manifest_files = 3;
+
   // The change of the storage statistics.
-  StorageStatistics storage_statistics_update = 3;
+  StorageStatistics storage_statistics_update = 4;
 }
 
 // Result of a job.
