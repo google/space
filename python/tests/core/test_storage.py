@@ -21,9 +21,10 @@ import space.core.proto.metadata_pb2 as meta
 from space.core.storage import Storage
 from space.core.utils.paths import _ENTRY_POINT_FILE
 
-_LOCATION = "location"
 _SNAPSHOT_ID = 100
-_SCHEMA = pa.schema([pa.field("a", pa.int64()), pa.field("b", pa.string())])
+_SCHEMA = pa.schema(
+    [pa.field("int64", pa.int64()),
+     pa.field("string", pa.string())])
 
 
 class TestStorage:
@@ -48,7 +49,7 @@ class TestStorage:
 
   @pytest.fixture
   def storage(self, metadata):
-    return Storage(_LOCATION, metadata)
+    return Storage("location", metadata)
 
   def test_create_dir(self, storage, metadata):
     assert storage.metadata == metadata
@@ -64,12 +65,12 @@ class TestStorage:
     assert storage.snapshot(snapshot_id=10).snapshot_id == 10
 
   def test_create_storage(self, tmp_path):
-    dir_path = tmp_path / "test_create_storage" / "dataset"
-    storage = Storage.create(location=str(dir_path),
+    location = tmp_path / "dataset"
+    storage = Storage.create(location=str(location),
                              schema=_SCHEMA,
-                             primary_keys=["a"])
+                             primary_keys=["int64"])
 
-    entry_point_file = dir_path / "metadata" / _ENTRY_POINT_FILE
+    entry_point_file = location / "metadata" / _ENTRY_POINT_FILE
     assert entry_point_file.exists()
 
     metadata = storage.metadata
@@ -80,22 +81,23 @@ class TestStorage:
     assert (metadata.create_time == metadata.last_update_time ==
             snapshot.create_time)
 
-    assert metadata.schema.fields == NamedStruct(
-        names=["a", "b"],
+    assert metadata.schema == meta.Schema(fields=NamedStruct(
+        names=["int64", "string"],
         struct=Type.Struct(types=[
             Type(i64=Type.I64(type_variation_reference=0)),
             Type(string=Type.String(type_variation_reference=1))
-        ]))
+        ])),
+                                          primary_keys=["int64"])
 
   def test_load_storage(self, tmp_path):
-    dir_path = tmp_path / "test_create_storage" / "dataset"
-    storage = Storage.create(location=str(dir_path),
+    location = tmp_path / "dataset"
+    storage = Storage.create(location=str(location),
                              schema=_SCHEMA,
-                             primary_keys=["a"])
+                             primary_keys=["int64"])
 
-    loaded_storage = Storage.load(str(dir_path))
+    loaded_storage = Storage.load(str(location))
     assert loaded_storage.metadata == storage.metadata
 
   def test_load_storage_file_not_found_should_fail(self, tmp_path):
     with pytest.raises(FileNotFoundError):
-      Storage.load(str(tmp_path / "test_create_storage" / "dataset"))
+      Storage.load(str(tmp_path / "dataset"))

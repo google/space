@@ -14,14 +14,38 @@
 
 import pyarrow as pa
 
-import space.core.schema.arrow as arrow_schema
+from space.core.schema import arrow
 
 
 def test_field_metadata():
-  assert arrow_schema.field_metadata(123) == {b"PARQUET:field_id": b"123"}
+  assert arrow.field_metadata(123) == {b"PARQUET:field_id": b"123"}
 
 
 def test_field_id():
-  assert arrow_schema.field_id(
+  assert arrow.field_id(
       pa.field("name", pa.int64(), metadata={b"PARQUET:field_id":
                                              b"123"})) == 123
+
+
+def test_arrow_schema(sample_substrait_fields, sample_arrow_schema):
+  assert sample_arrow_schema == arrow.arrow_schema(sample_substrait_fields)
+
+
+def test_field_name_to_id_dict(sample_arrow_schema):
+  assert arrow.field_name_to_id_dict(sample_arrow_schema) == {
+      "float32": 100,
+      "list": 120,
+      "struct": 150,
+      "list_struct": 220,
+      "struct_list": 260
+  }
+
+
+def test_field_id_to_column_id_dict(sample_arrow_schema):
+  assert arrow.field_id_to_column_id_dict(sample_arrow_schema) == {
+      100: 0,
+      120: 1,
+      150: 2,
+      220: 3,
+      260: 4
+  }

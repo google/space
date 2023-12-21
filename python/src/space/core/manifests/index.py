@@ -35,9 +35,15 @@ _MIN_FIELD = "_MIN"
 _MAX_FIELD = "_MAX"
 
 
-def _stats_field_name(name: str) -> str:
-  """Column stats struct field name."""
-  return f"{_STATS_FIELD}_{name}"
+def _stats_field_name(field_id_: int) -> str:
+  """Column stats struct field name.
+  
+  It uses field ID instead of name. Manifest file has all Parquet files and it
+  is not tied with one Parquet schema, we can't do table field name to file
+  field name projection. Using field ID ensures that we can always uniquely
+  identifies a field.
+  """
+  return f"{_STATS_FIELD}_f{field_id_}"
 
 
 def _stats_subfields(type_: pa.DataType) -> List[pa.Field]:
@@ -62,9 +68,10 @@ def _manifest_schema(
     if f.name not in primary_keys_:
       continue
 
+    field_id_ = field_id(f)
     fields.append(
-        (_stats_field_name(f.name), pa.struct(_stats_subfields(f.type))))
-    stats_fields.append((field_id(f), f.type))
+        (_stats_field_name(field_id_), pa.struct(_stats_subfields(f.type))))
+    stats_fields.append((field_id_, f.type))
 
   return pa.schema(fields), stats_fields  # type: ignore[arg-type]
 
@@ -140,9 +147,6 @@ class IndexManifestWriter:
       self._stats_column_ids.append(column_id)
       self._field_stats_dict[column_id] = _FieldStats(type_)
 
-    # Cache for manifest data to materialize.
-    self._manifest_data: List[pa.Table] = []
-
   def write(self, file_path: str,
             parquet_metadata: pq.FileMetaData) -> meta.StorageStatistics:
     """Write a new manifest row.
@@ -182,6 +186,8 @@ class IndexManifestWriter:
   def finish(self) -> Optional[str]:
     """Materialize the manifest file and return the file path."""
     # Convert cached manifest data to Arrow.
+    all_manifest_data: List[pa.Table] = []
+
     if self._file_paths:
       arrays = [
           self._file_paths, self._num_rows, self._index_compressed_bytes,
@@ -191,12 +197,15 @@ class IndexManifestWriter:
       for column_id in self._stats_column_ids:
         arrays.append(self._field_stats_dict[column_id].to_arrow())
 
-      self._manifest_data.append(
+      all_manifest_data.append(
           pa.Table.from_arrays(
               arrays=arrays,
               schema=self._manifest_schema))  # type: ignore[call-arg]
 
-    manifest_data = pa.concat_tables(self._manifest_data)
+    if not all_manifest_data:
+      return None
+
+    manifest_data = pa.concat_tables(all_manifest_data)
     if manifest_data.num_rows == 0:
       return None
 

@@ -51,7 +51,7 @@ class BaseAppendOp(BaseOp):
 
 
 @dataclass
-class IndexWriterInfo:
+class _IndexWriterInfo:
   """Contain information of index file writer."""
   writer: pq.ParquetWriter
   file_path: str
@@ -73,7 +73,7 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
     self._schema = arrow_schema(self._metadata.schema.fields)
 
     # Data file writers.
-    self._index_writer_info: Optional[IndexWriterInfo] = None
+    self._index_writer_info: Optional[_IndexWriterInfo] = None
 
     # Local runtime caches.
     self._cached_index_data: Optional[pa.Table] = None
@@ -98,9 +98,6 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
     Returns:
       A patch to the storage or None if no actual storage modification happens.
     """
-    if self._patch.storage_statistics_update.num_rows == 0:
-      return None
-
     # Flush all cached index data.
     if self._cached_index_data is not None:
       self._maybe_create_index_writer()
@@ -114,6 +111,9 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
     if index_manifest_full_path is not None:
       self._patch.added_index_manifest_files.append(
           self.short_path(index_manifest_full_path))
+
+    if self._patch.storage_statistics_update.num_rows == 0:
+      return None
 
     return self._patch
 
@@ -150,7 +150,7 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
     if self._index_writer_info is None:
       full_file_path = paths.new_index_file_path(self._data_dir)
       writer = pq.ParquetWriter(full_file_path, self._schema)
-      self._index_writer_info = IndexWriterInfo(
+      self._index_writer_info = _IndexWriterInfo(
           writer, self.short_path(full_file_path))
 
   def _finish_index_writer(self) -> None:

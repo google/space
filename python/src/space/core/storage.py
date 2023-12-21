@@ -88,6 +88,7 @@ class Storage(paths.StoragePaths):
       primary_keys: un-enforced primary keys.
     """
     # TODO: to verify that location is an empty directory.
+    # TODO: to verify primary key fields (and types) are valid.
 
     field_id_mgr = FieldIdManager()
     schema = field_id_mgr.assign_field_ids(schema)

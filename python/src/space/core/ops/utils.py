@@ -22,6 +22,6 @@ def update_index_storage_statistics(
     update: meta.StorageStatistics,
 ) -> None:
   """Update index storage statistics."""
-  base.num_rows += base.num_rows
+  base.num_rows += update.num_rows
   base.index_compressed_bytes += update.index_compressed_bytes
   base.index_uncompressed_bytes += update.index_uncompressed_bytes

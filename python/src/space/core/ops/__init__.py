@@ -12,3 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+"""Space local data operations."""
+
+from space.core.ops.append import LocalAppendOp
