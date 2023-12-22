@@ -17,7 +17,7 @@ from typing import Any, Dict, List
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from space.core.manifests.index import IndexManifestWriter
+from space.core.manifests import IndexManifestWriter
 from space.core.schema.arrow import field_metadata
 
 _SCHEMA = pa.schema([
@@ -53,11 +53,10 @@ class TestIndexManifestWriter:
         schema=schema,
         primary_keys=["int64", "float64", "bool", "string"])
 
-    file_path = str(data_dir / "file0")
     # TODO: the test should cover all types supported by column stats.
     manifest_writer.write(
-        file_path,
-        _write_parquet_file(file_path, schema, [{
+        "data/file0",
+        _write_parquet_file(str(data_dir / "file0"), schema, [{
             "int64": [1, 2, 3],
             "float64": [0.1, 0.2, 0.3],
             "bool": [True, False, False],
@@ -68,10 +67,9 @@ class TestIndexManifestWriter:
             "bool": [False, False],
             "string": ["A", "z"]
         }]))
-    file_path = str(data_dir / "file1")
     manifest_writer.write(
-        file_path,
-        _write_parquet_file(file_path, schema, [{
+        "data/file1",
+        _write_parquet_file(str(data_dir / "file1"), schema, [{
             "int64": [1000, 1000000],
             "float64": [-0.001, 0.001],
             "bool": [False, False],
@@ -80,10 +78,9 @@ class TestIndexManifestWriter:
 
     manifest_path = manifest_writer.finish()
 
-    data_dir_str = str(data_dir)
     assert manifest_path is not None
     assert pq.read_table(manifest_path).to_pydict() == {
-        "_FILE": [f"{data_dir_str}/file0", f"{data_dir_str}/file1"],
+        "_FILE": ["data/file0", "data/file1"],
         "_INDEX_COMPRESSED_BYTES": [645, 334],
         "_INDEX_UNCOMPRESSED_BYTES": [624, 320],
         "_NUM_ROWS": [5, 2],

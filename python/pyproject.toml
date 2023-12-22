@@ -1,34 +1,29 @@
 [project]
 name = "space"
 version = "0.0.1"
-authors = [
-  { name="Space team", email="no-reply@google.com" },
-]
+authors = [{ name = "Space team", email = "no-reply@google.com" }]
 description = "A storage framework for machine learning datasets"
-license = {text = "Apache-2.0"}
+license = { text = "Apache-2.0" }
 classifiers = [
   "License :: OSI Approved :: Apache Software License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11"
+  "Programming Language :: Python :: 3.11",
 ]
 requires-python = ">=3.8"
 dependencies = [
+  "array-record",
   "numpy",
   "protobuf",
   "pyarrow >= 14.0.0",
   "tensorflow_datasets",
-  "typing_extensions"
+  "typing_extensions",
 ]
 
 [project.optional-dependencies]
-dev = [
-  "pyarrow-stubs",
-  "tensorflow",
-  "types-protobuf"
-]
+dev = ["pyarrow-stubs", "tensorflow", "types-protobuf"]
 
 [project.urls]
 Homepage = "https://github.com/google/space"
@@ -49,4 +44,9 @@ disable = ['fixme']
 
 [tool.pylint.MAIN]
 ignore = 'space/core/proto'
-ignored-modules = ['space.core.proto', 'google.protobuf', 'substrait']
+ignored-modules = [
+  'space.core.proto',
+  'google.protobuf',
+  'substrait',
+  'array_record',
+]

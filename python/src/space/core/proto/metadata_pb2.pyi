@@ -153,20 +153,25 @@ class Schema(google.protobuf.message.Message):
 
     FIELDS_FIELD_NUMBER: builtins.int
     PRIMARY_KEYS_FIELD_NUMBER: builtins.int
+    RECORD_FIELDS_FIELD_NUMBER: builtins.int
     @property
     def fields(self) -> substrait.type_pb2.NamedStruct:
         """Fields persisted as Substrait named struct."""
     @property
     def primary_keys(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """Primary key field names. Required but primary keys are un-enforced."""
+    @property
+    def record_fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Names of record fields that are stored in row formats (ArrayRecord)."""
     def __init__(
         self,
         *,
         fields: substrait.type_pb2.NamedStruct | None = ...,
         primary_keys: collections.abc.Iterable[builtins.str] | None = ...,
+        record_fields: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["fields", b"fields"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields", "primary_keys", b"primary_keys"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields", "primary_keys", b"primary_keys", "record_fields", b"record_fields"]) -> None: ...
 
 global___Schema = Schema
 
@@ -200,7 +205,7 @@ global___Snapshot = Snapshot
 @typing_extensions.final
 class StorageStatistics(google.protobuf.message.Message):
     """Statistics of storage data.
-    NEXT_ID: 4
+    NEXT_ID: 5
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -208,19 +213,23 @@ class StorageStatistics(google.protobuf.message.Message):
     NUM_ROWS_FIELD_NUMBER: builtins.int
     INDEX_COMPRESSED_BYTES_FIELD_NUMBER: builtins.int
     INDEX_UNCOMPRESSED_BYTES_FIELD_NUMBER: builtins.int
+    RECORD_UNCOMPRESSED_BYTES_FIELD_NUMBER: builtins.int
     num_rows: builtins.int
     """Number of rows."""
     index_compressed_bytes: builtins.int
     """Compressed bytes of index data."""
     index_uncompressed_bytes: builtins.int
     """Uncompressed bytes of index data."""
+    record_uncompressed_bytes: builtins.int
+    """Uncompressed bytes of record data."""
     def __init__(
         self,
         *,
         num_rows: builtins.int = ...,
         index_compressed_bytes: builtins.int = ...,
         index_uncompressed_bytes: builtins.int = ...,
+        record_uncompressed_bytes: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["index_compressed_bytes", b"index_compressed_bytes", "index_uncompressed_bytes", b"index_uncompressed_bytes", "num_rows", b"num_rows"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["index_compressed_bytes", b"index_compressed_bytes", "index_uncompressed_bytes", b"index_uncompressed_bytes", "num_rows", b"num_rows", "record_uncompressed_bytes", b"record_uncompressed_bytes"]) -> None: ...
 
 global___StorageStatistics = StorageStatistics

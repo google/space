@@ -75,20 +75,19 @@ class Storage(paths.StoragePaths):
 
   @classmethod
   def create(
-      cls,
-      location: str,
-      schema: pa.Schema,
-      primary_keys: List[str],
-  ) -> Storage:  # pylint: disable=unused-argument
+      cls, location: str, schema: pa.Schema, primary_keys: List[str],
+      record_fields: List[str]) -> Storage:  # pylint: disable=unused-argument
     """Create a new empty storage.
     
     Args:
       location: the directory path to the storage.
       schema: the schema of the storage.
       primary_keys: un-enforced primary keys.
+      record_fields: fields stored in row format (ArrayRecord).
     """
     # TODO: to verify that location is an empty directory.
-    # TODO: to verify primary key fields (and types) are valid.
+    # TODO: to verify primary key fields and record_fields (and types) are
+    # valid.
 
     field_id_mgr = FieldIdManager()
     schema = field_id_mgr.assign_field_ids(schema)
@@ -98,8 +97,11 @@ class Storage(paths.StoragePaths):
     metadata = meta.StorageMetadata(
         create_time=now,
         last_update_time=now,
-        schema=meta.Schema(fields=substrait_schema.substrait_fields(schema),
-                           primary_keys=primary_keys),
+        schema=meta.Schema(
+            fields=substrait_schema.substrait_fields(schema),
+            primary_keys=primary_keys,
+            # TODO: to optionally auto infer record fields.
+            record_fields=record_fields),
         current_snapshot_id=_INIT_SNAPSHOT_ID,
         type=meta.StorageMetadata.DATASET)
 

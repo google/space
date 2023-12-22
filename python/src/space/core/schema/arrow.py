@@ -15,14 +15,14 @@
 """Utilities for schemas in the Arrow format."""
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Tuple
 
 import pyarrow as pa
 from substrait.type_pb2 import NamedStruct, Type
 
-from space.core.utils.constants import UTF_8
-from space.core.schema.constants import TF_FEATURES_TYPE
+from space.core.schema import constants
 from space.core.schema.types import TfFeatures
+from space.core.utils.constants import UTF_8
 
 _PARQUET_FIELD_ID_KEY = b"PARQUET:field_id"
 
@@ -49,11 +49,13 @@ class _NamesVisitor:
     return name
 
 
-def arrow_schema(fields: NamedStruct) -> pa.Schema:
+def arrow_schema(fields: NamedStruct, record_fields: Set[str],
+                 physical: bool) -> pa.Schema:
   """Return Arrow schema from Substrait fields.
   
   Args:
     fields: schema fields in the Substrait format.
+    record_fields: a set of record field names.
     physical: if true, return the physical schema. Physical schema matches with
       the underlying index (Parquet) file schema. Record fields are stored by
       their references, e.g., row position in ArrayRecord file.
@@ -61,19 +63,28 @@ def arrow_schema(fields: NamedStruct) -> pa.Schema:
   return pa.schema(
       _arrow_fields(
           _NamesVisitor(fields.names),  # type: ignore[arg-type]
-          fields.struct.types))  # type: ignore[arg-type]
+          fields.struct.types,  # type: ignore[arg-type]
+          record_fields,
+          physical))
 
 
-def _arrow_fields(names_visitor: _NamesVisitor,
-                  types: List[Type]) -> List[pa.Field]:
+def _arrow_fields(names_visitor: _NamesVisitor, types: List[Type],
+                  record_fields: Set[str], physical: bool) -> List[pa.Field]:
   fields: List[pa.Field] = []
 
   for type_ in types:
     name = names_visitor.next()
-    arrow_field = pa.field(name,
-                           _arrow_type(type_, names_visitor),
-                           metadata=field_metadata(_substrait_field_id(type_)))
-    fields.append(arrow_field)
+
+    if physical and name in record_fields:
+      arrow_type: pa.DataType = pa.struct(
+          record_address_types())  # type: ignore[arg-type]
+    else:
+      arrow_type = _arrow_type(type_, names_visitor)
+
+    fields.append(
+        pa.field(name,
+                 arrow_type,
+                 metadata=field_metadata(_substrait_field_id(type_))))
 
   return fields
 
@@ -121,7 +132,7 @@ def _user_defined_arrow_type(type_: Type) -> pa.ExtensionType:
   type_name = type_.user_defined.type_parameters[0].string
   serialized = type_.user_defined.type_parameters[1].string
 
-  if type_name == TF_FEATURES_TYPE:
+  if type_name == constants.TF_FEATURES_TYPE:
     return TfFeatures.__arrow_ext_deserialize__(
         None, serialized)  # type: ignore[arg-type]
 
@@ -140,3 +151,52 @@ def field_id_to_column_id_dict(schema: pa.Schema) -> Dict[int, int]:
       field_id_dict[name]: column_id
       for column_id, name in enumerate(schema.names)
   }
+
+
+@dataclass
+class Field:
+  """Information of a field."""
+  name: str
+  field_id: int
+
+
+def classify_fields(
+    schema: pa.Schema,
+    record_fields: Set[str],
+    selected_fields: Optional[Set[str]] = None
+) -> Tuple[List[Field], List[Field]]:
+  """Classify fields into indexes and records.
+  
+  Args:
+    schema: storage logical or physical schema.
+    record_fields: names of record fields.
+    selected_fields: selected fields to be accessed.
+
+  Returns:
+    A tuple (index_fields, record_fields).
+  """
+  index_fields: List[Field] = []
+  record_fields_: List[Field] = []
+
+  for f in schema:
+    if selected_fields is not None and f.name not in selected_fields:
+      continue
+
+    field = Field(f.name, field_id(f))
+    if f.name in record_fields:
+      record_fields_.append(field)
+    else:
+      index_fields.append(field)
+
+  return index_fields, record_fields_
+
+
+def field_names(fields: List[Field]) -> List[str]:
+  """Extract field names from a list of fields."""
+  return list(map(lambda f: f.name, fields))
+
+
+def record_address_types() -> List[Tuple[str, pa.DataType]]:
+  """Returns Arrow fields of record addresses."""
+  return [(constants.FILE_PATH_FIELD, pa.string()),
+          (constants.ROW_ID_FIELD, pa.int32())]

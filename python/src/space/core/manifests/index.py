@@ -19,13 +19,13 @@ from typing import Any, Dict, List, Optional, Tuple
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from space.core.manifests.utils import write_parquet_file
 import space.core.proto.metadata_pb2 as meta
+from space.core.schema import constants
 from space.core.schema.arrow import field_id, field_id_to_column_id_dict
 from space.core.utils import paths
 
 # Manifest file fields.
-_FILE_PATH_FIELD = '_FILE'
-_NUM_ROWS_FIELD = '_NUM_ROWS'
 _INDEX_COMPRESSED_BYTES_FIELD = '_INDEX_COMPRESSED_BYTES'
 _INDEX_UNCOMPRESSED_BYTES_FIELD = '_INDEX_UNCOMPRESSED_BYTES'
 
@@ -57,7 +57,8 @@ def _manifest_schema(
   """Build the index manifest file schema, based on storage schema."""
   primary_keys_ = set(primary_keys)
 
-  fields = [(_FILE_PATH_FIELD, pa.utf8()), (_NUM_ROWS_FIELD, pa.int64()),
+  fields = [(constants.FILE_PATH_FIELD, pa.utf8()),
+            (constants.NUM_ROWS_FIELD, pa.int64()),
             (_INDEX_COMPRESSED_BYTES_FIELD, pa.int64()),
             (_INDEX_UNCOMPRESSED_BYTES_FIELD, pa.int64())]
 
@@ -209,16 +210,6 @@ class IndexManifestWriter:
     if manifest_data.num_rows == 0:
       return None
 
-    return _write_index_manifest(self._metadata_dir, self._manifest_schema,
-                                 manifest_data)
-
-
-def _write_index_manifest(metadata_dir: str, schema: pa.Schema,
-                          data: pa.Table) -> str:
-  # TODO: currently assume this file is small, so always write a single file.
-  file_path = paths.new_index_manifest_path(metadata_dir)
-  writer = pq.ParquetWriter(file_path, schema)
-  writer.write_table(data)
-
-  writer.close()
-  return file_path
+    file_path = paths.new_index_manifest_path(self._metadata_dir)
+    write_parquet_file(file_path, self._manifest_schema, manifest_data)
+    return file_path

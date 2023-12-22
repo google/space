@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Constants for schema."""
+"""Manifest utilities."""
 
-# Substrait type name of Arrow custom type TfFeatures.
-TF_FEATURES_TYPE = "TF_FEATURES"
+import pyarrow as pa
+import pyarrow.parquet as pq
 
-FILE_PATH_FIELD = "_FILE"
-ROW_ID_FIELD = "_ROW_ID"
-FIELD_ID_FIELD = "_FIELD_ID"
 
-NUM_ROWS_FIELD = "_NUM_ROWS"
-UNCOMPRESSED_BYTES_FIELD = "_UNCOMPRESSED_BYTES"
+def write_parquet_file(file_path: str, schema: pa.Schema,
+                       data: pa.Table) -> None:
+  """Materialize a single Parquet file."""
+  # TODO: currently assume this file is small, so always write a single file.
+  writer = pq.ParquetWriter(file_path, schema)
+  writer.write_table(data)
+
+  writer.close()
