@@ -21,7 +21,6 @@ import space.core.proto.metadata_pb2 as meta
 class TestRecordManifestWriter:
 
   def test_write(self, tmp_path):
-    data_dir = tmp_path / "dataset" / "data"
     metadata_dir = tmp_path / "dataset" / "metadata"
     metadata_dir.mkdir(parents=True)
 

@@ -20,9 +20,9 @@ from typing import Dict, List, Optional, Set, Tuple
 import pyarrow as pa
 from substrait.type_pb2 import NamedStruct, Type
 
-from space.core.utils.constants import UTF_8
 from space.core.schema import constants
 from space.core.schema.types import TfFeatures
+from space.core.utils.constants import UTF_8
 
 _PARQUET_FIELD_ID_KEY = b"PARQUET:field_id"
 
@@ -49,11 +49,13 @@ class _NamesVisitor:
     return name
 
 
-def arrow_schema(fields: NamedStruct) -> pa.Schema:
+def arrow_schema(fields: NamedStruct, record_fields: Set[str],
+                 physical: bool) -> pa.Schema:
   """Return Arrow schema from Substrait fields.
   
   Args:
     fields: schema fields in the Substrait format.
+    record_fields: a set of record field names.
     physical: if true, return the physical schema. Physical schema matches with
       the underlying index (Parquet) file schema. Record fields are stored by
       their references, e.g., row position in ArrayRecord file.
@@ -61,19 +63,28 @@ def arrow_schema(fields: NamedStruct) -> pa.Schema:
   return pa.schema(
       _arrow_fields(
           _NamesVisitor(fields.names),  # type: ignore[arg-type]
-          fields.struct.types))  # type: ignore[arg-type]
+          fields.struct.types,  # type: ignore[arg-type]
+          record_fields,
+          physical))
 
 
-def _arrow_fields(names_visitor: _NamesVisitor,
-                  types: List[Type]) -> List[pa.Field]:
+def _arrow_fields(names_visitor: _NamesVisitor, types: List[Type],
+                  record_fields: Set[str], physical: bool) -> List[pa.Field]:
   fields: List[pa.Field] = []
 
   for type_ in types:
     name = names_visitor.next()
-    arrow_field = pa.field(name,
-                           _arrow_type(type_, names_visitor),
-                           metadata=field_metadata(_substrait_field_id(type_)))
-    fields.append(arrow_field)
+
+    if physical and name in record_fields:
+      arrow_type: pa.DataType = pa.struct(
+          record_address_types())  # type: ignore[arg-type]
+    else:
+      arrow_type = _arrow_type(type_, names_visitor)
+
+    fields.append(
+        pa.field(name,
+                 arrow_type,
+                 metadata=field_metadata(_substrait_field_id(type_))))
 
   return fields
 

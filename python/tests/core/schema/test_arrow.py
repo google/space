@@ -15,6 +15,7 @@
 import pyarrow as pa
 
 from space.core.schema import arrow
+from space.core.schema.arrow import field_metadata
 
 
 def test_field_metadata():
@@ -27,8 +28,33 @@ def test_field_id():
                                              b"123"})) == 123
 
 
-def test_arrow_schema(sample_substrait_fields, sample_arrow_schema):
-  assert sample_arrow_schema == arrow.arrow_schema(sample_substrait_fields)
+def test_arrow_schema_logical_without_records(sample_substrait_fields,
+                                              sample_arrow_schema):
+  assert arrow.arrow_schema(sample_substrait_fields, [],
+                            False) == sample_arrow_schema
+
+
+def test_arrow_schema_logical_with_records(tf_features_substrait_fields,
+                                           tf_features_arrow_schema):
+  assert arrow.arrow_schema(tf_features_substrait_fields, [],
+                            False) == tf_features_arrow_schema
+
+
+def test_arrow_schema_physical_without_records(sample_substrait_fields,
+                                               sample_arrow_schema):
+  assert arrow.arrow_schema(sample_substrait_fields, [],
+                            True) == sample_arrow_schema
+
+
+def test_arrow_schema_physical_with_records(tf_features_substrait_fields):
+  arrow_schema = pa.schema([
+      pa.field("int64", pa.int64(), metadata=field_metadata(0)),
+      pa.field("features",
+               pa.struct([("_FILE", pa.string()), ("_ROW_ID", pa.int32())]),
+               metadata=field_metadata(1))
+  ])
+  assert arrow.arrow_schema(tf_features_substrait_fields, ["features"],
+                            True) == arrow_schema
 
 
 def test_field_name_to_id_dict(sample_arrow_schema):

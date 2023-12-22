@@ -53,8 +53,14 @@ class TestTfFeatures:
         "type"] == "tensorflow_datasets.core.features.features_dict.FeaturesDict"  # pylint: disable=line-too-long
     assert "sequence" in features_dict["content"]["features"]["objects"]
 
+    # Bytes input.
     tf_features = TfFeatures.__arrow_ext_deserialize__(storage_type=None,
                                                        serialized=serialized)
+    assert len(tf_features.serialize(sample_objects)) > 0
+
+    # String input.
+    tf_features = TfFeatures.__arrow_ext_deserialize__(
+        storage_type=None, serialized=serialized.decode(UTF_8))
     assert len(tf_features.serialize(sample_objects)) > 0
 
   def test_serialize_deserialize(self, tf_features, sample_objects):

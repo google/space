@@ -84,12 +84,12 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
     StoragePaths.__init__(self, location)
 
     self._metadata = metadata
-    self._schema = arrow.arrow_schema(self._metadata.schema.fields)
-
+    record_fields = set(self._metadata.schema.record_fields)
+    self._schema = arrow.arrow_schema(self._metadata.schema.fields,
+                                      record_fields,
+                                      physical=True)
     self._index_fields, self._record_fields = arrow.classify_fields(
-        self._schema,
-        set(self._metadata.schema.record_fields),
-        selected_fields=None)
+        self._schema, record_fields, selected_fields=None)
 
     # Data file writers.
     self._index_writer_info: Optional[_IndexWriterInfo] = None

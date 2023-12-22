@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
+import json
 
+import numpy as np
 import pyarrow as pa
+import pytest
+from tensorflow_datasets import features  # type: ignore[import-untyped]
 from substrait.type_pb2 import NamedStruct, Type
 
 from space.core.schema.arrow import field_metadata
+from space.core.schema.types import TfFeatures
 
 
 @pytest.fixture
@@ -91,4 +95,32 @@ def sample_arrow_schema():
                             metadata=field_metadata(250))
                ]),
                metadata=field_metadata(260))
+  ])
+
+
+@pytest.fixture
+def tf_features():
+  return features.FeaturesDict(
+      {"images": features.Image(shape=(None, None, 3), dtype=np.uint8)})
+
+
+@pytest.fixture
+def tf_features_substrait_fields(tf_features):  # pylint: disable=redefined-outer-name
+  return NamedStruct(
+      names=["int64", "features"],
+      struct=Type.Struct(types=[
+          Type(i64=Type.I64(type_variation_reference=0)),
+          Type(user_defined=Type.UserDefined(type_parameters=[
+              Type.Parameter(string="TF_FEATURES"),
+              Type.Parameter(string=json.dumps(tf_features.to_json()))
+          ],
+                                             type_variation_reference=1))
+      ]))
+
+
+@pytest.fixture
+def tf_features_arrow_schema(tf_features):  # pylint: disable=redefined-outer-name
+  return pa.schema([
+      pa.field("int64", pa.int64(), metadata=field_metadata(0)),
+      pa.field("features", TfFeatures(tf_features), metadata=field_metadata(1))
   ])

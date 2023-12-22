@@ -15,7 +15,7 @@
 """Define a custom Arrow type for Tensorflow Dataset Features."""
 
 from __future__ import annotations
-from typing import Any
+from typing import Any, Union
 
 import json
 import pyarrow as pa
@@ -47,9 +47,12 @@ class TfFeatures(pa.ExtensionType, FieldSerializer):
   def __arrow_ext_deserialize__(
       cls,
       storage_type: pa.DataType,  # pylint: disable=unused-argument
-      serialized: bytes) -> TfFeatures:
-    return TfFeatures(
-        f.FeaturesDict.from_json(json.loads(serialized.decode(UTF_8))))
+      serialized: Union[bytes, str]
+  ) -> TfFeatures:
+    if isinstance(serialized, bytes):
+      serialized = serialized.decode(UTF_8)
+
+    return TfFeatures(f.FeaturesDict.from_json(json.loads(serialized)))
 
   def serialize(self, value: Any) -> bytes:
     """Serialize value using the provided features_dict."""
