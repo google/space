@@ -49,3 +49,35 @@ def test_field_id_to_column_id_dict(sample_arrow_schema):
       220: 3,
       260: 4
   }
+
+
+def test_classify_fields(sample_arrow_schema):
+  index_fields, record_fields = arrow.classify_fields(sample_arrow_schema,
+                                                      ["float32", "list"])
+
+  assert index_fields == [
+      arrow.Field("struct", 150),
+      arrow.Field("list_struct", 220),
+      arrow.Field("struct_list", 260)
+  ]
+  assert record_fields == [
+      arrow.Field("float32", 100),
+      arrow.Field("list", 120)
+  ]
+
+
+def test_classify_fields_with_selected_fields(sample_arrow_schema):
+  index_fields, record_fields = arrow.classify_fields(sample_arrow_schema,
+                                                      ["float32", "list"],
+                                                      ["list", "struct"])
+
+  assert index_fields == [arrow.Field("struct", 150)]
+  assert record_fields == [arrow.Field("list", 120)]
+
+
+def test_field_names():
+  assert arrow.field_names([
+      arrow.Field("struct", 150),
+      arrow.Field("list_struct", 220),
+      arrow.Field("struct_list", 260)
+  ]) == ["struct", "list_struct", "struct_list"]

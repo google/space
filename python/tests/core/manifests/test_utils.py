@@ -21,9 +21,7 @@ def test_write_parquet_file(tmp_path):
   data_dir = tmp_path / "file.parquet"
 
   file_path = str(data_dir)
-  returned_path = utils.write_parquet_file(
-      file_path, pa.schema([("int64", pa.int64())]),
-      pa.Table.from_pydict({"int64": [1, 2]}))
+  utils.write_parquet_file(file_path, pa.schema([("int64", pa.int64())]),
+                           pa.Table.from_pydict({"int64": [1, 2]}))
 
   assert data_dir.exists()
-  assert returned_path == file_path
