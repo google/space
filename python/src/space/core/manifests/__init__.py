@@ -11,9 +11,4 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from space.core.schema.substrait import substrait_fields
-
-
-def test_substrait_fields(sample_arrow_schema, sample_substrait_fields):
-  assert substrait_fields(sample_arrow_schema) == sample_substrait_fields
+#

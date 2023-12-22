@@ -11,9 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+"""Utilities for operation classes."""
 
-from space.core.schema.substrait import substrait_fields
+from space.core.proto import metadata_pb2 as meta
 
 
-def test_substrait_fields(sample_arrow_schema, sample_substrait_fields):
-  assert substrait_fields(sample_arrow_schema) == sample_substrait_fields
+def update_index_storage_statistics(
+    base: meta.StorageStatistics,
+    update: meta.StorageStatistics,
+) -> None:
+  """Update index storage statistics."""
+  base.num_rows += update.num_rows
+  base.index_compressed_bytes += update.index_compressed_bytes
+  base.index_uncompressed_bytes += update.index_uncompressed_bytes

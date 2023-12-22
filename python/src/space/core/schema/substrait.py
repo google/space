@@ -20,12 +20,9 @@ from typing import Any, List
 import pyarrow as pa
 from substrait.type_pb2 import NamedStruct, Type
 
+from space.core.schema.constants import TF_FEATURES_TYPE
 import space.core.schema.arrow as arrow_schema
 from space.core.schema.types import TfFeatures
-from space.core.utils.constants import UTF_8
-
-# Substrait type name of Arrow custom type TfFeatures.
-TF_FEATURES_TYPE = "TF_FEATURES"
 
 
 def substrait_fields(schema: pa.Schema) -> NamedStruct:
@@ -54,6 +51,7 @@ def _substrait_field(field: pa.Field,
   type_ = Type()
   field_id = arrow_schema.field_id(field)
 
+  # TODO: to support more types in Substrait, e.g., fixed_size_list, map.
   if pa.types.is_int64(field.type):
     _set_field_id(type_.i64, field_id)
   elif pa.types.is_int32(field.type):
@@ -75,7 +73,6 @@ def _substrait_field(field: pa.Field,
             field.type.value_field,  # type: ignore[attr-defined]
             mutable_names,
             is_list_item=True))
-    # TODO: to support more types in Substrait, e.g., fixed_size_list, map.
   elif pa.types.is_struct(field.type):
     _set_field_id(type_.struct, field_id)
     subfields = list(field.type)  # type: ignore[call-overload]
@@ -84,13 +81,12 @@ def _substrait_field(field: pa.Field,
     # TfFeatures is persisted in Substrait as a user defined type, with
     # parameters [TF_FEATURES_TYPE, __arrow_ext_serialize__()].
     _set_field_id(type_.user_defined, field_id)
-    type_.user_defined.type_parameters.extend([
-        Type.Parameter(string=TF_FEATURES_TYPE),
-        Type.Parameter(
-            string=field.type.__arrow_ext_serialize__().decode(UTF_8))
-    ])
+    serialized = Type.Parameter(
+        string=field.type.__arrow_ext_serialize__())  # type: ignore[arg-type]
+    type_.user_defined.type_parameters.extend(
+        [Type.Parameter(string=TF_FEATURES_TYPE), serialized])
   else:
-    raise ValueError(
+    raise TypeError(
         f"Type {field.type} of field {field.name} is not supported")
 
   return type_

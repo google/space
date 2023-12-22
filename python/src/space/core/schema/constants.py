@@ -11,9 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+"""Constants for schema."""
 
-from space.core.schema.substrait import substrait_fields
-
-
-def test_substrait_fields(sample_arrow_schema, sample_substrait_fields):
-  assert substrait_fields(sample_arrow_schema) == sample_substrait_fields
+# Substrait type name of Arrow custom type TfFeatures.
+TF_FEATURES_TYPE = "TF_FEATURES"

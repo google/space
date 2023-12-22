@@ -11,9 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+"""Abstract base operation."""
 
-from space.core.schema.substrait import substrait_fields
+from __future__ import annotations
+from abc import ABC
+from typing import Any, Dict, Union
+from typing_extensions import TypeAlias
+
+import pyarrow as pa
+
+# Input data can be either nested Py dict or Arrow table.
+InputData: TypeAlias = Union[Dict[str, Any], pa.Table]
 
 
-def test_substrait_fields(sample_arrow_schema, sample_substrait_fields):
-  assert substrait_fields(sample_arrow_schema) == sample_substrait_fields
+# pylint: disable=too-few-public-methods
+class BaseOp(ABC):
+  """Abstract base operation class."""

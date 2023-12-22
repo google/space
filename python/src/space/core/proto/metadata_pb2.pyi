@@ -61,7 +61,7 @@ class StorageMetadata(google.protobuf.message.Message):
     """Metadata persisting the current status of a storage, including logical
     metadata such as schema, and physical metadata persisted as a history of
     snapshots
-    NEXT_ID: 7
+    NEXT_ID: 8
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -107,6 +107,7 @@ class StorageMetadata(google.protobuf.message.Message):
     SCHEMA_FIELD_NUMBER: builtins.int
     CURRENT_SNAPSHOT_ID_FIELD_NUMBER: builtins.int
     SNAPSHOTS_FIELD_NUMBER: builtins.int
+    STORAGE_STATISTICS_FIELD_NUMBER: builtins.int
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Create time of the storage."""
@@ -122,6 +123,9 @@ class StorageMetadata(google.protobuf.message.Message):
     @property
     def snapshots(self) -> google.protobuf.internal.containers.MessageMap[builtins.int, global___Snapshot]:
         """All alive snapshots with snapshot ID as key."""
+    @property
+    def storage_statistics(self) -> global___StorageStatistics:
+        """Statistics of all data in the storage."""
     def __init__(
         self,
         *,
@@ -131,9 +135,10 @@ class StorageMetadata(google.protobuf.message.Message):
         schema: global___Schema | None = ...,
         current_snapshot_id: builtins.int = ...,
         snapshots: collections.abc.Mapping[builtins.int, global___Snapshot] | None = ...,
+        storage_statistics: global___StorageStatistics | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "last_update_time", b"last_update_time", "schema", b"schema"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "current_snapshot_id", b"current_snapshot_id", "last_update_time", b"last_update_time", "schema", b"schema", "snapshots", b"snapshots", "type", b"type"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "last_update_time", b"last_update_time", "schema", b"schema", "storage_statistics", b"storage_statistics"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "current_snapshot_id", b"current_snapshot_id", "last_update_time", b"last_update_time", "schema", b"schema", "snapshots", b"snapshots", "storage_statistics", b"storage_statistics", "type", b"type"]) -> None: ...
 
 global___StorageMetadata = StorageMetadata
 
@@ -147,16 +152,21 @@ class Schema(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FIELDS_FIELD_NUMBER: builtins.int
+    PRIMARY_KEYS_FIELD_NUMBER: builtins.int
     @property
     def fields(self) -> substrait.type_pb2.NamedStruct:
         """Fields persisted as Substrait named struct."""
+    @property
+    def primary_keys(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Primary key field names. Required but primary keys are un-enforced."""
     def __init__(
         self,
         *,
         fields: substrait.type_pb2.NamedStruct | None = ...,
+        primary_keys: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["fields", b"fields"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields", "primary_keys", b"primary_keys"]) -> None: ...
 
 global___Schema = Schema
 
@@ -186,3 +196,31 @@ class Snapshot(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "snapshot_id", b"snapshot_id"]) -> None: ...
 
 global___Snapshot = Snapshot
+
+@typing_extensions.final
+class StorageStatistics(google.protobuf.message.Message):
+    """Statistics of storage data.
+    NEXT_ID: 4
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NUM_ROWS_FIELD_NUMBER: builtins.int
+    INDEX_COMPRESSED_BYTES_FIELD_NUMBER: builtins.int
+    INDEX_UNCOMPRESSED_BYTES_FIELD_NUMBER: builtins.int
+    num_rows: builtins.int
+    """Number of rows."""
+    index_compressed_bytes: builtins.int
+    """Compressed bytes of index data."""
+    index_uncompressed_bytes: builtins.int
+    """Uncompressed bytes of index data."""
+    def __init__(
+        self,
+        *,
+        num_rows: builtins.int = ...,
+        index_compressed_bytes: builtins.int = ...,
+        index_uncompressed_bytes: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["index_compressed_bytes", b"index_compressed_bytes", "index_uncompressed_bytes", b"index_uncompressed_bytes", "num_rows", b"num_rows"]) -> None: ...
+
+global___StorageStatistics = StorageStatistics
