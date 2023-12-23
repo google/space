@@ -16,18 +16,22 @@
 
 from __future__ import annotations
 from os import path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import pyarrow as pa
+import pyarrow.compute as pc
 
-from space.core.schema import FieldIdManager
-from space.core.schema import substrait as substrait_schema
 from space.core.fs.factory import create_fs
+from space.core.manifests.falsifiable_filters import build_manifest_filter
+from space.core.manifests.index import read_index_manifests
+from space.core.ops import utils as ops_utils
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as runtime
+from space.core.schema import FieldIdManager
+from space.core.schema import arrow
+from space.core.schema import substrait as substrait_schema
 from space.core.utils import paths
 from space.core.utils.protos import proto_now
-from space.core.ops import utils as ops_utils
 
 # Initial snapshot ID.
 _INIT_SNAPSHOT_ID = 0
@@ -41,27 +45,22 @@ class Storage(paths.StoragePaths):
     self._metadata = metadata
     self._fs = create_fs(location)
 
-  def _initialize(self, metadata_path: str) -> None:
-    """Initialize a new storage by creating folders and files."""
-    self._fs.create_dir(self._data_dir)
-    self._fs.create_dir(self._metadata_dir)
-    self._write_metadata(metadata_path, self._metadata)
-
-  def _write_metadata(
-      self,
-      metadata_path: str,
-      metadata: meta.StorageMetadata,
-  ) -> None:
-    """Persist a StorageMetadata to files."""
-    self._fs.write_proto(metadata_path, metadata)
-    self._fs.write_proto(
-        self._entry_point_file,
-        meta.EntryPoint(metadata_file=self.short_path(metadata_path)))
+    record_fields = set(self._metadata.schema.record_fields)
+    self._physical_schema = arrow.arrow_schema(self._metadata.schema.fields,
+                                               record_fields,
+                                               physical=True)
+    self._field_name_ids: Dict[str, int] = arrow.field_name_to_id_dict(
+        self._physical_schema)
 
   @property
   def metadata(self) -> meta.StorageMetadata:
     """Return the storage metadata."""
     return self._metadata
+
+  @property
+  def physical_schema(self) -> pa.Schema:
+    """Return the physcal schema that uses reference for record fields."""
+    return self._physical_schema
 
   def snapshot(self, snapshot_id: Optional[int] = None) -> meta.Snapshot:
     """Return the snapshot specified by a snapshot ID, or current snapshot ID
@@ -164,6 +163,51 @@ class Storage(paths.StoragePaths):
     new_metadata.snapshots[new_snapshot_id].CopyFrom(snapshot)
     self._write_metadata(new_metadata_path, new_metadata)
     self._metadata = new_metadata
+
+  def data_files(self,
+                 filter_: Optional[pc.Expression] = None,
+                 snapshot_id: Optional[int] = None) -> runtime.FileSet:
+    """Return the data files and the manifest files containing them.
+    
+    Args:
+      filter_: a filter on the data.
+      snapshot_id: read a specified snapshot instead of the current.
+    """
+    manifest_files = self.snapshot(snapshot_id).manifest_files
+    result = runtime.FileSet()
+
+    # Construct falsifiable filter to prune manifest rows.
+    manifest_filter = None
+    if filter_ is not None:
+      manifest_filter = build_manifest_filter(self._physical_schema,
+                                              self._field_name_ids, filter_)
+
+    for f in manifest_files.index_manifest_files:
+      result_per_manifest = read_index_manifests(self.full_path(f),
+                                                 manifest_filter)
+      if not result_per_manifest.index_files:
+        continue
+
+      result.index_files.extend(result_per_manifest.index_files)
+
+    return result
+
+  def _initialize(self, metadata_path: str) -> None:
+    """Initialize a new storage by creating folders and files."""
+    self._fs.create_dir(self._data_dir)
+    self._fs.create_dir(self._metadata_dir)
+    self._write_metadata(metadata_path, self._metadata)
+
+  def _write_metadata(
+      self,
+      metadata_path: str,
+      metadata: meta.StorageMetadata,
+  ) -> None:
+    """Persist a StorageMetadata to files."""
+    self._fs.write_proto(metadata_path, metadata)
+    self._fs.write_proto(
+        self._entry_point_file,
+        meta.EntryPoint(metadata_file=self.short_path(metadata_path)))
 
 
 def _patch_manifests(manifest_files: meta.ManifestFiles, patch: runtime.Patch):

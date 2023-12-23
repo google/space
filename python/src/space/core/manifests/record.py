@@ -18,7 +18,7 @@ from typing import List, Optional
 
 import pyarrow as pa
 
-from space.core.manifests.utils import write_parquet_file
+from space.core.utils.parquet import write_parquet_file
 import space.core.proto.metadata_pb2 as meta
 from space.core.utils import paths
 from space.core.schema import constants
@@ -73,5 +73,5 @@ class RecordManifestWriter:
         schema=self._manifest_schema)  # type: ignore[call-arg]
 
     file_path = paths.new_record_manifest_path(self._metadata_dir)
-    write_parquet_file(file_path, self._manifest_schema, manifest_data)
+    write_parquet_file(file_path, self._manifest_schema, [manifest_data])
     return file_path

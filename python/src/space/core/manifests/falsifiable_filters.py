@@ -36,66 +36,76 @@ from space.core.schema import utils as schema_utils
 from space.core.schema import constants
 
 
-def substrait_expr(schema: pa.Schema,
-                   arrow_expr: pc.Expression) -> ExtendedExpression:
+def build_manifest_filter(schema: pa.Schema, field_name_ids: Dict[str, int],
+                          filter_: pc.Expression) -> Optional[pc.Expression]:
+  """Build a falsifiable filter on index manifest files column statistics.
+  
+  Args:
+    schema: the storage schema.
+    filter_: a filter on data fields.
+    field_name_ids: a dict of field names to IDs mapping.
+
+  Returns:
+    Falsifiable filter, or None if not supported.
+  """
+  expr = _substrait_expr(schema, filter_)
+
+  try:
+    return ~_falsifiable_filter(expr, field_name_ids)  # type: ignore[operator]
+  except _ExpressionException as e:
+    logging.info(
+        "Index manifest filter push-down is not used, query may be slower; "
+        f"error: {e}")
+    return None
+
+
+def _substrait_expr(schema: pa.Schema,
+                    arrow_expr: pc.Expression) -> ExtendedExpression:
   """Convert an expression from Arrow to Substrait format.
   
   PyArrow does not expose enough methods for processing expressions, thus we
   convert it to Substrait format for processing.
   """
   buf = ps.serialize_expressions(  # type: ignore[attr-defined]
-      [arrow_expr], ['expr'], schema)
+      [arrow_expr], ["expr"], schema)
 
   expr = ExtendedExpression()
   expr.ParseFromString(buf.to_pybytes())
   return expr
 
 
-class ExpressionException(Exception):
-  """Raise for exceptions in expressions."""
+class _ExpressionException(Exception):
+  """Raise for exceptions in Substrait expressions."""
 
 
-def falsifiable_filter(
-    filter_: ExtendedExpression,
-    field_name_to_id_dict: Dict[str, int]) -> Optional[pc.Expression]:
-  """Build a falsifiable filter.
-  
-  Args:
-    filter_: a filter on data fields.
-    field_name_to_id_dict: a dict of field names to IDs mapping.
-
-  Returns:
-    Falsifiable filter, or None if not convertable.
-  """
+def _falsifiable_filter(filter_: ExtendedExpression,
+                        field_name_ids: Dict[str, int]) -> pc.Expression:
   if len(filter_.referred_expr) != 1:
-    logging.warning(
-        f"Expect 1 referred expr, found: {len(filter_.referred_expr)}; "
-        "Falsifiable filter is not used.")
-    return None
+    raise _ExpressionException(
+        f"Expect 1 referred expr, found: {len(filter_.referred_expr)}")
 
-  return _falsifiable_filter(
+  return _falsifiable_filter_internal(
       filter_.extensions,  # type: ignore[arg-type]
       filter_.base_schema,
-      field_name_to_id_dict,
+      field_name_ids,
       filter_.referred_expr[0].expression.scalar_function)
 
 
 # pylint: disable=too-many-locals,too-many-return-statements
-def _falsifiable_filter(
+def _falsifiable_filter_internal(
     extensions: List[SimpleExtensionDeclaration], base_schema: NamedStruct,
-    field_name_to_id_dict: Dict[str, int],
-    root: Expression.ScalarFunction) -> Optional[pc.Expression]:
+    field_name_ids: Dict[str, int],
+    root: Expression.ScalarFunction) -> pc.Expression:
   if len(root.arguments) != 2:
-    logging.warning(f"Invalid number of arguments: {root.arguments}; "
-                    "Falsifiable filter is not used.")
-    return None
+    raise _ExpressionException(
+        f"Invalid number of arguments: {root.arguments}")
 
   fn = extensions[root.function_reference].extension_function.name
   lhs = root.arguments[0].value
   rhs = root.arguments[1].value
 
-  falsifiable_filter_fn = partial(_falsifiable_filter, extensions, base_schema,
-                                  field_name_to_id_dict)
+  falsifiable_filter_fn = partial(_falsifiable_filter_internal, extensions,
+                                  base_schema, field_name_ids)
 
   if _has_scalar_function(lhs) and _has_scalar_function(rhs):
     lhs_fn = lhs.scalar_function
@@ -109,18 +119,13 @@ def _falsifiable_filter(
       return falsifiable_filter_fn(lhs_fn) & falsifiable_filter_fn(
           rhs_fn)  # type: ignore[operator]
     else:
-      logging.warning(f"Unsupported fn: {fn}; Falsifiable filter is not used.")
-      return None
+      raise _ExpressionException(f"Unsupported fn: {fn}")
 
   if _has_selection(lhs) and _has_selection(rhs):
-    logging.warning(f"Both args are fields: {root.arguments}; "
-                    "Falsifiable filter is not used.")
-    return None
+    raise _ExpressionException(f"Both args are fields: {root.arguments}")
 
   if _has_literal(lhs) and _has_literal(rhs):
-    logging.warning(f"Both args are constants: {root.arguments}; "
-                    "Falsifiable filter is not used.")
-    return None
+    raise _ExpressionException(f"Both args are constants: {root.arguments}")
 
   # Move literal to rhs.
   if _has_selection(rhs):
@@ -129,7 +134,7 @@ def _falsifiable_filter(
 
   field_index = lhs.selection.direct_reference.struct_field.field
   field_name = base_schema.names[field_index]
-  field_id = field_name_to_id_dict[field_name]
+  field_id = field_name_ids[field_name]
   field_min, field_max = _stats_field_min(field_id), _stats_field_max(field_id)
   value = pc.scalar(
       getattr(
@@ -144,8 +149,7 @@ def _falsifiable_filter(
   elif fn == "equal":
     return (field_min > value) | (field_max < value)
 
-  logging.warning(f"Unsupported fn: {fn}; Falsifiable filter is not used.")
-  return None
+  raise _ExpressionException(f"Unsupported fn: {fn}")
 
 
 def _stats_field_min(field_id: int) -> pc.Expression:

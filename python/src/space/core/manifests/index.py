@@ -14,13 +14,17 @@
 #
 """Index manifest files writer and reader implementation."""
 
+import typing
 from typing import Any, Dict, List, Optional, Tuple
 
+from dataclasses import dataclass
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
-from space.core.manifests.utils import write_parquet_file
+from space.core.utils.parquet import write_parquet_file
 import space.core.proto.metadata_pb2 as meta
+import space.core.proto.runtime_pb2 as runtime
 from space.core.schema import constants
 from space.core.schema import utils as schema_utils
 from space.core.schema.arrow import field_id, field_id_to_column_id_dict
@@ -199,5 +203,61 @@ class IndexManifestWriter:
       return None
 
     file_path = paths.new_index_manifest_path(self._metadata_dir)
-    write_parquet_file(file_path, self._manifest_schema, manifest_data)
+    write_parquet_file(file_path, self._manifest_schema, [manifest_data])
     return file_path
+
+
+@dataclass
+class _IndexManifests:
+  """Represent index manfiests read from a Parquet file."""
+  file_path: pa.StringArray
+  num_rows: pa.Int64Array
+  index_compressed_bytes: pa.Int64Array
+  index_uncompressed_bytes: pa.Int64Array
+
+
+def read_index_manifests(
+    manifest_path: str,
+    filter_: Optional[pc.Expression] = None) -> runtime.FileSet:
+  """Read an index manifest file.
+  
+  Args:
+    manifest_path: full file path of the manifest file.
+    filter_: a filter on the index manifest rows.
+
+  Returns:
+    A file set of data files in the manifest file.
+  """
+  if filter_ is None:
+    table = pq.read_table(manifest_path)
+  else:
+    table = pq.read_table(manifest_path,
+                          filters=filter_)  # type: ignore[arg-type]
+
+  manifests = _index_manifests(table)
+
+  file_set = runtime.FileSet()
+  for i in range(table.num_rows):
+    file = runtime.DataFile()
+    file.path = manifests.file_path[i].as_py()
+
+    stats = file.storage_statistics
+    stats.num_rows = manifests.num_rows[i].as_py()
+    stats.index_compressed_bytes = manifests.index_compressed_bytes[i].as_py()
+    stats.index_uncompressed_bytes = manifests.index_uncompressed_bytes[
+        i].as_py()
+
+    file_set.index_files.append(file)
+
+  return file_set
+
+
+@typing.no_type_check
+def _index_manifests(table: pa.Table) -> _IndexManifests:
+  return _IndexManifests(
+      file_path=table.column(constants.FILE_PATH_FIELD).combine_chunks(),
+      num_rows=table.column(constants.NUM_ROWS_FIELD).combine_chunks(),
+      index_compressed_bytes=table.column(
+          _INDEX_COMPRESSED_BYTES_FIELD).combine_chunks(),
+      index_uncompressed_bytes=table.column(
+          _INDEX_UNCOMPRESSED_BYTES_FIELD).combine_chunks())

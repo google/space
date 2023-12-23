@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List
-
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from space.core.manifests import IndexManifestWriter
+from space.core.manifests.index import read_index_manifests
+import space.core.proto.metadata_pb2 as meta
+import space.core.proto.runtime_pb2 as runtime
 from space.core.schema.arrow import field_metadata
+from space.core.utils.parquet import write_parquet_file
 
 _SCHEMA = pa.schema([
     pa.field("int64", pa.int64(), metadata=field_metadata(0)),
@@ -28,20 +31,9 @@ _SCHEMA = pa.schema([
 ])
 
 
-def _write_parquet_file(
-    file_path: str, schema: pa.Schema,
-    batches: List[Dict[str, List[Any]]]) -> pq.FileMetaData:
-  writer = pq.ParquetWriter(file_path, schema)
-  for batch in batches:
-    writer.write_table(pa.Table.from_pydict(batch))
-
-  writer.close()
-  return writer.writer.metadata
-
-
 class TestIndexManifestWriter:
 
-  def test_write_all_types(self, tmp_path):
+  def test_write_all_types_and_read(self, tmp_path):
     data_dir = tmp_path / "dataset" / "data"
     data_dir.mkdir(parents=True)
     metadata_dir = tmp_path / "dataset" / "metadata"
@@ -56,25 +48,30 @@ class TestIndexManifestWriter:
     # TODO: the test should cover all types supported by column stats.
     manifest_writer.write(
         "data/file0",
-        _write_parquet_file(str(data_dir / "file0"), schema, [{
-            "int64": [1, 2, 3],
-            "float64": [0.1, 0.2, 0.3],
-            "bool": [True, False, False],
-            "string": ["a", "b", "c"]
-        }, {
-            "int64": [0, 10],
-            "float64": [-0.1, 100.0],
-            "bool": [False, False],
-            "string": ["A", "z"]
-        }]))
+        write_parquet_file(str(data_dir / "file0"), schema, [
+            pa.Table.from_pydict({
+                "int64": [1, 2, 3],
+                "float64": [0.1, 0.2, 0.3],
+                "bool": [True, False, False],
+                "string": ["a", "b", "c"]
+            }),
+            pa.Table.from_pydict({
+                "int64": [0, 10],
+                "float64": [-0.1, 100.0],
+                "bool": [False, False],
+                "string": ["A", "z"]
+            })
+        ]))
     manifest_writer.write(
         "data/file1",
-        _write_parquet_file(str(data_dir / "file1"), schema, [{
-            "int64": [1000, 1000000],
-            "float64": [-0.001, 0.001],
-            "bool": [False, False],
-            "string": ["abcedf", "ABCDEF"]
-        }]))
+        write_parquet_file(str(data_dir / "file1"), schema, [
+            pa.Table.from_pydict({
+                "int64": [1000, 1000000],
+                "float64": [-0.001, 0.001],
+                "bool": [False, False],
+                "string": ["abcedf", "ABCDEF"]
+            })
+        ]))
 
     manifest_path = manifest_writer.finish()
 
@@ -114,6 +111,27 @@ class TestIndexManifestWriter:
         }]
     }
 
+    assert read_index_manifests(manifest_path) == runtime.FileSet(index_files=[
+        runtime.DataFile(path="data/file0",
+                         storage_statistics=meta.StorageStatistics(
+                             num_rows=5,
+                             index_compressed_bytes=645,
+                             index_uncompressed_bytes=624)),
+        runtime.DataFile(path="data/file1",
+                         storage_statistics=meta.StorageStatistics(
+                             num_rows=2,
+                             index_compressed_bytes=334,
+                             index_uncompressed_bytes=320))
+    ])
+
+    # Test index manifest filtering.
+    # TODO: to move it to a separate test and add more test cases.
+    filtered_manifests = read_index_manifests(
+        manifest_path,
+        pc.field("_STATS_f3", "_MIN") >= "ABCDEF")
+    assert len(filtered_manifests.index_files) == 1
+    assert filtered_manifests.index_files[0].path == "data/file1"
+
   def test_write_collet_stats_for_primary_keys_only(self, tmp_path):
     data_dir = tmp_path / "dataset" / "data"
     data_dir.mkdir(parents=True)
@@ -129,12 +147,14 @@ class TestIndexManifestWriter:
     # TODO: the test should cover all types supported by column stats.
     manifest_writer.write(
         file_path,
-        _write_parquet_file(file_path, schema, [{
-            "int64": [1, 2, 3],
-            "float64": [0.1, 0.2, 0.3],
-            "bool": [True, False, False],
-            "string": ["a", "b", "c"]
-        }]))
+        write_parquet_file(file_path, schema, [
+            pa.Table.from_pydict({
+                "int64": [1, 2, 3],
+                "float64": [0.1, 0.2, 0.3],
+                "bool": [True, False, False],
+                "string": ["a", "b", "c"]
+            })
+        ]))
 
     manifest_path = manifest_writer.finish()
 

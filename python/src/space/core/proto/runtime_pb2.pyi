@@ -16,7 +16,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 import builtins
+import collections.abc
 import google.protobuf.descriptor
+import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import space.core.proto.metadata_pb2
@@ -29,6 +31,49 @@ else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
+
+@typing_extensions.final
+class DataFile(google.protobuf.message.Message):
+    """Information of a data file."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PATH_FIELD_NUMBER: builtins.int
+    STORAGE_STATISTICS_FIELD_NUMBER: builtins.int
+    path: builtins.str
+    """Data file path."""
+    @property
+    def storage_statistics(self) -> space.core.proto.metadata_pb2.StorageStatistics:
+        """Storage statistics of data in the file."""
+    def __init__(
+        self,
+        *,
+        path: builtins.str = ...,
+        storage_statistics: space.core.proto.metadata_pb2.StorageStatistics | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["storage_statistics", b"storage_statistics"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["path", b"path", "storage_statistics", b"storage_statistics"]) -> None: ...
+
+global___DataFile = DataFile
+
+@typing_extensions.final
+class FileSet(google.protobuf.message.Message):
+    """A set of associated data and manifest files."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INDEX_FILES_FIELD_NUMBER: builtins.int
+    @property
+    def index_files(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DataFile]:
+        """Index data files."""
+    def __init__(
+        self,
+        *,
+        index_files: collections.abc.Iterable[global___DataFile] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["index_files", b"index_files"]) -> None: ...
+
+global___FileSet = FileSet
 
 @typing_extensions.final
 class Patch(google.protobuf.message.Message):
