@@ -18,6 +18,21 @@ import "space/core/proto/metadata.proto";
 
 package space.proto;
 
+// Information of a data file.
+message DataFile {
+  // Data file path.
+  string path = 1;
+
+  // Storage statistics of data in the file.
+  StorageStatistics storage_statistics = 4;
+}
+
+// A set of associated data and manifest files.
+message FileSet {
+  // Index data files.
+  repeated DataFile index_files = 1;
+}
+
 // A patch describing metadata changes to the storage.
 // NEXT_ID: 4
 message Patch {

@@ -86,11 +86,11 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
 
     self._metadata = metadata
     record_fields = set(self._metadata.schema.record_fields)
-    self._schema = arrow.arrow_schema(self._metadata.schema.fields,
-                                      record_fields,
-                                      physical=True)
+    self._physical_schema = arrow.arrow_schema(self._metadata.schema.fields,
+                                               record_fields,
+                                               physical=True)
     self._index_fields, self._record_fields = arrow.classify_fields(
-        self._schema, record_fields, selected_fields=None)
+        self._physical_schema, record_fields, selected_fields=None)
 
     # Data file writers.
     self._index_writer_info: Optional[_IndexWriterInfo] = None
@@ -104,7 +104,7 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
 
     # Manifest file writers.
     self._index_manifest_writer = IndexManifestWriter(
-        self._metadata_dir, self._schema,
+        self._metadata_dir, self._physical_schema,
         self._metadata.schema.primary_keys)  # type: ignore[arg-type]
     self._record_manifest_writer = RecordManifestWriter(self._metadata_dir)
 
@@ -199,7 +199,7 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
     """Create a new index file writer if needed."""
     if self._index_writer_info is None:
       full_file_path = paths.new_index_file_path(self._data_dir)
-      writer = pq.ParquetWriter(full_file_path, self._schema)
+      writer = pq.ParquetWriter(full_file_path, self._physical_schema)
       self._index_writer_info = _IndexWriterInfo(
           writer, self.short_path(full_file_path))
 

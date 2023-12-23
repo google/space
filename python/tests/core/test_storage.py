@@ -13,14 +13,17 @@
 # limitations under the License.
 
 from google.protobuf.timestamp_pb2 import Timestamp
+import pyarrow.compute as pc
 import pyarrow as pa
 import pytest
 from substrait.type_pb2 import NamedStruct, Type
 
+from space.core.manifests import IndexManifestWriter
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as runtime
 from space.core.storage import Storage
 from space.core.utils.paths import _ENTRY_POINT_FILE
+from space.core.utils.parquet import write_parquet_file
 
 _SNAPSHOT_ID = 100
 _SCHEMA = pa.schema(
@@ -153,3 +156,71 @@ class TestStorage:
         index_compressed_bytes=110,
         index_uncompressed_bytes=220,
         record_uncompressed_bytes=330)
+
+  def test_data_files(self, tmp_path):
+    location = tmp_path / "dataset"
+    data_dir = location / "data"
+    metadata_dir = location / "metadata"
+    storage = Storage.create(location=str(location),
+                             schema=_SCHEMA,
+                             primary_keys=["int64"],
+                             record_fields=[])
+    schema = storage.physical_schema
+
+    def create_index_manifest_writer():
+      return IndexManifestWriter(metadata_dir=str(metadata_dir),
+                                 schema=schema,
+                                 primary_keys=["int64"])
+
+    def commit_add_index_manifest(manifest_path: str):
+      patch = runtime.Patch(addition=meta.ManifestFiles(
+          index_manifest_files=[storage.short_path(manifest_path)]))
+      storage.commit(patch)
+
+    manifest_writer = create_index_manifest_writer()
+    manifest_writer.write(
+        "data/file0",
+        write_parquet_file(str(data_dir / "file0"), schema, [
+            pa.Table.from_pydict({
+                "int64": [1, 2, 3],
+                "string": ["a", "b", "c"]
+            })
+        ]))
+    commit_add_index_manifest(manifest_writer.finish())
+
+    index_file0 = runtime.DataFile(path="data/file0",
+                                   storage_statistics=meta.StorageStatistics(
+                                       num_rows=3,
+                                       index_compressed_bytes=110,
+                                       index_uncompressed_bytes=109))
+    assert storage.data_files() == runtime.FileSet(index_files=[index_file0])
+
+    # Write the 2nd data file, generate manifest, and commit.
+    manifest_writer = create_index_manifest_writer()
+    manifest_writer.write(
+        "data/file1",
+        write_parquet_file(str(data_dir / "file1"), schema, [
+            pa.Table.from_pydict({
+                "int64": [1000, 1000000],
+                "string": ["abcedf", "ABCDEF"]
+            })
+        ]))
+    commit_add_index_manifest(manifest_writer.finish())
+
+    index_file1 = runtime.DataFile(path="data/file1",
+                                   storage_statistics=meta.StorageStatistics(
+                                       num_rows=2,
+                                       index_compressed_bytes=104,
+                                       index_uncompressed_bytes=100))
+    assert storage.data_files() == runtime.FileSet(
+        index_files=[index_file0, index_file1])
+
+    # Test time travel data_files().
+    assert storage.data_files(snapshot_id=0) == runtime.FileSet()
+    assert storage.data_files(snapshot_id=1) == runtime.FileSet(
+        index_files=[index_file0])
+
+    # Test data_files() with filters.
+    assert storage.data_files(
+        filter_=pc.field("int64") > 1000) == runtime.FileSet(
+            index_files=[index_file1])

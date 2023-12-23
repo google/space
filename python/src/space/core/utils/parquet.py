@@ -12,17 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Manifest utilities."""
+"""Parquet utilities."""
+
+from typing import List
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 
 def write_parquet_file(file_path: str, schema: pa.Schema,
-                       data: pa.Table) -> None:
+                       data: List[pa.Table]) -> pq.FileMetaData:
   """Materialize a single Parquet file."""
   # TODO: currently assume this file is small, so always write a single file.
   writer = pq.ParquetWriter(file_path, schema)
-  writer.write_table(data)
+  for batch in data:
+    writer.write_table(batch)
 
   writer.close()
+  return writer.writer.metadata
