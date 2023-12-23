@@ -14,6 +14,7 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies = [
+  "absl-py",
   "array-record",
   "numpy",
   "protobuf",
@@ -39,14 +40,14 @@ pythonpath = ["src"]
 
 [tool.pylint.format]
 max-line-length = 80
-indent-string = '  '
-disable = ['fixme']
+indent-string = "  "
+disable = ["fixme", "no-else-return"]
 
 [tool.pylint.MAIN]
-ignore = 'space/core/proto'
+ignore = "space/core/proto"
 ignored-modules = [
-  'space.core.proto',
-  'google.protobuf',
-  'substrait',
-  'array_record',
+  "space.core.proto",
+  "google.protobuf",
+  "substrait",
+  "array_record",
 ]

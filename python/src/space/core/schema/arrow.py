@@ -22,6 +22,7 @@ from substrait.type_pb2 import NamedStruct, Type
 
 from space.core.schema import constants
 from space.core.schema.types import TfFeatures
+from space.core.schema import utils
 from space.core.utils.constants import UTF_8
 
 _PARQUET_FIELD_ID_KEY = b"PARQUET:field_id"
@@ -153,18 +154,11 @@ def field_id_to_column_id_dict(schema: pa.Schema) -> Dict[int, int]:
   }
 
 
-@dataclass
-class Field:
-  """Information of a field."""
-  name: str
-  field_id: int
-
-
 def classify_fields(
     schema: pa.Schema,
     record_fields: Set[str],
     selected_fields: Optional[Set[str]] = None
-) -> Tuple[List[Field], List[Field]]:
+) -> Tuple[List[utils.Field], List[utils.Field]]:
   """Classify fields into indexes and records.
   
   Args:
@@ -175,25 +169,20 @@ def classify_fields(
   Returns:
     A tuple (index_fields, record_fields).
   """
-  index_fields: List[Field] = []
-  record_fields_: List[Field] = []
+  index_fields: List[utils.Field] = []
+  record_fields_: List[utils.Field] = []
 
   for f in schema:
     if selected_fields is not None and f.name not in selected_fields:
       continue
 
-    field = Field(f.name, field_id(f))
+    field = utils.Field(f.name, field_id(f))
     if f.name in record_fields:
       record_fields_.append(field)
     else:
       index_fields.append(field)
 
   return index_fields, record_fields_
-
-
-def field_names(fields: List[Field]) -> List[str]:
-  """Extract field names from a list of fields."""
-  return list(map(lambda f: f.name, fields))
 
 
 def record_address_types() -> List[Tuple[str, pa.DataType]]:

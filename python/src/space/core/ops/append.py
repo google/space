@@ -29,6 +29,7 @@ from space.core.ops.base import BaseOp, InputData
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as runtime
 from space.core.schema import arrow
+from space.core.schema import utils as schema_utils
 from space.core.utils import paths
 from space.core.utils.lazy_imports_utils import array_record_module as ar
 from space.core.utils.paths import StoragePaths
@@ -161,7 +162,7 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
     index_data = data
     self._maybe_create_index_writer()
 
-    index_data = data.select(arrow.field_names(self._index_fields))
+    index_data = data.select(schema_utils.field_names(self._index_fields))
 
     # Write record fields into files.
     # TODO: to parallelize it.
@@ -220,7 +221,7 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
     self._cached_index_file_bytes = 0
 
   def _write_record_column(
-      self, field: arrow.Field,
+      self, field: schema_utils.Field,
       column: pa.ChunkedArray) -> Tuple[str, pa.StructArray]:
     """Write record field into files.
 
@@ -259,7 +260,7 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
 
     return field_name, address_column
 
-  def _finish_record_writer(self, field: arrow.Field,
+  def _finish_record_writer(self, field: schema_utils.Field,
                             writer_info: _RecordWriterInfo) -> None:
     """Materialize a new record file (ArrayRecord), update metadata and
     stats.

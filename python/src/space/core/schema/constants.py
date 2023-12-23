@@ -23,3 +23,8 @@ FIELD_ID_FIELD = "_FIELD_ID"
 
 NUM_ROWS_FIELD = "_NUM_ROWS"
 UNCOMPRESSED_BYTES_FIELD = "_UNCOMPRESSED_BYTES"
+
+# Constants for building column statistics field name.
+STATS_FIELD = "_STATS"
+MIN_FIELD = "_MIN"
+MAX_FIELD = "_MAX"
