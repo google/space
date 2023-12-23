@@ -61,7 +61,7 @@ class StorageMetadata(google.protobuf.message.Message):
     """Metadata persisting the current status of a storage, including logical
     metadata such as schema, and physical metadata persisted as a history of
     snapshots
-    NEXT_ID: 8
+    NEXT_ID: 7
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -107,7 +107,6 @@ class StorageMetadata(google.protobuf.message.Message):
     SCHEMA_FIELD_NUMBER: builtins.int
     CURRENT_SNAPSHOT_ID_FIELD_NUMBER: builtins.int
     SNAPSHOTS_FIELD_NUMBER: builtins.int
-    STORAGE_STATISTICS_FIELD_NUMBER: builtins.int
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Create time of the storage."""
@@ -123,9 +122,6 @@ class StorageMetadata(google.protobuf.message.Message):
     @property
     def snapshots(self) -> google.protobuf.internal.containers.MessageMap[builtins.int, global___Snapshot]:
         """All alive snapshots with snapshot ID as key."""
-    @property
-    def storage_statistics(self) -> global___StorageStatistics:
-        """Statistics of all data in the storage."""
     def __init__(
         self,
         *,
@@ -135,10 +131,9 @@ class StorageMetadata(google.protobuf.message.Message):
         schema: global___Schema | None = ...,
         current_snapshot_id: builtins.int = ...,
         snapshots: collections.abc.Mapping[builtins.int, global___Snapshot] | None = ...,
-        storage_statistics: global___StorageStatistics | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "last_update_time", b"last_update_time", "schema", b"schema", "storage_statistics", b"storage_statistics"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "current_snapshot_id", b"current_snapshot_id", "last_update_time", b"last_update_time", "schema", b"schema", "snapshots", b"snapshots", "storage_statistics", b"storage_statistics", "type", b"type"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "last_update_time", b"last_update_time", "schema", b"schema"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "current_snapshot_id", b"current_snapshot_id", "last_update_time", b"last_update_time", "schema", b"schema", "snapshots", b"snapshots", "type", b"type"]) -> None: ...
 
 global___StorageMetadata = StorageMetadata
 
@@ -146,7 +141,7 @@ global___StorageMetadata = StorageMetadata
 class Schema(google.protobuf.message.Message):
     """The storage logical schema where user provided types are persisted instead
     of their physical storage format.
-    NEXT_ID: 2
+    NEXT_ID: 4
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -179,28 +174,67 @@ global___Schema = Schema
 class Snapshot(google.protobuf.message.Message):
     """Storage snapshot persisting physical metadata such as manifest file paths.
     It is used for obtaining all alive data file paths for a given snapshot.
-    NEXT_ID: 3
+    NEXT_ID: 5
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SNAPSHOT_ID_FIELD_NUMBER: builtins.int
     CREATE_TIME_FIELD_NUMBER: builtins.int
+    MANIFEST_FILES_FIELD_NUMBER: builtins.int
+    STORAGE_STATISTICS_FIELD_NUMBER: builtins.int
     snapshot_id: builtins.int
     """The snapshot ID."""
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The create time of the snapshot."""
+    @property
+    def manifest_files(self) -> global___ManifestFiles:
+        """Manifest file information embedded in Snapshot. Preferred option when
+        the number of manifest files are small.
+        """
+    @property
+    def storage_statistics(self) -> global___StorageStatistics:
+        """Statistics of all data in the storage."""
     def __init__(
         self,
         *,
         snapshot_id: builtins.int = ...,
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        manifest_files: global___ManifestFiles | None = ...,
+        storage_statistics: global___StorageStatistics | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["create_time", b"create_time"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "snapshot_id", b"snapshot_id"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "data_info", b"data_info", "manifest_files", b"manifest_files", "storage_statistics", b"storage_statistics"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "data_info", b"data_info", "manifest_files", b"manifest_files", "snapshot_id", b"snapshot_id", "storage_statistics", b"storage_statistics"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["data_info", b"data_info"]) -> typing_extensions.Literal["manifest_files"] | None: ...
 
 global___Snapshot = Snapshot
+
+@typing_extensions.final
+class ManifestFiles(google.protobuf.message.Message):
+    """Stores information of manifest files.
+    NEXT_ID: 3
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INDEX_MANIFEST_FILES_FIELD_NUMBER: builtins.int
+    RECORD_MANIFEST_FILES_FIELD_NUMBER: builtins.int
+    @property
+    def index_manifest_files(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Manifest for index files."""
+    @property
+    def record_manifest_files(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Manifest for record files."""
+    def __init__(
+        self,
+        *,
+        index_manifest_files: collections.abc.Iterable[builtins.str] | None = ...,
+        record_manifest_files: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["index_manifest_files", b"index_manifest_files", "record_manifest_files", b"record_manifest_files"]) -> None: ...
+
+global___ManifestFiles = ManifestFiles
 
 @typing_extensions.final
 class StorageStatistics(google.protobuf.message.Message):

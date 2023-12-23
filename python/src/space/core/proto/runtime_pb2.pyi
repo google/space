@@ -16,9 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 import builtins
-import collections.abc
 import google.protobuf.descriptor
-import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import space.core.proto.metadata_pb2
@@ -40,32 +38,27 @@ class Patch(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    ADDED_INDEX_MANIFEST_FILES_FIELD_NUMBER: builtins.int
-    DELETED_INDEX_MANIFEST_FILES_FIELD_NUMBER: builtins.int
-    ADDED_RECORD_MANIFEST_FILES_FIELD_NUMBER: builtins.int
+    ADDITION_FIELD_NUMBER: builtins.int
+    DELETION_FIELD_NUMBER: builtins.int
     STORAGE_STATISTICS_UPDATE_FIELD_NUMBER: builtins.int
     @property
-    def added_index_manifest_files(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """Index manifest file paths newly added to the storage."""
+    def addition(self) -> space.core.proto.metadata_pb2.ManifestFiles:
+        """Manifest files to add to the storage."""
     @property
-    def deleted_index_manifest_files(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """Index manifest file paths to be removed from the storage."""
-    @property
-    def added_record_manifest_files(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """Record manifest file paths newly added to the storage."""
+    def deletion(self) -> space.core.proto.metadata_pb2.ManifestFiles:
+        """Manifest files to remove from the storage."""
     @property
     def storage_statistics_update(self) -> space.core.proto.metadata_pb2.StorageStatistics:
         """The change of the storage statistics."""
     def __init__(
         self,
         *,
-        added_index_manifest_files: collections.abc.Iterable[builtins.str] | None = ...,
-        deleted_index_manifest_files: collections.abc.Iterable[builtins.str] | None = ...,
-        added_record_manifest_files: collections.abc.Iterable[builtins.str] | None = ...,
+        addition: space.core.proto.metadata_pb2.ManifestFiles | None = ...,
+        deletion: space.core.proto.metadata_pb2.ManifestFiles | None = ...,
         storage_statistics_update: space.core.proto.metadata_pb2.StorageStatistics | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["storage_statistics_update", b"storage_statistics_update"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["added_index_manifest_files", b"added_index_manifest_files", "added_record_manifest_files", b"added_record_manifest_files", "deleted_index_manifest_files", b"deleted_index_manifest_files", "storage_statistics_update", b"storage_statistics_update"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["addition", b"addition", "deletion", b"deletion", "storage_statistics_update", b"storage_statistics_update"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["addition", b"addition", "deletion", b"deletion", "storage_statistics_update", b"storage_statistics_update"]) -> None: ...
 
 global___Patch = Patch
 

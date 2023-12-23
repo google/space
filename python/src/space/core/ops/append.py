@@ -138,12 +138,12 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
     # Write manifest files.
     index_manifest_full_path = self._index_manifest_writer.finish()
     if index_manifest_full_path is not None:
-      self._patch.added_index_manifest_files.append(
+      self._patch.addition.index_manifest_files.append(
           self.short_path(index_manifest_full_path))
 
     record_manifest_path = self._record_manifest_writer.finish()
     if record_manifest_path:
-      self._patch.added_record_manifest_files.append(
+      self._patch.addition.record_manifest_files.append(
           self.short_path(record_manifest_path))
 
     if self._patch.storage_statistics_update.num_rows == 0:

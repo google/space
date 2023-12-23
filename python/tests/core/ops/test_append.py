@@ -61,7 +61,7 @@ class TestLocalAppendOp:
     assert patch is not None
 
     index_manifests = []
-    for f in patch.added_index_manifest_files:
+    for f in patch.addition.index_manifest_files:
       index_manifests.append(pq.read_table(storage.full_path(f)))
 
     index_manifest = pa.concat_tables(index_manifests).to_pydict()
@@ -124,7 +124,7 @@ class TestLocalAppendOp:
 
     # Validate index manifest files.
     index_manifest = self._read_manifests(
-        storage, list(patch.added_index_manifest_files))
+        storage, list(patch.addition.index_manifest_files))
     assert index_manifest == {
         "_FILE": index_manifest["_FILE"],
         "_INDEX_COMPRESSED_BYTES": [114],
@@ -138,7 +138,7 @@ class TestLocalAppendOp:
 
     # Validate record manifest files.
     record_manifest = self._read_manifests(
-        storage, list(patch.added_record_manifest_files))
+        storage, list(patch.addition.record_manifest_files))
     assert record_manifest == {
         "_FILE": record_manifest["_FILE"],
         "_FIELD_ID": [2, 3],

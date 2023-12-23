@@ -18,6 +18,7 @@ import pytest
 from substrait.type_pb2 import NamedStruct, Type
 
 import space.core.proto.metadata_pb2 as meta
+import space.core.proto.runtime_pb2 as runtime
 from space.core.storage import Storage
 from space.core.utils.paths import _ENTRY_POINT_FILE
 
@@ -104,3 +105,51 @@ class TestStorage:
   def test_load_storage_file_not_found_should_fail(self, tmp_path):
     with pytest.raises(FileNotFoundError):
       Storage.load(str(tmp_path / "dataset"))
+
+  def test_commit(self, tmp_path):
+    location = tmp_path / "dataset"
+    storage = Storage.create(location=str(location),
+                             schema=_SCHEMA,
+                             primary_keys=["int64"],
+                             record_fields=["string"])
+
+    added_manifest_files = meta.ManifestFiles(
+        index_manifest_files=["data/index_manifest0"],
+        record_manifest_files=["data/record_manifest0"])
+    added_storage_statistics = meta.StorageStatistics(
+        num_rows=123,
+        index_compressed_bytes=10,
+        index_uncompressed_bytes=20,
+        record_uncompressed_bytes=30)
+    patch = runtime.Patch(addition=added_manifest_files,
+                          storage_statistics_update=added_storage_statistics)
+    storage.commit(patch)
+
+    assert storage.snapshot(0) is not None
+    new_snapshot = storage.snapshot(1)
+
+    assert new_snapshot.manifest_files == added_manifest_files
+    assert new_snapshot.storage_statistics == added_storage_statistics
+
+    # Add more manifests
+    patch = runtime.Patch(addition=meta.ManifestFiles(
+        index_manifest_files=["data/index_manifest1"],
+        record_manifest_files=["data/record_manifest1"]),
+                          storage_statistics_update=meta.StorageStatistics(
+                              num_rows=100,
+                              index_compressed_bytes=100,
+                              index_uncompressed_bytes=200,
+                              record_uncompressed_bytes=300))
+    storage.commit(patch)
+
+    new_snapshot = storage.snapshot(2)
+    assert new_snapshot.manifest_files == meta.ManifestFiles(
+        index_manifest_files=["data/index_manifest0", "data/index_manifest1"],
+        record_manifest_files=[
+            "data/record_manifest0", "data/record_manifest1"
+        ])
+    assert new_snapshot.storage_statistics == meta.StorageStatistics(
+        num_rows=223,
+        index_compressed_bytes=110,
+        index_uncompressed_bytes=220,
+        record_uncompressed_bytes=330)
