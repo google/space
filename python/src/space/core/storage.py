@@ -24,8 +24,10 @@ from space.core.schema import FieldIdManager
 from space.core.schema import substrait as substrait_schema
 from space.core.fs.factory import create_fs
 import space.core.proto.metadata_pb2 as meta
+import space.core.proto.runtime_pb2 as runtime
 from space.core.utils import paths
 from space.core.utils.protos import proto_now
+from space.core.ops import utils as ops_utils
 
 # Initial snapshot ID.
 _INIT_SNAPSHOT_ID = 0
@@ -123,3 +125,52 @@ class Storage(paths.StoragePaths):
     metadata = fs.read_proto(path.join(location, entry_point.metadata_file),
                              meta.StorageMetadata())
     return Storage(location, metadata)
+
+  def _next_snapshot_id(self) -> int:
+    return self._metadata.current_snapshot_id + 1
+
+  def commit(self, patch: runtime.Patch) -> None:
+    """Commit changes to the storage.
+
+    TODO: only support a single writer; to ensure atomicity in commit by
+    concurrent writers.
+
+    Args:
+      patch: a patch describing changes made to the storage.
+    """
+    new_metadata = meta.StorageMetadata()
+    new_metadata.CopyFrom(self._metadata)
+
+    new_snapshot_id = self._next_snapshot_id()
+    new_metadata.current_snapshot_id = new_snapshot_id
+    current_snapshot = self.snapshot()
+
+    new_metadata_path = self.new_metadata_path()
+
+    snapshot = meta.Snapshot(
+        snapshot_id=new_snapshot_id,
+        create_time=proto_now(),
+        manifest_files=current_snapshot.manifest_files,
+        storage_statistics=current_snapshot.storage_statistics)
+    _patch_manifests(snapshot.manifest_files, patch)
+
+    # Update storage statistics.
+    ops_utils.update_index_storage_stats(snapshot.storage_statistics,
+                                         patch.storage_statistics_update)
+    ops_utils.update_record_stats_bytes(snapshot.storage_statistics,
+                                        patch.storage_statistics_update)
+
+    # Set new snapshot and materialize new metadata.
+    new_metadata.snapshots[new_snapshot_id].CopyFrom(snapshot)
+    self._write_metadata(new_metadata_path, new_metadata)
+    self._metadata = new_metadata
+
+
+def _patch_manifests(manifest_files: meta.ManifestFiles, patch: runtime.Patch):
+  """Apply changes in a patch to manifest files for a commit."""
+  # Process added manifest files.
+  for f in patch.addition.index_manifest_files:
+    manifest_files.index_manifest_files.append(f)
+
+  for f in patch.addition.record_manifest_files:
+    manifest_files.record_manifest_files.append(f)
