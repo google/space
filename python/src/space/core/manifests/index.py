@@ -22,6 +22,7 @@ import pyarrow.parquet as pq
 from space.core.manifests.utils import write_parquet_file
 import space.core.proto.metadata_pb2 as meta
 from space.core.schema import constants
+from space.core.schema import utils as schema_utils
 from space.core.schema.arrow import field_id, field_id_to_column_id_dict
 from space.core.utils import paths
 
@@ -29,26 +30,13 @@ from space.core.utils import paths
 _INDEX_COMPRESSED_BYTES_FIELD = '_INDEX_COMPRESSED_BYTES'
 _INDEX_UNCOMPRESSED_BYTES_FIELD = '_INDEX_UNCOMPRESSED_BYTES'
 
-# Constants for building column statistics field name.
-_STATS_FIELD = "_STATS"
-_MIN_FIELD = "_MIN"
-_MAX_FIELD = "_MAX"
-
-
-def _stats_field_name(field_id_: int) -> str:
-  """Column stats struct field name.
-  
-  It uses field ID instead of name. Manifest file has all Parquet files and it
-  is not tied with one Parquet schema, we can't do table field name to file
-  field name projection. Using field ID ensures that we can always uniquely
-  identifies a field.
-  """
-  return f"{_STATS_FIELD}_f{field_id_}"
-
 
 def _stats_subfields(type_: pa.DataType) -> List[pa.Field]:
   """Column stats struct field sub-fields."""
-  return [pa.field(_MIN_FIELD, type_), pa.field(_MAX_FIELD, type_)]
+  return [
+      pa.field(constants.MIN_FIELD, type_),
+      pa.field(constants.MAX_FIELD, type_)
+  ]
 
 
 def _manifest_schema(
@@ -70,8 +58,8 @@ def _manifest_schema(
       continue
 
     field_id_ = field_id(f)
-    fields.append(
-        (_stats_field_name(field_id_), pa.struct(_stats_subfields(f.type))))
+    fields.append((schema_utils.stats_field_name(field_id_),
+                   pa.struct(_stats_subfields(f.type))))
     stats_fields.append((field_id_, f.type))
 
   return pa.schema(fields), stats_fields  # type: ignore[arg-type]
