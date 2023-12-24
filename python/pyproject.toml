@@ -41,7 +41,14 @@ pythonpath = ["src"]
 [tool.pylint.format]
 max-line-length = 80
 indent-string = "  "
-disable = ["fixme", "no-else-return"]
+disable = [
+  "duplicate-code",
+  "fixme",
+  "no-else-return",
+  "too-few-public-methods",
+  "too-many-instance-attributes",
+  "too-many-locals"
+]
 
 [tool.pylint.MAIN]
 ignore = "space/core/proto"

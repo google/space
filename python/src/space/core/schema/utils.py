@@ -32,6 +32,11 @@ def field_names(fields: List[Field]) -> List[str]:
   return list(map(lambda f: f.name, fields))
 
 
+def field_ids(fields: List[Field]) -> List[int]:
+  """Extract field IDs from a list of fields."""
+  return list(map(lambda f: f.field_id, fields))
+
+
 def stats_field_name(field_id_: int) -> str:
   """Column stats struct field name.
   

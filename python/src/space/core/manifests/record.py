@@ -18,7 +18,7 @@ from typing import List, Optional
 
 import pyarrow as pa
 
-from space.core.utils.parquet import write_parquet_file
+from space.core.fs.parquet import write_parquet_file
 import space.core.proto.metadata_pb2 as meta
 from space.core.utils import paths
 from space.core.schema import constants

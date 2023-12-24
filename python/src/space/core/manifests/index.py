@@ -22,7 +22,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
-from space.core.utils.parquet import write_parquet_file
+from space.core.fs.parquet import write_parquet_file
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as runtime
 from space.core.schema import constants
@@ -106,7 +106,6 @@ class _FieldStats:
         fields=self._fields)
 
 
-# pylint: disable=too-many-instance-attributes
 class IndexManifestWriter:
   """Writer of index manifest files."""
 
@@ -228,11 +227,8 @@ def read_index_manifests(
   Returns:
     A file set of data files in the manifest file.
   """
-  if filter_ is None:
-    table = pq.read_table(manifest_path)
-  else:
-    table = pq.read_table(manifest_path,
-                          filters=filter_)  # type: ignore[arg-type]
+  table = pq.read_table(manifest_path,
+                        filters=filter_)  # type: ignore[arg-type]
 
   manifests = _index_manifests(table)
 

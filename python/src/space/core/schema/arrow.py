@@ -189,3 +189,12 @@ def record_address_types() -> List[Tuple[str, pa.DataType]]:
   """Returns Arrow fields of record addresses."""
   return [(constants.FILE_PATH_FIELD, pa.string()),
           (constants.ROW_ID_FIELD, pa.int32())]
+
+
+def binary_field(field: utils.Field) -> pa.Field:
+  """Return a binary Arrow field for the given field."""
+  return _set_field_type(field, pa.binary())
+
+
+def _set_field_type(field: utils.Field, type_: pa.DataType) -> pa.Field:
+  return pa.field(field.name, type_, metadata=field_metadata(field.field_id))
