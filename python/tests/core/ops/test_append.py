@@ -104,6 +104,8 @@ class TestLocalAppendOp:
     # Data file exists.
     self._check_file_exists(location, index_manifest["_FILE"])
     self._check_file_exists(location, record_manifest["_FILE"])
+    assert self._file_schema(
+        location, index_manifest["_FILE"][0]) == storage.physical_schema
 
     # Validate statistics.
     assert patch.storage_statistics_update == meta.StorageStatistics(
@@ -134,3 +136,6 @@ class TestLocalAppendOp:
   def _check_file_exists(self, location, file_paths: List[str]):
     for f in file_paths:
       assert (location / f).exists()
+
+  def _file_schema(self, location, file_path: str) -> pa.Schema:
+    return pq.read_schema(str(location / file_path))
