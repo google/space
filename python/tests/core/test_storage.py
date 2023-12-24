@@ -18,12 +18,12 @@ import pyarrow as pa
 import pytest
 from substrait.type_pb2 import NamedStruct, Type
 
+from space.core.fs.parquet import write_parquet_file
 from space.core.manifests import IndexManifestWriter
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as runtime
 from space.core.storage import Storage
 from space.core.utils.paths import _ENTRY_POINT_FILE
-from space.core.utils.parquet import write_parquet_file
 
 _SNAPSHOT_ID = 100
 _SCHEMA = pa.schema(

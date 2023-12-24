@@ -23,7 +23,6 @@ from space.core.schema import arrow
 _START_FIELD_ID = 0
 
 
-# pylint: disable=too-few-public-methods
 class FieldIdManager:
   """Assign field IDs to schema fields using Depth First Search.
 

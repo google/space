@@ -28,7 +28,7 @@ from space.core.manifests import falsifiable_filters as ff
                            ((pc.field("_STATS_f1", "_MIN") > 1) |
                             (pc.field("_STATS_f1", "_MAX") < 1)))])
 def test_build_manifest_filter(filter_, falsifiable_filter):
-  arrow_schema = pa.schema([("a", pa.int64()), ("b", pa.float64())])  # pylint: disable=too-few-public-methods
+  arrow_schema = pa.schema([("a", pa.int64()), ("b", pa.float64())])
   field_name_ids = {"a": 0, "b": 1}
 
   falsifiable_filter = ff.build_manifest_filter(arrow_schema, field_name_ids,
@@ -39,7 +39,7 @@ def test_build_manifest_filter(filter_, falsifiable_filter):
 @pytest.mark.parametrize("filter_", [(pc.field("a") != 10),
                                      (~(pc.field("a") > 10))])
 def test_build_manifest_filter_not_supported_return_none(filter_):
-  arrow_schema = pa.schema([("a", pa.int64()), ("b", pa.float64())])  # pylint: disable=too-few-public-methods
+  arrow_schema = pa.schema([("a", pa.int64()), ("b", pa.float64())])
   field_name_ids = {"a": 0, "b": 1}
 
   assert ff.build_manifest_filter(arrow_schema, field_name_ids,

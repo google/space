@@ -18,10 +18,10 @@ import pyarrow.parquet as pq
 
 from space.core.manifests import IndexManifestWriter
 from space.core.manifests.index import read_index_manifests
+from space.core.fs.parquet import write_parquet_file
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as runtime
 from space.core.schema.arrow import field_metadata
-from space.core.utils.parquet import write_parquet_file
 
 _SCHEMA = pa.schema([
     pa.field("int64", pa.int64(), metadata=field_metadata(0)),

@@ -42,7 +42,7 @@ _MAX_ROW_GROUP_BYTES = 100 * 1024
 
 
 class BaseAppendOp(BaseOp):
-  """Abstract base Append operation class."""
+  """Abstract base append operation class."""
 
   @abstractmethod
   def write(self, data: InputData) -> None:
@@ -71,7 +71,6 @@ class _RecordWriterInfo:
       default_factory=meta.StorageStatistics)
 
 
-# pylint: disable=too-many-instance-attributes
 class LocalAppendOp(BaseAppendOp, StoragePaths):
   """Append operation running locally.
   

@@ -25,6 +25,5 @@ import pyarrow as pa
 InputData: TypeAlias = Union[Dict[str, Any], pa.Table]
 
 
-# pylint: disable=too-few-public-methods
 class BaseOp(ABC):
   """Abstract base operation class."""

@@ -12,21 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Parquet utilities."""
+"""ArrayRecord file utilities."""
 
 from typing import List
 
-import pyarrow as pa
-import pyarrow.parquet as pq
+from space.core.utils.lazy_imports_utils import array_record_module as ar
 
 
-def write_parquet_file(file_path: str, schema: pa.Schema,
-                       data: List[pa.Table]) -> pq.FileMetaData:
-  """Materialize a single Parquet file."""
-  # TODO: currently assume this file is small, so always write a single file.
-  writer = pq.ParquetWriter(file_path, schema)
-  for batch in data:
-    writer.write_table(batch)
+def read_record_file(file_path: str, positions: List[int]) -> List[bytes]:
+  """Read records of an ArrayRecord file.
+  
+  Args:
+   file_path: full file path.
+   positions: the position inside the file of the records to read.
 
-  writer.close()
-  return writer.writer.metadata
+  """
+  record_reader = ar.ArrayRecordReader(file_path)
+  records = record_reader.read(positions)
+  record_reader.close()
+  return records

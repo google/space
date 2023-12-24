@@ -13,14 +13,11 @@
 # limitations under the License.
 
 from typing import List
-import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
-from tensorflow_datasets import features  # type: ignore[import-untyped]
 
 from space.core.ops import LocalAppendOp
 import space.core.proto.metadata_pb2 as meta
-from space.core.schema.types import TfFeatures
 from space.core.storage import Storage
 
 
@@ -28,34 +25,17 @@ class TestLocalAppendOp:
 
   # TODO: to add tests using Arrow table input.
 
-  def test_write_pydict_all_types(self, tmp_path):
+  def test_write_pydict_all_types(self, tmp_path, all_types_schema,
+                                  all_types_input_data):
     location = tmp_path / "dataset"
-    schema = pa.schema([
-        pa.field("int64", pa.int64()),
-        pa.field("float64", pa.float64()),
-        pa.field("bool", pa.bool_()),
-        pa.field("string", pa.string())
-    ])
     storage = Storage.create(location=str(location),
-                             schema=schema,
+                             schema=all_types_schema,
                              primary_keys=["int64"],
                              record_fields=[])
 
     op = LocalAppendOp(str(location), storage.metadata)
-
-    # TODO: the test should cover all types supported by column stats.
-    op.write({
-        "int64": [1, 2, 3],
-        "float64": [0.1, 0.2, 0.3],
-        "bool": [True, False, False],
-        "string": ["a", "b", "c"]
-    })
-    op.write({
-        "int64": [0, 10],
-        "float64": [-0.1, 100.0],
-        "bool": [False, False],
-        "string": ["A", "z"]
-    })
+    for batch in all_types_input_data:
+      op.write(batch)
 
     patch = op.finish()
     assert patch is not None
@@ -81,43 +61,18 @@ class TestLocalAppendOp:
     assert patch.storage_statistics_update == meta.StorageStatistics(
         num_rows=5, index_compressed_bytes=114, index_uncompressed_bytes=126)
 
-  def test_write_pydict_with_record_fields(self, tmp_path):
-    tf_features_images = features.FeaturesDict(
-        {"images": features.Image(shape=(None, None, 3), dtype=np.uint8)})
-    tf_features_objects = features.FeaturesDict({
-        "objects":
-        features.Sequence({
-            "bbox": features.BBoxFeature(),
-            "id": np.int64
-        }),
-    })
-
+  def test_write_pydict_with_record_fields(self, tmp_path,
+                                           record_fields_schema,
+                                           record_fields_input_data):
     location = tmp_path / "dataset"
-    schema = pa.schema([
-        pa.field("int64", pa.int64()),
-        pa.field("string", pa.string()),
-        pa.field("images", TfFeatures(tf_features_images)),
-        pa.field("objects", TfFeatures(tf_features_objects))
-    ])
     storage = Storage.create(location=str(location),
-                             schema=schema,
+                             schema=record_fields_schema,
                              primary_keys=["int64"],
                              record_fields=["images", "objects"])
 
     op = LocalAppendOp(str(location), storage.metadata)
-
-    op.write({
-        "int64": [1, 2, 3],
-        "string": ["a", "b", "c"],
-        "images": [b"images0", b"images1", b"images2"],
-        "objects": [b"objects0", b"objects1", b"objects2"]
-    })
-    op.write({
-        "int64": [0, 10],
-        "string": ["A", "z"],
-        "images": [b"images3", b"images4"],
-        "objects": [b"objects3", b"objects4"]
-    })
+    for batch in record_fields_input_data:
+      op.write(batch)
 
     patch = op.finish()
     assert patch is not None
