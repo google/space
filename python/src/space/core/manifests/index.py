@@ -139,6 +139,7 @@ class IndexManifestWriter:
 
   @property
   def manifest_schema(self) -> pa.Schema:
+    """The schema of index manifest files."""
     return self._manifest_schema
 
   def write(self, file_path: str,
