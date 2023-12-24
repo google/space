@@ -34,44 +34,73 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 @typing_extensions.final
 class DataFile(google.protobuf.message.Message):
-    """Information of a data file."""
+    """Information of a data file.
+    NEXT_ID: 4
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     PATH_FIELD_NUMBER: builtins.int
     STORAGE_STATISTICS_FIELD_NUMBER: builtins.int
+    MANIFEST_FILE_ID_FIELD_NUMBER: builtins.int
     path: builtins.str
     """Data file path."""
     @property
     def storage_statistics(self) -> space.core.proto.metadata_pb2.StorageStatistics:
         """Storage statistics of data in the file."""
+    manifest_file_id: builtins.int
+    """Locally assigned manifest file IDs."""
     def __init__(
         self,
         *,
         path: builtins.str = ...,
         storage_statistics: space.core.proto.metadata_pb2.StorageStatistics | None = ...,
+        manifest_file_id: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["storage_statistics", b"storage_statistics"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["path", b"path", "storage_statistics", b"storage_statistics"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["manifest_file_id", b"manifest_file_id", "path", b"path", "storage_statistics", b"storage_statistics"]) -> None: ...
 
 global___DataFile = DataFile
 
 @typing_extensions.final
 class FileSet(google.protobuf.message.Message):
-    """A set of associated data and manifest files."""
+    """A set of associated data and manifest files.
+    NEXT_ID: 2
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
+    class IndexManifestFilesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.int
+        value: builtins.str
+        def __init__(
+            self,
+            *,
+            key: builtins.int = ...,
+            value: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
     INDEX_FILES_FIELD_NUMBER: builtins.int
+    INDEX_MANIFEST_FILES_FIELD_NUMBER: builtins.int
     @property
     def index_files(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DataFile]:
         """Index data files."""
+    @property
+    def index_manifest_files(self) -> google.protobuf.internal.containers.ScalarMap[builtins.int, builtins.str]:
+        """Key is locally assigned manifest IDs by a local operation."""
     def __init__(
         self,
         *,
         index_files: collections.abc.Iterable[global___DataFile] | None = ...,
+        index_manifest_files: collections.abc.Mapping[builtins.int, builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["index_files", b"index_files"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["index_files", b"index_files", "index_manifest_files", b"index_manifest_files"]) -> None: ...
 
 global___FileSet = FileSet
 

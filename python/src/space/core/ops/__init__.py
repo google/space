@@ -15,4 +15,5 @@
 """Space local data operations."""
 
 from space.core.ops.append import LocalAppendOp
+from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.read import FileSetReadOp

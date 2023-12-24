@@ -44,7 +44,13 @@ class BaseReadOp(BaseOp):
 
 
 class FileSetReadOp(BaseReadOp, StoragePaths):
-  """Read data from a dataset."""
+  """Read operation of a given file set running locally.
+  
+  It can be used as components of more complex operations and distributed
+  read operation.
+
+  Not thread safe.
+  """
 
   def __init__(self,
                location: str,
@@ -78,12 +84,12 @@ class FileSetReadOp(BaseReadOp, StoragePaths):
       yield self._read_index_and_record(file.path)
 
   def _read_index_and_record(self, index_path: str) -> pa.Table:
-    index_table = pq.read_table(self.full_path(index_path),
-                                filters=self._filter)  # type: ignore[arg-type]
+    index_data = pq.read_table(self.full_path(index_path),
+                               filters=self._filter)  # type: ignore[arg-type]
 
     index_column_ids: List[int] = []
     record_columns: List[Tuple[int, pa.Field]] = []
-    for column_id, field in enumerate(index_table.schema):
+    for column_id, field in enumerate(index_data.schema):
       field_id = arrow.field_id(field)
       if field_id in self._index_field_ids:
         index_column_ids.append(column_id)
@@ -92,18 +98,18 @@ class FileSetReadOp(BaseReadOp, StoragePaths):
             (column_id,
              arrow.binary_field(self._record_fields_dict[field_id])))
 
-    result_table = index_table.select(
-        index_column_ids)  # type: ignore[arg-type]
+    result_data = index_data.select(index_column_ids)  # type: ignore[arg-type]
 
-    # Record record fields from addresses.
+    # Read record fields from addresses.
     for column_id, field in record_columns:
-      result_table = result_table.append_column(
+      result_data = result_data.append_column(
           field,
           self._read_record_column(
-              index_table.select([column_id]),  # type: ignore[list-item]
+              index_data.select([column_id]),  # type: ignore[list-item]
               field.name))
 
-    return result_table
+    # TODO: to keep field order the same as schema.
+    return result_data
 
   def _read_record_column(self, record_address: pa.Table,
                           field: str) -> pa.BinaryArray:

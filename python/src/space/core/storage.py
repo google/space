@@ -176,18 +176,25 @@ class Storage(paths.StoragePaths):
     manifest_files = self.snapshot(snapshot_id).manifest_files
     result = runtime.FileSet()
 
+    # A temporily assigned identifier for tracking manifest files.
+    # Start from 1 to detect unassigned values 0 that is default.
+    manifest_file_id = 1
+
     # Construct falsifiable filter to prune manifest rows.
     manifest_filter = None
     if filter_ is not None:
       manifest_filter = build_manifest_filter(self._physical_schema,
                                               self._field_name_ids, filter_)
 
-    for f in manifest_files.index_manifest_files:
-      result_per_manifest = read_index_manifests(self.full_path(f),
+    for manifest_file in manifest_files.index_manifest_files:
+      result_per_manifest = read_index_manifests(self.full_path(manifest_file),
+                                                 manifest_file_id,
                                                  manifest_filter)
       if not result_per_manifest.index_files:
         continue
 
+      result.index_manifest_files[manifest_file_id] = manifest_file
+      manifest_file_id += 1
       result.index_files.extend(result_per_manifest.index_files)
 
     return result
@@ -212,6 +219,12 @@ class Storage(paths.StoragePaths):
 
 def _patch_manifests(manifest_files: meta.ManifestFiles, patch: runtime.Patch):
   """Apply changes in a patch to manifest files for a commit."""
+  # Process deleted index manifest files.
+  deleted_manifests = set(patch.deletion.index_manifest_files)
+  for i in range(len(manifest_files.index_manifest_files) - 1, -1, -1):
+    if manifest_files.index_manifest_files[i] in deleted_manifests:
+      del manifest_files.index_manifest_files[i]
+
   # Process added manifest files.
   for f in patch.addition.index_manifest_files:
     manifest_files.index_manifest_files.append(f)

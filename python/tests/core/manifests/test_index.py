@@ -73,10 +73,50 @@ class TestIndexManifestWriter:
             })
         ]))
 
+    # Test directly write manifests.
+    external_manifests = {
+        "_FILE": ["data/file2", "data/file3"],
+        "_INDEX_COMPRESSED_BYTES": [100, 200],
+        "_INDEX_UNCOMPRESSED_BYTES": [300, 400],
+        "_NUM_ROWS": [10, 20],
+        "_STATS_f0": [{
+            "_MAX": -100,
+            "_MIN": -200
+        }, {
+            "_MAX": -300,
+            "_MIN": -400
+        }],
+        "_STATS_f1": [{
+            "_MAX": -100.1,
+            "_MIN": -200.1
+        }, {
+            "_MAX": -300.1,
+            "_MIN": -400.1
+        }],
+        "_STATS_f2": [{
+            "_MAX": True,
+            "_MIN": False
+        }, {
+            "_MAX": False,
+            "_MIN": False
+        }],
+        "_STATS_f3": [{
+            "_MAX": "z",
+            "_MIN": "A"
+        }, {
+            "_MAX": "abcedf",
+            "_MIN": "ABCDEF"
+        }]
+    }
+    manifest_writer.write_arrow(
+        pa.Table.from_pydict(external_manifests,
+                             schema=manifest_writer.manifest_schema))
+
     manifest_path = manifest_writer.finish()
 
     assert manifest_path is not None
-    assert pq.read_table(manifest_path).to_pydict() == {
+
+    expected_manifests = {
         "_FILE": ["data/file0", "data/file1"],
         "_INDEX_COMPRESSED_BYTES": [645, 334],
         "_INDEX_UNCOMPRESSED_BYTES": [624, 320],
@@ -111,26 +151,46 @@ class TestIndexManifestWriter:
         }]
     }
 
-    assert read_index_manifests(manifest_path) == runtime.FileSet(index_files=[
-        runtime.DataFile(path="data/file0",
-                         storage_statistics=meta.StorageStatistics(
-                             num_rows=5,
-                             index_compressed_bytes=645,
-                             index_uncompressed_bytes=624)),
-        runtime.DataFile(path="data/file1",
-                         storage_statistics=meta.StorageStatistics(
-                             num_rows=2,
-                             index_compressed_bytes=334,
-                             index_uncompressed_bytes=320))
-    ])
+    for k, v in external_manifests.items():
+      expected_manifests[k] = v + expected_manifests[k]
+
+    assert pq.read_table(manifest_path).to_pydict() == expected_manifests
+    assert read_index_manifests(
+        manifest_path, 123) == runtime.FileSet(index_files=[
+            runtime.DataFile(path="data/file2",
+                             manifest_file_id=123,
+                             storage_statistics=meta.StorageStatistics(
+                                 num_rows=10,
+                                 index_compressed_bytes=100,
+                                 index_uncompressed_bytes=300)),
+            runtime.DataFile(path="data/file3",
+                             manifest_file_id=123,
+                             storage_statistics=meta.StorageStatistics(
+                                 num_rows=20,
+                                 index_compressed_bytes=200,
+                                 index_uncompressed_bytes=400)),
+            runtime.DataFile(path="data/file0",
+                             manifest_file_id=123,
+                             storage_statistics=meta.StorageStatistics(
+                                 num_rows=5,
+                                 index_compressed_bytes=645,
+                                 index_uncompressed_bytes=624)),
+            runtime.DataFile(path="data/file1",
+                             manifest_file_id=123,
+                             storage_statistics=meta.StorageStatistics(
+                                 num_rows=2,
+                                 index_compressed_bytes=334,
+                                 index_uncompressed_bytes=320))
+        ])
 
     # Test index manifest filtering.
     # TODO: to move it to a separate test and add more test cases.
     filtered_manifests = read_index_manifests(
-        manifest_path,
+        manifest_path, 0,
         pc.field("_STATS_f3", "_MIN") >= "ABCDEF")
-    assert len(filtered_manifests.index_files) == 1
-    assert filtered_manifests.index_files[0].path == "data/file1"
+    assert len(filtered_manifests.index_files) == 2
+    assert filtered_manifests.index_files[0].path == "data/file3"
+    assert filtered_manifests.index_files[1].path == "data/file1"
 
   def test_write_collet_stats_for_primary_keys_only(self, tmp_path):
     data_dir = tmp_path / "dataset" / "data"

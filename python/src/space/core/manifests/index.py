@@ -30,10 +30,6 @@ from space.core.schema import utils as schema_utils
 from space.core.schema.arrow import field_id, field_id_to_column_id_dict
 from space.core.utils import paths
 
-# Manifest file fields.
-_INDEX_COMPRESSED_BYTES_FIELD = '_INDEX_COMPRESSED_BYTES'
-_INDEX_UNCOMPRESSED_BYTES_FIELD = '_INDEX_UNCOMPRESSED_BYTES'
-
 
 def _stats_subfields(type_: pa.DataType) -> List[pa.Field]:
   """Column stats struct field sub-fields."""
@@ -51,8 +47,8 @@ def _manifest_schema(
 
   fields = [(constants.FILE_PATH_FIELD, pa.utf8()),
             (constants.NUM_ROWS_FIELD, pa.int64()),
-            (_INDEX_COMPRESSED_BYTES_FIELD, pa.int64()),
-            (_INDEX_UNCOMPRESSED_BYTES_FIELD, pa.int64())]
+            (constants.INDEX_COMPRESSED_BYTES_FIELD, pa.int64()),
+            (constants.INDEX_UNCOMPRESSED_BYTES_FIELD, pa.int64())]
 
   # Fields to collect Parquet column statistics: [(field_id, type), ...].
   stats_fields: List[Tuple[int, pa.DataType]] = []
@@ -139,6 +135,12 @@ class IndexManifestWriter:
       self._stats_column_ids.append(column_id)
       self._field_stats_dict[column_id] = _FieldStats(type_)
 
+    self._cached_manifest_data: List[pa.Table] = []
+
+  @property
+  def manifest_schema(self) -> pa.Schema:
+    return self._manifest_schema
+
   def write(self, file_path: str,
             parquet_metadata: pq.FileMetaData) -> meta.StorageStatistics:
     """Write a new manifest row.
@@ -175,11 +177,13 @@ class IndexManifestWriter:
         index_compressed_bytes=index_compressed_bytes,
         index_uncompressed_bytes=index_uncompressed_bytes)
 
+  def write_arrow(self, manifest_data: pa.Table) -> None:
+    """Write manifest rows in Arrow format."""
+    self._cached_manifest_data.append(manifest_data)
+
   def finish(self) -> Optional[str]:
     """Materialize the manifest file and return the file path."""
     # Convert cached manifest data to Arrow.
-    all_manifest_data: List[pa.Table] = []
-
     if self._file_paths:
       arrays = [
           self._file_paths, self._num_rows, self._index_compressed_bytes,
@@ -189,15 +193,15 @@ class IndexManifestWriter:
       for column_id in self._stats_column_ids:
         arrays.append(self._field_stats_dict[column_id].to_arrow())
 
-      all_manifest_data.append(
+      self._cached_manifest_data.append(
           pa.Table.from_arrays(
               arrays=arrays,
               schema=self._manifest_schema))  # type: ignore[call-arg]
 
-    if not all_manifest_data:
+    if not self._cached_manifest_data:
       return None
 
-    manifest_data = pa.concat_tables(all_manifest_data)
+    manifest_data = pa.concat_tables(self._cached_manifest_data)
     if manifest_data.num_rows == 0:
       return None
 
@@ -217,11 +221,13 @@ class _IndexManifests:
 
 def read_index_manifests(
     manifest_path: str,
+    manifest_file_id: int,
     filter_: Optional[pc.Expression] = None) -> runtime.FileSet:
   """Read an index manifest file.
   
   Args:
     manifest_path: full file path of the manifest file.
+    manifest_file_id: a temporary manifest file ID assigned by the caller.
     filter_: a filter on the index manifest rows.
 
   Returns:
@@ -234,15 +240,13 @@ def read_index_manifests(
 
   file_set = runtime.FileSet()
   for i in range(table.num_rows):
-    file = runtime.DataFile()
-    file.path = manifests.file_path[i].as_py()
-
-    stats = file.storage_statistics
-    stats.num_rows = manifests.num_rows[i].as_py()
-    stats.index_compressed_bytes = manifests.index_compressed_bytes[i].as_py()
-    stats.index_uncompressed_bytes = manifests.index_uncompressed_bytes[
-        i].as_py()
-
+    stats = meta.StorageStatistics(
+        num_rows=manifests.num_rows[i].as_py(),
+        index_compressed_bytes=manifests.index_compressed_bytes[i].as_py(),
+        index_uncompressed_bytes=manifests.index_uncompressed_bytes[i].as_py())
+    file = runtime.DataFile(path=manifests.file_path[i].as_py(),
+                            manifest_file_id=manifest_file_id,
+                            storage_statistics=stats)
     file_set.index_files.append(file)
 
   return file_set
@@ -254,6 +258,6 @@ def _index_manifests(table: pa.Table) -> _IndexManifests:
       file_path=table.column(constants.FILE_PATH_FIELD).combine_chunks(),
       num_rows=table.column(constants.NUM_ROWS_FIELD).combine_chunks(),
       index_compressed_bytes=table.column(
-          _INDEX_COMPRESSED_BYTES_FIELD).combine_chunks(),
+          constants.INDEX_COMPRESSED_BYTES_FIELD).combine_chunks(),
       index_uncompressed_bytes=table.column(
-          _INDEX_UNCOMPRESSED_BYTES_FIELD).combine_chunks())
+          constants.INDEX_UNCOMPRESSED_BYTES_FIELD).combine_chunks())
