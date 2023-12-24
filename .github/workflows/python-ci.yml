@@ -47,7 +47,8 @@ jobs:
     - name: Analysing test code with pylint
       working-directory: ./python
       run: |
-        pylint tests/**/* --disable="missing-module-docstring,missing-function-docstring,missing-class-docstring,duplicate-code"
+        pylint tests/**/* \
+          --disable="missing-module-docstring,missing-function-docstring,missing-class-docstring,duplicate-code"
     - name: Checking type with mypy
       working-directory: ./python/src
       run: |

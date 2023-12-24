@@ -17,14 +17,15 @@ import pyarrow.compute as pc
 
 from space.core.ops import LocalAppendOp
 from space.core.ops import FileSetReadOp
+from space.core.ops import FileSetDeleteOp
 from space.core.storage import Storage
 
 
-class TestFileSetReadOp:
+class TestFileSetDeleteOp:
 
   # TODO: to add tests using Arrow table input.
-  def test_read_all_types(self, tmp_path, all_types_schema,
-                          all_types_input_data):
+  def test_delete_all_types(self, tmp_path, all_types_schema,
+                            all_types_input_data):
     location = tmp_path / "dataset"
     storage = Storage.create(location=str(location),
                              schema=all_types_schema,
@@ -38,20 +39,32 @@ class TestFileSetReadOp:
       append_op.write(batch)
 
     storage.commit(append_op.finish())
+    old_data_files = storage.data_files()
 
-    read_op = FileSetReadOp(str(location), storage.metadata,
-                            storage.data_files())
-    results = list(iter(read_op))
-    assert len(results) == 1
-    assert list(iter(read_op))[0] == pa.concat_tables(input_data)
-
-    # Test FileSetReadOp with filters.
-    read_op = FileSetReadOp(
+    delete_op = FileSetDeleteOp(
         str(location),
         storage.metadata,
         storage.data_files(),
         # pylint: disable=singleton-comparison
-        filter_=pc.field("bool") == True)
+        filter_=pc.field("bool") == False)
+    patch = delete_op.delete()
+    assert patch is not None
+    storage.commit(patch)
+
+    # Verify storage metadata after patch.
+    new_data_files = storage.data_files()
+
+    def validate_data_files(data_files, patch_manifests):
+      assert len(data_files.index_manifest_files) == 1
+      assert len(patch_manifests.index_manifest_files) == 1
+      assert data_files.index_manifest_files[
+          1] == patch_manifests.index_manifest_files[0]
+
+    validate_data_files(old_data_files, patch.deletion)
+    validate_data_files(new_data_files, patch.addition)
+
+    read_op = FileSetReadOp(str(location), storage.metadata,
+                            storage.data_files())
     results = list(iter(read_op))
     assert len(results) == 1
     assert list(iter(read_op))[0] == pa.Table.from_pydict({
@@ -60,24 +73,3 @@ class TestFileSetReadOp:
         "bool": [True],
         "string": ["a"]
     })
-
-  def test_read_with_record_filters(self, tmp_path, record_fields_schema,
-                                    record_fields_input_data):
-    location = tmp_path / "dataset"
-    storage = Storage.create(location=str(location),
-                             schema=record_fields_schema,
-                             primary_keys=["int64"],
-                             record_fields=["images", "objects"])
-
-    append_op = LocalAppendOp(str(location), storage.metadata)
-    input_data = [pa.Table.from_pydict(d) for d in record_fields_input_data]
-    for batch in input_data:
-      append_op.write(batch)
-
-    storage.commit(append_op.finish())
-    data_files = storage.data_files()
-
-    read_op = FileSetReadOp(str(location), storage.metadata, data_files)
-    results = list(iter(read_op))
-    assert len(results) == 1
-    assert list(iter(read_op))[0] == pa.concat_tables(input_data)

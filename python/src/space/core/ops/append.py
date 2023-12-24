@@ -80,7 +80,14 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
   Not thread safe.
   """
 
-  def __init__(self, location: str, metadata: meta.StorageMetadata):
+  def __init__(self,
+               location: str,
+               metadata: meta.StorageMetadata,
+               record_address_input: bool = False):
+    """
+    Args:
+      record_address_input: if true, input record fields are addresses.
+    """
     StoragePaths.__init__(self, location)
 
     self._metadata = metadata
@@ -90,6 +97,8 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
                                                physical=True)
     self._index_fields, self._record_fields = arrow.classify_fields(
         self._physical_schema, record_fields, selected_fields=None)
+
+    self._record_address_input = record_address_input
 
     # Data file writers.
     self._index_writer_info: Optional[_IndexWriterInfo] = None
@@ -151,6 +160,10 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
 
     return self._patch
 
+  def append_index_manifest(self, index_manifest_table: pa.Table) -> None:
+    """Append external index manifest data."""
+    return self._index_manifest_writer.write_arrow(index_manifest_table)
+
   def _append_arrow(self, data: pa.Table) -> None:
     # TODO: to verify the schema of input data.
     if data.num_rows == 0:
@@ -165,15 +178,20 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
 
     # Write record fields into files.
     # TODO: to parallelize it.
-    record_addresses = [
-        self._write_record_column(f, data.column(f.name))
-        for f in self._record_fields
-    ]
-
     # TODO: to preserve the field order in schema.
-    for field_name, address_column in record_addresses:
-      # TODO: the field/column added must have field ID.
-      index_data = index_data.append_column(field_name, address_column)
+    if self._record_address_input:
+      for f in self._record_fields:
+        index_data = index_data.append_column(f.name, data.column(
+            f.name))  # type: ignore[arg-type]
+    else:
+      record_addresses = [
+          self._write_record_column(f, data.column(f.name))
+          for f in self._record_fields
+      ]
+
+      for field_name, address_column in record_addresses:
+        # TODO: the field/column added must have field ID.
+        index_data = index_data.append_column(field_name, address_column)
 
     # Write index fields into files.
     self._cached_index_file_bytes += index_data.nbytes
