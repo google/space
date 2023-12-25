@@ -74,6 +74,11 @@ class StoragePaths:
     self._entry_point_file = entry_point_path(self._location)
 
   @property
+  def location(self) -> str:
+    """Return the storage base folder location."""
+    return self._location
+
+  @property
   def data_dir(self) -> str:
     """Return the data directory."""
     return self._data_dir
