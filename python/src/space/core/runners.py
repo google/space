@@ -26,6 +26,7 @@ from space.core.ops import FileSetDeleteOp, FileSetReadOp, LocalAppendOp
 from space.core.ops.base import InputData
 import space.core.proto.runtime_pb2 as runtime
 from space.core.storage import Storage
+from space.tf.conversion import LocalConvertTfdsOp, TfdsIndexFn
 
 
 class BaseRunner(ABC):
@@ -43,6 +44,17 @@ class BaseRunner(ABC):
   @abstractmethod
   def append(self, data: InputData) -> runtime.JobResult:
     """Append data into the dataset."""
+
+  @abstractmethod
+  def append_tfds(self, tfds_path: str,
+                  index_fn: TfdsIndexFn) -> runtime.JobResult:
+    """Append data from a Tensorflow Dataset without copying data.
+    
+    Args:
+      tfds_path: the folder of TFDS dataset files, should contain ArrowRecord
+        files.
+      index_fn: a function that build index fields from each TFDS record.
+    """
 
   @abstractmethod
   def delete(self, filter_: pc.Expression) -> runtime.JobResult:
@@ -72,6 +84,12 @@ class LocalRunner(BaseRunner):
     op.write(data)
     return self._try_commit(op.finish())
 
+  def append_tfds(self, tfds_path: str,
+                  index_fn: TfdsIndexFn) -> runtime.JobResult:
+    op = LocalConvertTfdsOp(self._storage.location, self._storage.metadata,
+                            tfds_path, index_fn)
+    return self._try_commit(op.write())
+
   def delete(self, filter_: pc.Expression) -> runtime.JobResult:
     ds = self._storage
     op = FileSetDeleteOp(self._storage.location, self._storage.metadata,
@@ -88,5 +106,5 @@ def _job_result(patch: Optional[runtime.Patch]) -> runtime.JobResult:
         state=runtime.JobResult.State.SUCCEEDED,
         storage_statistics_update=patch.storage_statistics_update)
 
-  logging.info(f'Job result:\n{result}')
+  logging.info(f"Job result:\n{result}")
   return result

@@ -14,11 +14,14 @@
 
 import json
 import numpy as np
+from numpy.testing import assert_array_equal
+import pyarrow as pa
 import pytest
 import tensorflow_datasets as tfds  # type: ignore[import-untyped]
 from tensorflow_datasets import features as f  # type: ignore[import-untyped]
 
 from space.core.schema.types import TfFeatures
+from space.core.serializers import DictSerializer
 from space.core.utils.constants import UTF_8
 
 
@@ -68,6 +71,35 @@ class TestTfFeatures:
     assert len(value_bytes) > 0
 
     objects = tf_features.deserialize(value_bytes)["objects"]
-    np.testing.assert_array_equal(
-        objects["bbox"], np.array([[0.3, 0.8, 0.5, 1.]], dtype=np.float32))
-    np.testing.assert_array_equal(objects["id"], np.array([123]))
+    assert_array_equal(objects["bbox"],
+                       np.array([[0.3, 0.8, 0.5, 1.]], dtype=np.float32))
+    assert_array_equal(objects["id"], np.array([123]))
+
+  def test_dict_serialize_deserialize(self, tf_features):
+    schema = pa.schema([("int64", pa.int64()), ("features", tf_features)])
+    serializer = DictSerializer(schema)
+
+    features_data = [{
+        "objects": {
+            "bbox": np.array([[0.3, 0.8, 0.5, 1.0]], np.float32),
+            "id": np.array([123]),
+        }
+    }, {
+        "objects": {
+            "bbox": np.array([[0.1, 0.2, 0.3, 0.4]], np.float32),
+            "id": np.array([456]),
+        }
+    }]
+
+    data = {"int64": [1, 2], "features": features_data}
+    serialized_data = serializer.serialize(data)
+    assert serialized_data["int64"] == [1, 2]
+    assert len(serialized_data["features"]) == 2
+
+    objects = tf_features.deserialize(
+        serialized_data["features"][0])["objects"]
+    assert_array_equal(objects["bbox"],
+                       np.array([[0.3, 0.8, 0.5, 1.]], dtype=np.float32))
+    assert_array_equal(objects["id"], np.array([123]))
+
+    assert serializer.deserialize(serialized_data) == data

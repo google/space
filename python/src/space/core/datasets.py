@@ -24,7 +24,7 @@ from space.core.storage import Storage
 
 
 class Dataset:
-  """Dataset is the interface to intract with Space storage."""
+  """Dataset is the interface to interact with Space storage."""
 
   def __init__(self, storage: Storage):
     self._storage = storage

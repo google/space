@@ -198,3 +198,20 @@ def binary_field(field: utils.Field) -> pa.Field:
 
 def _set_field_type(field: utils.Field, type_: pa.DataType) -> pa.Field:
   return pa.field(field.name, type_, metadata=field_metadata(field.field_id))
+
+
+def logical_to_physical_schema(logical_schema: pa.Schema,
+                               record_fields: Set[str]) -> pa.Schema:
+  """Convert a logical schema to a physical schema."""
+  fields: List[pa.Field] = []
+  for f in logical_schema:
+    if f.name in record_fields:
+      fields.append(
+          pa.field(
+              f.name,
+              pa.struct(record_address_types()),  # type: ignore[arg-type]
+              metadata=f.metadata))
+    else:
+      fields.append(f)
+
+  return pa.schema(fields)

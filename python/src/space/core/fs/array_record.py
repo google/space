@@ -14,12 +14,13 @@
 #
 """ArrayRecord file utilities."""
 
-from typing import List
+from typing import List, Optional
 
 from space.core.utils.lazy_imports_utils import array_record_module as ar
 
 
-def read_record_file(file_path: str, positions: List[int]) -> List[bytes]:
+def read_record_file(file_path: str,
+                     positions: Optional[List[int]] = None) -> List[bytes]:
   """Read records of an ArrayRecord file.
   
   Args:
@@ -28,6 +29,10 @@ def read_record_file(file_path: str, positions: List[int]) -> List[bytes]:
 
   """
   record_reader = ar.ArrayRecordReader(file_path)
-  records = record_reader.read(positions)
+  if positions is not None:
+    records = record_reader.read(positions)
+  else:
+    records = record_reader.read_all()
+
   record_reader.close()
   return records

@@ -27,13 +27,13 @@ class TestRecordManifestWriter:
     manifest_writer = RecordManifestWriter(metadata_dir=str(metadata_dir))
 
     manifest_writer.write(
-        "data/file0.arrayrecord", 0,
+        "data/file0.array_record", 0,
         meta.StorageStatistics(num_rows=123,
                                index_compressed_bytes=10,
                                index_uncompressed_bytes=20,
                                record_uncompressed_bytes=30))
     manifest_writer.write(
-        "data/file1.arrayrecord", 1,
+        "data/file1.array_record", 1,
         meta.StorageStatistics(num_rows=456,
                                index_compressed_bytes=10,
                                index_uncompressed_bytes=20,
@@ -43,7 +43,7 @@ class TestRecordManifestWriter:
 
     assert manifest_path is not None
     assert pq.read_table(manifest_path).to_pydict() == {
-        "_FILE": ["data/file0.arrayrecord", "data/file1.arrayrecord"],
+        "_FILE": ["data/file0.array_record", "data/file1.array_record"],
         "_FIELD_ID": [0, 1],
         "_NUM_ROWS": [123, 456],
         "_UNCOMPRESSED_BYTES": [30, 100]

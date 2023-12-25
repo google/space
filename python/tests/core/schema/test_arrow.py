@@ -108,3 +108,14 @@ def test_field_names():
       utils.Field("list_struct", 220),
       utils.Field("struct_list", 260)
   ]) == ["struct", "list_struct", "struct_list"]
+
+
+def test_logical_to_physical_schema(tf_features_arrow_schema):
+  physical_schema = pa.schema([
+      pa.field("int64", pa.int64(), metadata=field_metadata(0)),
+      pa.field("features",
+               pa.struct([("_FILE", pa.string()), ("_ROW_ID", pa.int32())]),
+               metadata=field_metadata(1))
+  ])
+  assert arrow.logical_to_physical_schema(tf_features_arrow_schema,
+                                          set(["features"])) == physical_schema
