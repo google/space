@@ -139,7 +139,7 @@ global___Patch = Patch
 @typing_extensions.final
 class JobResult(google.protobuf.message.Message):
     """Result of a job.
-    NEXT_ID: 2
+    NEXT_ID: 3
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

@@ -55,7 +55,7 @@ message Patch {
 }
 
 // Result of a job.
-// NEXT_ID: 2
+// NEXT_ID: 3
 message JobResult {
   enum State {
     STATE_UNSPECIFIED = 0;

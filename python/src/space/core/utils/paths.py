@@ -30,7 +30,7 @@ def new_index_file_path(data_dir_: str):
 
 def new_record_file_path(data_dir_: str, field_name: str):
   """Return a random record file path in a given data directory.."""
-  return path.join(data_dir_, f"{field_name}_{uuid_()}.arrowrecord")
+  return path.join(data_dir_, f"{field_name}_{uuid_()}.array_record")
 
 
 def new_index_manifest_path(metadata_dir_: str):

@@ -79,7 +79,7 @@ class TestTfFeatures:
     schema = pa.schema([("int64", pa.int64()), ("features", tf_features)])
     serializer = DictSerializer(schema)
 
-    features = [{
+    features_data = [{
         "objects": {
             "bbox": np.array([[0.3, 0.8, 0.5, 1.0]], np.float32),
             "id": np.array([123]),
@@ -91,7 +91,7 @@ class TestTfFeatures:
         }
     }]
 
-    data = {"int64": [1, 2], "features": features}
+    data = {"int64": [1, 2], "features": features_data}
     serialized_data = serializer.serialize(data)
     assert serialized_data["int64"] == [1, 2]
     assert len(serialized_data["features"]) == 2

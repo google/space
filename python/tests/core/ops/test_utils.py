@@ -65,14 +65,14 @@ def test_update_record_stats_bytes():
 
 def test_address_column():
   result = [{
-      "_FILE": "data/file.arrayrecord",
+      "_FILE": "data/file.array_record",
       "_ROW_ID": 2
   }, {
-      "_FILE": "data/file.arrayrecord",
+      "_FILE": "data/file.array_record",
       "_ROW_ID": 3
   }, {
-      "_FILE": "data/file.arrayrecord",
+      "_FILE": "data/file.array_record",
       "_ROW_ID": 4
   }]
-  assert utils.address_column("data/file.arrayrecord", 2,
+  assert utils.address_column("data/file.array_record", 2,
                               3).to_pylist() == result

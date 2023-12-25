@@ -31,8 +31,8 @@ def test_new_index_file_path(mock_uuid):  # pylint: disable=unused-argument
 
 @patch(_UUID_PATH, side_effect=_mocked_uuid)
 def test_new_record_file_path(mock_uuid):  # pylint: disable=unused-argument
-  assert paths.new_record_file_path("data",
-                                    "field") == "data/field_<uuid>.arrowrecord"
+  assert paths.new_record_file_path(
+      "data", "field") == "data/field_<uuid>.array_record"
 
 
 @patch(_UUID_PATH, side_effect=_mocked_uuid)
