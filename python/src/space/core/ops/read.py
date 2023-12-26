@@ -18,6 +18,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Iterator, Dict, List, Tuple, Optional
 
+from dataclasses import dataclass
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -33,6 +34,18 @@ from space.core.schema import utils as schema_utils
 from space.core.utils.paths import StoragePaths
 
 _RECORD_KEY_FIELD = "__RECORD_KEY"
+
+
+@dataclass
+class ReadOptions:
+  """Options of reading data."""
+  # Filters on index fields.
+  filter_: Optional[pc.Expression] = None
+  # When specified, only read the given fields instead of all fields.
+  fields: Optional[List[str]] = None
+  # If true, read the references (e.g., address) of read record fields instead
+  #  of values.
+  reference_read: bool = False
 
 
 class BaseReadOp(BaseOp):
@@ -56,7 +69,7 @@ class FileSetReadOp(BaseReadOp, StoragePaths):
                location: str,
                metadata: meta.StorageMetadata,
                file_set: runtime.FileSet,
-               filter_: Optional[pc.Expression] = None):
+               options: Optional[ReadOptions] = None):
     StoragePaths.__init__(self, location)
 
     # TODO: to validate that filter_ does not contain record files.
@@ -64,12 +77,23 @@ class FileSetReadOp(BaseReadOp, StoragePaths):
     self._metadata = metadata
     self._file_set = file_set
 
+    # TODO: to validate options, e.g., fields are valid.
+    self._options = ReadOptions() if options is None else options
+
     record_fields = set(self._metadata.schema.record_fields)
     self._physical_schema = arrow.arrow_schema(self._metadata.schema.fields,
                                                record_fields,
                                                physical=True)
+
+    if self._options.fields is None:
+      self._selected_fields = [f.name for f in self._physical_schema]
+    else:
+      self._selected_fields = self._options.fields
+
     self._index_fields, self._record_fields = arrow.classify_fields(
-        self._physical_schema, record_fields, selected_fields=None)
+        self._physical_schema,
+        record_fields,
+        selected_fields=set(self._selected_fields))
 
     self._index_field_ids = set(schema_utils.field_ids(self._index_fields))
 
@@ -77,15 +101,18 @@ class FileSetReadOp(BaseReadOp, StoragePaths):
     for f in self._record_fields:
       self._record_fields_dict[f.field_id] = f
 
-    self._filter = filter_
-
   def __iter__(self) -> Iterator[pa.Table]:
     for file in self._file_set.index_files:
       yield self._read_index_and_record(file.path)
 
   def _read_index_and_record(self, index_path: str) -> pa.Table:
-    index_data = pq.read_table(self.full_path(index_path),
-                               filters=self._filter)  # type: ignore[arg-type]
+    index_data = pq.read_table(
+        self.full_path(index_path),
+        columns=self._selected_fields,
+        filters=self._options.filter_)  # type: ignore[arg-type]
+
+    if self._options.reference_read:
+      return index_data
 
     index_column_ids: List[int] = []
     record_columns: List[Tuple[int, pa.Field]] = []

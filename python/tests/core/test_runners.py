@@ -54,7 +54,7 @@ class TestLocalRunner:
 
 def _read_pyarrow(runner: LocalRunner,
                   filter_: Optional[pc.Expression] = None) -> pa.Table:
-  return pa.concat_tables((list(runner.read(filter_))))
+  return runner.read_all(filter_)
 
 
 def _generate_data(ids: Iterable[int]) -> pa.Table:

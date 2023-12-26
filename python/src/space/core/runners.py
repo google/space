@@ -16,13 +16,16 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Iterator, Optional
+from typing import Iterator, List, Optional
 
 from absl import logging  # type: ignore[import-untyped]
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from space.core.ops import FileSetDeleteOp, FileSetReadOp, LocalAppendOp
+from space.core.ops import FileSetDeleteOp
+from space.core.ops import FileSetReadOp
+from space.core.ops import LocalAppendOp
+from space.core.ops import ReadOptions
 from space.core.ops.base import InputData
 import space.core.proto.runtime_pb2 as runtime
 from space.core.storage import Storage
@@ -38,8 +41,19 @@ class BaseRunner(ABC):
   @abstractmethod
   def read(self,
            filter_: Optional[pc.Expression] = None,
-           snapshot_id: Optional[int] = None) -> Iterator[pa.Table]:
+           fields: Optional[List[str]] = None,
+           snapshot_id: Optional[int] = None,
+           reference_read: bool = False) -> Iterator[pa.Table]:
     """Read data from the dataset as an iterator."""
+
+  def read_all(self,
+               filter_: Optional[pc.Expression] = None,
+               fields: Optional[List[str]] = None,
+               snapshot_id: Optional[int] = None,
+               reference_read: bool = False) -> pa.Table:
+    """Read data from the dataset as an Arrow table."""
+    return pa.concat_tables(
+        list(self.read(filter_, fields, snapshot_id, reference_read)))
 
   @abstractmethod
   def append(self, data: InputData) -> runtime.JobResult:
@@ -72,12 +86,16 @@ class LocalRunner(BaseRunner):
 
   def read(self,
            filter_: Optional[pc.Expression] = None,
-           snapshot_id: Optional[int] = None) -> Iterator[pa.Table]:
+           fields: Optional[List[str]] = None,
+           snapshot_id: Optional[int] = None,
+           reference_read: bool = False) -> Iterator[pa.Table]:
     return iter(
         FileSetReadOp(
             self._storage.location, self._storage.metadata,
             self._storage.data_files(filter_, snapshot_id=snapshot_id),
-            filter_))
+            ReadOptions(filter_=filter_,
+                        fields=fields,
+                        reference_read=reference_read)))
 
   def append(self, data: InputData) -> runtime.JobResult:
     op = LocalAppendOp(self._storage.location, self._storage.metadata)

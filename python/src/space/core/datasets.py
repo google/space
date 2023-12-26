@@ -20,6 +20,7 @@ from typing import List
 import pyarrow as pa
 
 from space.core.runners import LocalRunner
+from space.core.serializers.base import DictSerializer
 from space.core.storage import Storage
 
 
@@ -47,6 +48,15 @@ class Dataset:
   def load(cls, location: str) -> Dataset:
     """Load an existing dataset from the given location."""
     return Dataset(Storage.load(location))
+
+  @property
+  def schema(self) -> pa.Schema:
+    """Return the dataset schema."""
+    return self._storage.logical_schema
+
+  def serializer(self) -> DictSerializer:
+    """Return a serializer (deserializer) for the dataset."""
+    return DictSerializer(self.schema)
 
   def local(self) -> LocalRunner:
     """Get a runner that runs operations locally."""

@@ -14,7 +14,7 @@
 
 import json
 import numpy as np
-from numpy.testing import assert_array_equal
+from numpy.testing import assert_array_equal, assert_equal
 import pyarrow as pa
 import pytest
 import tensorflow_datasets as tfds  # type: ignore[import-untyped]
@@ -102,4 +102,4 @@ class TestTfFeatures:
                        np.array([[0.3, 0.8, 0.5, 1.]], dtype=np.float32))
     assert_array_equal(objects["id"], np.array([123]))
 
-    assert serializer.deserialize(serialized_data) == data
+    assert_equal(serializer.deserialize(serialized_data), data)

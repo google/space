@@ -16,4 +16,4 @@
 
 from space.core.ops.append import LocalAppendOp
 from space.core.ops.delete import FileSetDeleteOp
-from space.core.ops.read import FileSetReadOp
+from space.core.ops.read import FileSetReadOp, ReadOptions
