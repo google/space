@@ -22,10 +22,10 @@ from absl import logging  # type: ignore[import-untyped]
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from space.core.ops import FileSetDeleteOp
-from space.core.ops import FileSetReadOp
-from space.core.ops import LocalAppendOp
-from space.core.ops import ReadOptions
+from space.core.ops.append import LocalAppendOp
+from space.core.ops.insert import InsertOptions, LocalInsertOp
+from space.core.ops.delete import FileSetDeleteOp
+from space.core.ops.read import FileSetReadOp, ReadOptions
 from space.core.ops.base import InputData
 import space.core.proto.runtime_pb2 as runtime
 from space.core.storage import Storage
@@ -70,6 +70,25 @@ class BaseRunner(ABC):
       index_fn: a function that build index fields from each TFDS record.
     """
 
+  def upsert(self, data: InputData) -> runtime.JobResult:
+    """Upsert data into the dataset.
+    
+    Update existing data if primary key are found.
+    """
+    return self._insert(data, InsertOptions.Mode.UPSERT)
+
+  def insert(self, data: InputData) -> runtime.JobResult:
+    """Insert data into the dataset.
+    
+    Fail the operation if primary key are found.
+    """
+    return self._insert(data, InsertOptions.Mode.INSERT)
+
+  @abstractmethod
+  def _insert(self, data: InputData,
+              mode: InsertOptions.Mode) -> runtime.JobResult:
+    """Insert data into the dataset."""
+
   @abstractmethod
   def delete(self, filter_: pc.Expression) -> runtime.JobResult:
     """Delete data matching the filter from the dataset."""
@@ -107,6 +126,12 @@ class LocalRunner(BaseRunner):
     op = LocalConvertTfdsOp(self._storage.location, self._storage.metadata,
                             tfds_path, index_fn)
     return self._try_commit(op.write())
+
+  def _insert(self, data: InputData,
+              mode: InsertOptions.Mode) -> runtime.JobResult:
+    op = LocalInsertOp(self._storage.location, self._storage,
+                       InsertOptions(mode=mode))
+    return self._try_commit(op.write(data))
 
   def delete(self, filter_: pc.Expression) -> runtime.JobResult:
     ds = self._storage

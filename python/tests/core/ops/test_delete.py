@@ -15,9 +15,9 @@
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from space.core.ops import LocalAppendOp
-from space.core.ops import FileSetReadOp
-from space.core.ops import FileSetDeleteOp
+from space.core.ops.append import LocalAppendOp
+from space.core.ops.delete import FileSetDeleteOp
+from space.core.ops.read import FileSetReadOp
 from space.core.storage import Storage
 
 
