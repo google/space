@@ -77,7 +77,7 @@ class SpaceDataSource(AbcSequence):
       return self.__getitems__(record_key)
 
     record = self._data_source[record_key]
-    return self._serializer.deserialize(record)
+    return self._serializer.deserialize(record)  # type: ignore[union-attr]
 
   def __getitems__(self, record_keys: Sequence[int]) -> Sequence[Any]:
     records = self._data_source.__getitems__(record_keys)
@@ -86,7 +86,10 @@ class SpaceDataSource(AbcSequence):
                        f" {len(records)} records."
                        f"{record_keys=}, {records=}")
 
-    return [self._serializer.deserialize(record) for record in records]
+    return [
+        self._serializer.deserialize(record)  # type: ignore[union-attr]
+        for record in records
+    ]
 
   def _read_index_and_address(self) -> pa.Table:
     """Read index and record address columns.

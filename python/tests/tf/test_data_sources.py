@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
-
 import numpy as np
 from numpy.testing import assert_equal
 import pyarrow as pa
@@ -21,10 +19,6 @@ import pytest
 from tensorflow_datasets import features as f  # type: ignore[import-untyped]
 
 from space import Dataset, TfFeatures
-import space.core.proto.metadata_pb2 as meta
-from space.core.utils.lazy_imports_utils import array_record_module as ar
-from space.core.utils.uuids import uuid_
-
 from space.tf.data_sources import SpaceDataSource
 
 

@@ -76,15 +76,7 @@ class DictSerializer:
     Args:
       value: a dict of numpy-like nested dicts.
     """
-    result = {}
-    for field_name, value_batch in value.items():
-      if field_name in self._serializers:
-        ser = self._serializers[field_name]
-        result[field_name] = [ser.serialize(v) for v in value_batch]
-      else:
-        result[field_name] = value_batch
-
-    return result
+    return self._process_dict(value, serialize=True)
 
   def deserialize(self, value_bytes: DictData) -> DictData:
     """Deserialize a dict of bytes to a dict of values.
@@ -92,11 +84,17 @@ class DictSerializer:
     Returns:
       A dict of numpy-like nested dicts.
     """
+    return self._process_dict(value_bytes, serialize=False)
+
+  def _process_dict(self, value: DictData, serialize: bool) -> DictData:
     result = {}
-    for field_name, value_batch in value_bytes.items():
+    for field_name, value_batch in value.items():
       if field_name in self._serializers:
         ser = self._serializers[field_name]
-        result[field_name] = [ser.deserialize(v) for v in value_batch]
+        result[field_name] = [
+            ser.serialize(v) if serialize else ser.deserialize(v)
+            for v in value_batch
+        ]
       else:
         result[field_name] = value_batch
 
