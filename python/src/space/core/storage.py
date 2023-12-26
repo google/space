@@ -46,9 +46,12 @@ class Storage(paths.StoragePaths):
     self._fs = create_fs(location)
 
     record_fields = set(self._metadata.schema.record_fields)
-    self._physical_schema = arrow.arrow_schema(self._metadata.schema.fields,
-                                               record_fields,
-                                               physical=True)
+    self._logical_schema = arrow.arrow_schema(self._metadata.schema.fields,
+                                              record_fields,
+                                              physical=False)
+    self._physical_schema = arrow.logical_to_physical_schema(
+        self._logical_schema, record_fields)
+
     self._field_name_ids: Dict[str, int] = arrow.field_name_to_id_dict(
         self._physical_schema)
 
@@ -56,6 +59,11 @@ class Storage(paths.StoragePaths):
   def metadata(self) -> meta.StorageMetadata:
     """Return the storage metadata."""
     return self._metadata
+
+  @property
+  def logical_schema(self) -> pa.Schema:
+    """Return the user specified schema."""
+    return self._logical_schema
 
   @property
   def physical_schema(self) -> pa.Schema:
@@ -89,6 +97,7 @@ class Storage(paths.StoragePaths):
     # TODO: to verify that location is an empty directory.
     # TODO: to verify primary key fields and record_fields (and types) are
     # valid.
+    # TODO: to auto infer record_fields.
 
     field_id_mgr = FieldIdManager()
     schema = field_id_mgr.assign_field_ids(schema)

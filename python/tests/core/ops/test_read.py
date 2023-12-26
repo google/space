@@ -16,7 +16,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from space.core.ops import LocalAppendOp
-from space.core.ops import FileSetReadOp
+from space.core.ops import FileSetReadOp, ReadOptions
 from space.core.storage import Storage
 
 
@@ -51,7 +51,7 @@ class TestFileSetReadOp:
         storage.metadata,
         storage.data_files(),
         # pylint: disable=singleton-comparison
-        filter_=pc.field("bool") == True)
+        ReadOptions(filter_=pc.field("bool") == True))
     results = list(iter(read_op))
     assert len(results) == 1
     assert list(iter(read_op))[0] == pa.Table.from_pydict({

@@ -15,7 +15,7 @@
 """Serializers (and deserializers) for unstructured record fields."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from typing_extensions import TypeAlias
 
 import pyarrow as pa
@@ -63,17 +63,28 @@ class DictSerializer:
       if isinstance(field.type, FieldSerializer):
         self._serializers[field.name] = field.type
 
+  def field_serializer(self, field: str) -> Optional[FieldSerializer]:
+    """Return the FieldSerializer of a given field, or None if not found."""
+    if field not in self._serializers:
+      return None
+
+    return self._serializers[field]
+
   def serialize(self, value: DictData) -> DictData:
     """Serialize a value.
 
     Args:
       value: a dict of numpy-like nested dicts.
     """
-    for name, ser in self._serializers.items():
-      if name in value:
-        value[name] = [ser.serialize(d) for d in value[name]]
+    result = {}
+    for field_name, value_batch in value.items():
+      if field_name in self._serializers:
+        ser = self._serializers[field_name]
+        result[field_name] = [ser.serialize(v) for v in value_batch]
+      else:
+        result[field_name] = value_batch
 
-    return value
+    return result
 
   def deserialize(self, value_bytes: DictData) -> DictData:
     """Deserialize a dict of bytes to a dict of values.
@@ -81,8 +92,12 @@ class DictSerializer:
     Returns:
       A dict of numpy-like nested dicts.
     """
-    for name, ser in self._serializers.items():
-      if name in value_bytes:
-        value_bytes[name] = [ser.deserialize(d) for d in value_bytes[name]]
+    result = {}
+    for field_name, value_batch in value_bytes.items():
+      if field_name in self._serializers:
+        ser = self._serializers[field_name]
+        result[field_name] = [ser.deserialize(v) for v in value_batch]
+      else:
+        result[field_name] = value_batch
 
-    return value_bytes
+    return result
