@@ -74,7 +74,10 @@ class LocalInsertOp(BaseInsertOp, StoragePaths):
     if data.num_rows == 0:
       return None
 
-    pk_filter = utils.primary_key_filter(self._metadata.schema, data)
+    pk_filter = utils.primary_key_filter(
+        list(self._metadata.schema.primary_keys), data)
+    assert pk_filter is not None
+
     data_files = self._storage.data_files(pk_filter)
 
     mode = self._options.mode
@@ -87,7 +90,9 @@ class LocalInsertOp(BaseInsertOp, StoragePaths):
 
         for batch in iter(read_op):
           if batch.num_rows > 0:
-            raise ValueError('Primary key to insert already exist')
+            # TODO: to customize the error and converted it to JobResult failed
+            # status.
+            raise RuntimeError('Primary key to insert already exist')
       elif mode == InsertOptions.Mode.UPSERT:
         _try_delete_data(
             FileSetDeleteOp(self._location, self._metadata, data_files,

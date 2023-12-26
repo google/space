@@ -60,6 +60,10 @@ class BaseRunner(ABC):
     """Append data into the dataset."""
 
   @abstractmethod
+  def append_from(self, source: Iterator[InputData]) -> runtime.JobResult:
+    """Append data into the dataset from an iterator source."""
+
+  @abstractmethod
   def append_tfds(self, tfds_path: str,
                   index_fn: TfdsIndexFn) -> runtime.JobResult:
     """Append data from a Tensorflow Dataset without copying data.
@@ -117,8 +121,17 @@ class LocalRunner(BaseRunner):
                         reference_read=reference_read)))
 
   def append(self, data: InputData) -> runtime.JobResult:
+
+    def make_iter():
+      yield data
+
+    return self.append_from(make_iter())
+
+  def append_from(self, source: Iterator[InputData]) -> runtime.JobResult:
     op = LocalAppendOp(self._storage.location, self._storage.metadata)
-    op.write(data)
+    for data in source:
+      op.write(data)
+
     return self._try_commit(op.finish())
 
   def append_tfds(self, tfds_path: str,

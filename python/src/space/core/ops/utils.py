@@ -14,7 +14,7 @@
 #
 """Utilities for operation classes."""
 
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import numpy as np
 import pyarrow as pa
@@ -52,16 +52,39 @@ def address_column(file_path: str, start_row: int,
       fields=arrow.record_address_types())  # type: ignore[arg-type]
 
 
-def primary_key_filter(schema: meta.Schema, data: pa.Table) -> pc.Expression:
-  """Return a filter that match the given primary keys in the input data."""
+def primary_key_filter(primary_keys: List[str],
+                       data: pa.Table) -> Optional[pc.Expression]:
+  """Return a filter that match the given primary keys in the input data.
+  
+  Raise an error if data contain duplicated primary keys.
+  """
   columns = []
-  for key in schema.primary_keys:
+  for key in primary_keys:
     columns.append(data.column(key).combine_chunks())
 
-  filter_ = pc.scalar(False)
+  filter_ = None
+  filter_strs: Set[str] = set()
   for i_row in range(data.num_rows):
-    for i_col, key in enumerate(schema.primary_keys):
-      filter_ |= (pc.field(key) == columns[i_col][i_row])
+    row_filter = None
+    for i_col, key in enumerate(primary_keys):
+      new_filter = pc.field(key) == columns[i_col][i_row]
+      if row_filter is None:
+        row_filter = new_filter
+      else:
+        row_filter &= new_filter
+
+    # TODO: a simple method of detecting duplicated primary keys. To find a
+    # more efficient method.
+    filter_str = str(row_filter)
+    if filter_str in filter_strs:
+      raise RuntimeError(f"Found duplicated primary key: {filter_str}")
+
+    filter_strs.add(filter_str)
+
+    if filter_ is None:
+      filter_ = row_filter
+    else:
+      filter_ |= row_filter
 
   return filter_
 

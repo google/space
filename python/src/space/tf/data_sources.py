@@ -123,7 +123,7 @@ class SpaceDataSource(AbcSequence):
       previous_idx = indexes[0]
       start, end = indexes[0], indexes[-1]
       for idx in indexes:
-        if idx != previous_idx + 1 or idx == end:
+        if idx not in (0, previous_idx + 1) or idx == end:
           if idx == end:
             previous_idx = idx
 
