@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Loads ArrayRecord files into Space datasets."""
+"""Load ArrayRecord files into Space datasets."""
 
-import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pyarrow as pa
 from typing_extensions import TypeAlias
 
 from space.core.fs.array_record import read_record_file
+from space.core.loaders.utils import list_files
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as runtime
 from space.core.ops import utils
@@ -32,15 +32,15 @@ from space.core.utils.paths import StoragePathsMixin
 ArrayRecordIndexFn: TypeAlias = Callable[[Dict[str, Any]], Dict[str, Any]]
 
 
-class LocalLoadArrayRecordOp(StoragePathsMixin):
+class LocalArrayRecordLoadOp(StoragePathsMixin):
   """Load ArrayRecord files into Space without copying data."""
 
   def __init__(self, location: str, metadata: meta.StorageMetadata,
-               array_record_dir: str, index_fn: ArrayRecordIndexFn):
+               input_dir: str, index_fn: ArrayRecordIndexFn):
     StoragePathsMixin.__init__(self, location)
 
     self._metadata = metadata
-    self._array_record_dir = array_record_dir
+    self._input_dir = input_dir
     self._index_fn = index_fn
 
     record_fields = set(self._metadata.schema.record_fields)
@@ -58,17 +58,16 @@ class LocalLoadArrayRecordOp(StoragePathsMixin):
     self._record_field = self._record_fields[0]
 
     self._serializer = DictSerializer(logical_schema)
-    self._array_record_files = _list_files(array_record_dir)
+    self._input_files = list_files(input_dir, substr=".array_record")
 
   def write(self) -> Optional[runtime.Patch]:
     """Write index files to load ArrayRecord files to Space dataset."""
-    # TODO: to load files in parallel.
     append_op = LocalAppendOp(self._location,
                               self._metadata,
                               record_address_input=True)
 
     total_record_bytes = 0
-    for f in self._array_record_files:
+    for f in self._input_files:
       index_data, record_bytes = self._build_index_for_array_record(f)
       total_record_bytes += record_bytes
       append_op.write(index_data)
@@ -99,13 +98,3 @@ class LocalLoadArrayRecordOp(StoragePathsMixin):
         utils.address_column(file_path, start_row=0, num_rows=len(indxes)))
 
     return index_data, record_uncompressed_bytes
-
-
-def _list_files(array_record_dir: str) -> List[str]:
-  files: List[str] = []
-  for f in os.listdir(array_record_dir):
-    full_path = os.path.join(array_record_dir, f)
-    if os.path.isfile(full_path) and '.array_record' in f:
-      files.append(full_path)
-
-  return files

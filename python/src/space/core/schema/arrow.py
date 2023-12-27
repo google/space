@@ -25,6 +25,11 @@ from space.core.schema.types import TfFeatures
 from space.core.schema import utils
 from space.core.utils.constants import UTF_8
 
+# A special field ID representing unassigned field ID.
+# Used for external Parquet files not created by Space that don't have field
+# ID. Schema evolution is limitted for datasets containing such files.
+NULL_FIELD_ID = -1
+
 _PARQUET_FIELD_ID_KEY = b"PARQUET:field_id"
 
 
@@ -35,6 +40,9 @@ def field_metadata(field_id_: int) -> Dict[bytes, bytes]:
 
 def field_id(field: pa.Field) -> int:
   """Return field ID of an Arrow field."""
+  if field.metadata is None or _PARQUET_FIELD_ID_KEY not in field.metadata:
+    return NULL_FIELD_ID
+
   return int(field.metadata[_PARQUET_FIELD_ID_KEY])
 
 
