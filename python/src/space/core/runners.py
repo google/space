@@ -29,7 +29,8 @@ from space.core.ops.read import FileSetReadOp, ReadOptions
 from space.core.ops.base import InputData
 import space.core.proto.runtime_pb2 as runtime
 from space.core.storage import Storage
-from space.tf.conversion import LocalConvertTfdsOp, TfdsIndexFn
+from space.core.loaders.array_record import ArrayRecordIndexFn
+from space.core.loaders.array_record import LocalLoadArrayRecordOp
 
 
 class BaseRunner(ABC):
@@ -64,13 +65,14 @@ class BaseRunner(ABC):
     """Append data into the dataset from an iterator source."""
 
   @abstractmethod
-  def append_tfds(self, tfds_path: str,
-                  index_fn: TfdsIndexFn) -> runtime.JobResult:
-    """Append data from a Tensorflow Dataset without copying data.
+  def append_array_record(self, array_record_dir: str,
+                          index_fn: ArrayRecordIndexFn) -> runtime.JobResult:
+    """Append data from ArrayRecord files without copying data.
     
+    TODO: to support a pattern of files to expand.
+
     Args:
-      tfds_path: the folder of TFDS dataset files, should contain ArrowRecord
-        files.
+      array_record_dir: the folder of ArrayRecord files.
       index_fn: a function that build index fields from each TFDS record.
     """
 
@@ -134,10 +136,10 @@ class LocalRunner(BaseRunner):
 
     return self._try_commit(op.finish())
 
-  def append_tfds(self, tfds_path: str,
-                  index_fn: TfdsIndexFn) -> runtime.JobResult:
-    op = LocalConvertTfdsOp(self._storage.location, self._storage.metadata,
-                            tfds_path, index_fn)
+  def append_array_record(self, array_record_dir: str,
+                          index_fn: ArrayRecordIndexFn) -> runtime.JobResult:
+    op = LocalLoadArrayRecordOp(self._storage.location, self._storage.metadata,
+                                array_record_dir, index_fn)
     return self._try_commit(op.write())
 
   def _insert(self, data: InputData,

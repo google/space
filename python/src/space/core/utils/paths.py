@@ -63,7 +63,7 @@ def new_metadata_path(metadata_dir_: str) -> str:
   return path.join(metadata_dir_, f"metadata_{uuid_()}.txtpb")
 
 
-class StoragePaths:
+class StoragePathsMixin:
   """Provides util methods for file and directory paths."""
 
   def __init__(self, location: str):

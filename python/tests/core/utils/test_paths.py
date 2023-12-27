@@ -69,13 +69,13 @@ def test_new_metadata_path(mock_uuid):  # pylint: disable=unused-argument
       "metadata") == "metadata/metadata_<uuid>.txtpb"
 
 
-class TestStoragePaths:
+class TestStoragePathsMixin:
 
   _LOCATION = "location"
 
   @pytest.fixture
   def storage_paths(self):
-    return paths.StoragePaths(self._LOCATION)
+    return paths.StoragePathsMixin(self._LOCATION)
 
   def test_data_dir(self, storage_paths):
     assert storage_paths.data_dir == f"{self._LOCATION}/data"

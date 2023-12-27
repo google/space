@@ -26,7 +26,7 @@ from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import BaseOp
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as runtime
-from space.core.utils.paths import StoragePaths
+from space.core.utils.paths import StoragePathsMixin
 from space.core.schema import constants
 
 
@@ -46,7 +46,7 @@ class BaseDeleteOp(BaseOp):
     """
 
 
-class FileSetDeleteOp(BaseDeleteOp, StoragePaths):
+class FileSetDeleteOp(BaseDeleteOp, StoragePathsMixin):
   """Delete operation of a given file set running locally.
   
   It can be used as components of more complex operations and distributed
@@ -57,7 +57,7 @@ class FileSetDeleteOp(BaseDeleteOp, StoragePaths):
 
   def __init__(self, location: str, metadata: meta.StorageMetadata,
                file_set: runtime.FileSet, filter_: pc.Expression):
-    StoragePaths.__init__(self, location)
+    StoragePathsMixin.__init__(self, location)
 
     if not _validate_files(file_set):
       raise RuntimeError(f"Invalid input file set for delete op:\n{file_set}")

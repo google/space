@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""TFDS to Space dataset conversion."""
+"""Loads ArrayRecord files into Space datasets."""
 
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -27,20 +27,20 @@ from space.core.ops import utils
 from space.core.ops.append import LocalAppendOp
 from space.core.schema import arrow
 from space.core.serializers import DictSerializer
-from space.core.utils.paths import StoragePaths
+from space.core.utils.paths import StoragePathsMixin
 
-TfdsIndexFn: TypeAlias = Callable[[Dict[str, Any]], Dict[str, Any]]
+ArrayRecordIndexFn: TypeAlias = Callable[[Dict[str, Any]], Dict[str, Any]]
 
 
-class LocalConvertTfdsOp(StoragePaths):
-  """Convert a TFDS dataset to a Space dataset without copying data."""
+class LocalLoadArrayRecordOp(StoragePathsMixin):
+  """Load ArrayRecord files into Space without copying data."""
 
   def __init__(self, location: str, metadata: meta.StorageMetadata,
-               tfds_path: str, index_fn: TfdsIndexFn):
-    StoragePaths.__init__(self, location)
+               array_record_dir: str, index_fn: ArrayRecordIndexFn):
+    StoragePathsMixin.__init__(self, location)
 
     self._metadata = metadata
-    self._tfds_path = tfds_path
+    self._array_record_dir = array_record_dir
     self._index_fn = index_fn
 
     record_fields = set(self._metadata.schema.record_fields)
@@ -58,17 +58,17 @@ class LocalConvertTfdsOp(StoragePaths):
     self._record_field = self._record_fields[0]
 
     self._serializer = DictSerializer(logical_schema)
-    self._tfds_files = _list_tfds_files(tfds_path)
+    self._array_record_files = _list_files(array_record_dir)
 
   def write(self) -> Optional[runtime.Patch]:
-    """Write files to append a TFDS dataset to Space."""
-    # TODO: to convert files in parallel.
+    """Write index files to load ArrayRecord files to Space dataset."""
+    # TODO: to load files in parallel.
     append_op = LocalAppendOp(self._location,
                               self._metadata,
                               record_address_input=True)
 
     total_record_bytes = 0
-    for f in self._tfds_files:
+    for f in self._array_record_files:
       index_data, record_bytes = self._build_index_for_array_record(f)
       total_record_bytes += record_bytes
       append_op.write(index_data)
@@ -101,10 +101,10 @@ class LocalConvertTfdsOp(StoragePaths):
     return index_data, record_uncompressed_bytes
 
 
-def _list_tfds_files(tfds_path: str) -> List[str]:
+def _list_files(array_record_dir: str) -> List[str]:
   files: List[str] = []
-  for f in os.listdir(tfds_path):
-    full_path = os.path.join(tfds_path, f)
+  for f in os.listdir(array_record_dir):
+    full_path = os.path.join(array_record_dir, f)
     if os.path.isfile(full_path) and '.array_record' in f:
       files.append(full_path)
 
