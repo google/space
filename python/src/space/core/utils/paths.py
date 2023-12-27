@@ -21,6 +21,7 @@ from space.core.utils.uuids import uuid_
 _ENTRY_POINT_FILE = "entrypoint.txtpb"
 _DATA_DIR = "data"
 _METADATA_DIR = "metadata"
+_CHANGE_DATA_DIR = "changes"
 
 
 def new_index_file_path(data_dir_: str):
@@ -71,6 +72,7 @@ class StoragePathsMixin:
 
     self._data_dir = data_dir(self._location)
     self._metadata_dir = metadata_dir(self._location)
+    self._change_data_dir = path.join(self._metadata_dir, _CHANGE_DATA_DIR)
     self._entry_point_file = entry_point_path(self._location)
 
   @property
@@ -99,3 +101,7 @@ class StoragePathsMixin:
   def new_metadata_path(self) -> str:
     """Return a random metadata file path."""
     return new_metadata_path(self._metadata_dir)
+
+  def new_change_log_path(self) -> str:
+    """Return a random change log file path."""
+    return path.join(self._change_data_dir, f"change_{uuid_()}.txtpb")

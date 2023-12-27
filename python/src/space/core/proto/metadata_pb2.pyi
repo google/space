@@ -174,7 +174,7 @@ global___Schema = Schema
 class Snapshot(google.protobuf.message.Message):
     """Storage snapshot persisting physical metadata such as manifest file paths.
     It is used for obtaining all alive data file paths for a given snapshot.
-    NEXT_ID: 5
+    NEXT_ID: 6
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -183,6 +183,7 @@ class Snapshot(google.protobuf.message.Message):
     CREATE_TIME_FIELD_NUMBER: builtins.int
     MANIFEST_FILES_FIELD_NUMBER: builtins.int
     STORAGE_STATISTICS_FIELD_NUMBER: builtins.int
+    CHANGE_LOG_FILE_FIELD_NUMBER: builtins.int
     snapshot_id: builtins.int
     """The snapshot ID."""
     @property
@@ -196,6 +197,8 @@ class Snapshot(google.protobuf.message.Message):
     @property
     def storage_statistics(self) -> global___StorageStatistics:
         """Statistics of all data in the storage."""
+    change_log_file: builtins.str
+    """File path of the change log of the snapshot."""
     def __init__(
         self,
         *,
@@ -203,9 +206,10 @@ class Snapshot(google.protobuf.message.Message):
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         manifest_files: global___ManifestFiles | None = ...,
         storage_statistics: global___StorageStatistics | None = ...,
+        change_log_file: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "data_info", b"data_info", "manifest_files", b"manifest_files", "storage_statistics", b"storage_statistics"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "data_info", b"data_info", "manifest_files", b"manifest_files", "snapshot_id", b"snapshot_id", "storage_statistics", b"storage_statistics"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["change_log_file", b"change_log_file", "create_time", b"create_time", "data_info", b"data_info", "manifest_files", b"manifest_files", "snapshot_id", b"snapshot_id", "storage_statistics", b"storage_statistics"]) -> None: ...
     def WhichOneof(self, oneof_group: typing_extensions.Literal["data_info", b"data_info"]) -> typing_extensions.Literal["manifest_files"] | None: ...
 
 global___Snapshot = Snapshot
@@ -267,3 +271,59 @@ class StorageStatistics(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["index_compressed_bytes", b"index_compressed_bytes", "index_uncompressed_bytes", b"index_uncompressed_bytes", "num_rows", b"num_rows", "record_uncompressed_bytes", b"record_uncompressed_bytes"]) -> None: ...
 
 global___StorageStatistics = StorageStatistics
+
+@typing_extensions.final
+class ChangeLog(google.protobuf.message.Message):
+    """Change log stores changes made by a snapshot.
+    NEXT_ID: 3
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DELETED_ROWS_FIELD_NUMBER: builtins.int
+    ADDED_ROWS_FIELD_NUMBER: builtins.int
+    @property
+    def deleted_rows(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RowBitmap]:
+        """Rows deleted in this snapshot."""
+    @property
+    def added_rows(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RowBitmap]:
+        """New rows added in this snapshot."""
+    def __init__(
+        self,
+        *,
+        deleted_rows: collections.abc.Iterable[global___RowBitmap] | None = ...,
+        added_rows: collections.abc.Iterable[global___RowBitmap] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["added_rows", b"added_rows", "deleted_rows", b"deleted_rows"]) -> None: ...
+
+global___ChangeLog = ChangeLog
+
+@typing_extensions.final
+class RowBitmap(google.protobuf.message.Message):
+    """Mark rows in a file by bitmap.
+    NEXT_ID: 4
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FILE_FIELD_NUMBER: builtins.int
+    ALL_ROWS_FIELD_NUMBER: builtins.int
+    ROARING_BITMAP_FIELD_NUMBER: builtins.int
+    file: builtins.str
+    """File path that the bit map applies to."""
+    all_rows: builtins.bool
+    """All rows are selected. Bitmap is empty in this case."""
+    roaring_bitmap: builtins.bytes
+    """Roaring bitmap."""
+    def __init__(
+        self,
+        *,
+        file: builtins.str = ...,
+        all_rows: builtins.bool = ...,
+        roaring_bitmap: builtins.bytes = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["bitmap", b"bitmap", "roaring_bitmap", b"roaring_bitmap"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["all_rows", b"all_rows", "bitmap", b"bitmap", "file", b"file", "roaring_bitmap", b"roaring_bitmap"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["bitmap", b"bitmap"]) -> typing_extensions.Literal["roaring_bitmap"] | None: ...
+
+global___RowBitmap = RowBitmap

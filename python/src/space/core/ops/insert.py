@@ -56,8 +56,8 @@ class BaseInsertOp(BaseOp):
 class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
   '''Append data to a dataset.'''
 
-  def __init__(self, location: str, storage: Storage, options: InsertOptions):
-    StoragePathsMixin.__init__(self, location)
+  def __init__(self, storage: Storage, options: InsertOptions):
+    StoragePathsMixin.__init__(self, storage.location)
 
     self._storage = storage
     self._metadata = self._storage.metadata

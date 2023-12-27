@@ -17,9 +17,11 @@
 from abc import abstractmethod
 from typing import List, Optional, Set
 
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.compute as pc
+from pyroaring import BitMap  # type: ignore[import-not-found]
 
 from space.core.ops import utils
 from space.core.ops.append import LocalAppendOp
@@ -28,6 +30,9 @@ from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as runtime
 from space.core.utils.paths import StoragePathsMixin
 from space.core.schema import constants
+
+# A temporary row ID field used for generating deletion row bitmap.
+_ROW_ID_FIELD = "__ROW_ID"
 
 
 class BaseDeleteOp(BaseOp):
@@ -73,6 +78,7 @@ class FileSetDeleteOp(BaseDeleteOp, StoragePathsMixin):
   def delete(self) -> Optional[runtime.Patch]:
     # The index files and manifests deleted, to remove them from index
     # manifests.
+    patch = runtime.Patch()
     deleted_files: List[str] = []
     deleted_manifest_ids: Set[int] = set()
 
@@ -82,8 +88,13 @@ class FileSetDeleteOp(BaseDeleteOp, StoragePathsMixin):
       utils.update_index_storage_stats(stats_before_delete,
                                        file.storage_statistics)
 
-      index_data = pq.read_table(self.full_path(file.path),
-                                 filters=self._reinsert_filter)
+      # TODO: this can be down at row group level.
+      index_data = pq.read_table(self.full_path(file.path))
+      index_data = index_data.append_column(
+          _ROW_ID_FIELD,
+          pa.array(np.arange(0, index_data.num_rows,
+                             dtype=np.int32)))  # type: ignore[arg-type]
+      index_data = index_data.filter(mask=self._reinsert_filter)
 
       # No row is deleted. No need to re-insert rows.
       if index_data.num_rows == file.storage_statistics.num_rows:
@@ -92,6 +103,11 @@ class FileSetDeleteOp(BaseDeleteOp, StoragePathsMixin):
       # Collect statistics.
       deleted_rows += (file.storage_statistics.num_rows - index_data.num_rows)
       all_deleted = index_data.num_rows == 0
+
+      # Compute deleted row bitmap for change log.
+      patch.change_log.deleted_rows.append(
+          _build_bitmap(file, index_data, all_deleted))
+      index_data = index_data.drop(_ROW_ID_FIELD)  # type: ignore[attr-defined]
 
       # Record deleted files and manifests information.
       deleted_files.append(file.path)
@@ -130,7 +146,6 @@ class FileSetDeleteOp(BaseDeleteOp, StoragePathsMixin):
     reinsert_patch = self._append_op.finish()
 
     # Populate the patch for the delete.
-    patch = runtime.Patch()
     if reinsert_patch is not None:
       patch.addition.index_manifest_files.extend(
           reinsert_patch.addition.index_manifest_files)
@@ -189,3 +204,18 @@ def _validate_files(file_set: runtime.FileSet) -> bool:
       return False
 
   return len(file_set.index_manifest_files) > 0
+
+
+def _build_bitmap(file: runtime.DataFile, index_data: pa.Table,
+                  all_deleted: bool) -> meta.RowBitmap:
+  row_bitmap = meta.RowBitmap(file=file.path)
+  if all_deleted:
+    row_bitmap.all_rows = True
+  else:
+    deleted_bitmaps = BitMap()
+    deleted_bitmaps.add_range(0, file.storage_statistics.num_rows)
+    survivor_bitmaps = BitMap(index_data.column(_ROW_ID_FIELD).to_numpy())
+    deleted_bitmaps.difference_update(survivor_bitmaps)
+    row_bitmap.roaring_bitmap = deleted_bitmaps.serialize()
+
+  return row_bitmap

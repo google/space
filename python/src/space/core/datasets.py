@@ -66,3 +66,8 @@ class Dataset:
     """A list of full path of index files."""
     data_files = self._storage.data_files()
     return [self._storage.full_path(f.path) for f in data_files.index_files]
+
+  @property
+  def snapshot_ids(self) -> List[int]:
+    """A list of all alive snapshot IDs in the dataset."""
+    return self._storage.snapshot_ids
