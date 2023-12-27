@@ -118,7 +118,7 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
     record_columns: List[Tuple[int, pa.Field]] = []
     for column_id, field in enumerate(index_data.schema):
       field_id = arrow.field_id(field)
-      if field_id in self._index_field_ids:
+      if field_id in self._index_field_ids or field_id == arrow.NULL_FIELD_ID:
         index_column_ids.append(column_id)
       else:
         record_columns.append(

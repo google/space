@@ -25,7 +25,7 @@ from space.core.utils.lazy_imports_utils import array_record_module as ar
 from space.core.utils.uuids import uuid_
 
 
-class TestLocalLoadArrayRecordOp:
+class TestLocalArrayRecordLoadOp:
 
   @pytest.fixture
   def tf_features(self):
@@ -37,7 +37,7 @@ class TestLocalLoadArrayRecordOp:
     })
     return TfFeatures(features_dict)
 
-  def test_write_tfds_to_space(self, tmp_path, tf_features):
+  def test_append_array_record(self, tmp_path, tf_features):
     schema = pa.schema([("id", pa.int64()), ("num_objects", pa.int64()),
                         ("features", tf_features)])
     ds = Dataset.create(str(tmp_path / "dataset"),
@@ -58,13 +58,12 @@ class TestLocalLoadArrayRecordOp:
         }
     }]
 
-    # Make a fake TFDS dataset.
-    tfds_path = tmp_path / "tfds"
-    tfds_path.mkdir(parents=True)
+    # Create dummy ArrayRecord files.
+    input_dir = tmp_path / "array_record"
+    input_dir.mkdir(parents=True)
     _write_array_record_files(
-        tfds_path, [tf_features.serialize(r) for r in features_data])
+        input_dir, [tf_features.serialize(r) for r in features_data])
 
-    # Write TFDS into Space.
     def index_fn(record):
       assert len(record['features']) == 1
       features = record['features'][0]
@@ -74,7 +73,7 @@ class TestLocalLoadArrayRecordOp:
       }
 
     runner = ds.local()
-    response = runner.append_array_record(tfds_path, index_fn)
+    response = runner.append_array_record(input_dir, index_fn)
     assert response.storage_statistics_update == meta.StorageStatistics(
         num_rows=2,
         index_compressed_bytes=104,
@@ -89,9 +88,9 @@ class TestLocalLoadArrayRecordOp:
     })
 
 
-def _write_array_record_files(tfds_path, records: List[bytes]):
+def _write_array_record_files(input_dir, records: List[bytes]):
   file_path = f"{uuid_()}.array_record"
-  writer = ar.ArrayRecordWriter(str(tfds_path / file_path), options="")
+  writer = ar.ArrayRecordWriter(str(input_dir / file_path), options="")
   for r in records:
     writer.write(r)
 

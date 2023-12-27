@@ -30,7 +30,8 @@ from space.core.ops.base import InputData
 import space.core.proto.runtime_pb2 as runtime
 from space.core.storage import Storage
 from space.core.loaders.array_record import ArrayRecordIndexFn
-from space.core.loaders.array_record import LocalLoadArrayRecordOp
+from space.core.loaders.array_record import LocalArrayRecordLoadOp
+from space.core.loaders.parquet import LocalParquetLoadOp
 
 
 class BaseRunner(ABC):
@@ -65,15 +66,25 @@ class BaseRunner(ABC):
     """Append data into the dataset from an iterator source."""
 
   @abstractmethod
-  def append_array_record(self, array_record_dir: str,
+  def append_array_record(self, input_dir: str,
                           index_fn: ArrayRecordIndexFn) -> runtime.JobResult:
     """Append data from ArrayRecord files without copying data.
     
     TODO: to support a pattern of files to expand.
 
     Args:
-      array_record_dir: the folder of ArrayRecord files.
+      input_dir: the folder of ArrayRecord files.
       index_fn: a function that build index fields from each TFDS record.
+    """
+
+  @abstractmethod
+  def append_parquet(self, input_dir: str) -> runtime.JobResult:
+    """Append data from Parquet files without copying data.
+    
+    TODO: to support a pattern of files to expand.
+
+    Args:
+      input_dir: the folder of Parquet files.
     """
 
   def upsert(self, data: InputData) -> runtime.JobResult:
@@ -136,10 +147,15 @@ class LocalRunner(BaseRunner):
 
     return self._try_commit(op.finish())
 
-  def append_array_record(self, array_record_dir: str,
+  def append_array_record(self, input_dir: str,
                           index_fn: ArrayRecordIndexFn) -> runtime.JobResult:
-    op = LocalLoadArrayRecordOp(self._storage.location, self._storage.metadata,
-                                array_record_dir, index_fn)
+    op = LocalArrayRecordLoadOp(self._storage.location, self._storage.metadata,
+                                input_dir, index_fn)
+    return self._try_commit(op.write())
+
+  def append_parquet(self, input_dir: str) -> runtime.JobResult:
+    op = LocalParquetLoadOp(self._storage.location, self._storage.metadata,
+                            input_dir)
     return self._try_commit(op.write())
 
   def _insert(self, data: InputData,
