@@ -61,3 +61,8 @@ class Dataset:
   def local(self) -> LocalRunner:
     """Get a runner that runs operations locally."""
     return LocalRunner(self._storage)
+
+  def index_files(self) -> List[str]:
+    """A list of full path of index files."""
+    data_files = self._storage.data_files()
+    return [self._storage.full_path(f.path) for f in data_files.index_files]
