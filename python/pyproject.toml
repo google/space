@@ -53,8 +53,9 @@ disable = [
 [tool.pylint.MAIN]
 ignore = "space/core/proto"
 ignored-modules = [
-  "space.core.proto",
-  "google.protobuf",
-  "substrait",
   "array_record",
+  "datasets",
+  "google.protobuf",
+  "space.core.proto",
+  "substrait"
 ]
