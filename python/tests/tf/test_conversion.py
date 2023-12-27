@@ -25,7 +25,7 @@ from space.core.utils.lazy_imports_utils import array_record_module as ar
 from space.core.utils.uuids import uuid_
 
 
-class TestLocalConvertTfdsOp:
+class TestLocalLoadArrayRecordOp:
 
   @pytest.fixture
   def tf_features(self):
@@ -74,7 +74,7 @@ class TestLocalConvertTfdsOp:
       }
 
     runner = ds.local()
-    response = runner.append_tfds(tfds_path, index_fn)
+    response = runner.append_array_record(tfds_path, index_fn)
     assert response.storage_statistics_update == meta.StorageStatistics(
         num_rows=2,
         index_compressed_bytes=104,

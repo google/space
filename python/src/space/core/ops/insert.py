@@ -28,7 +28,7 @@ from space.core.ops import utils
 from space.core.ops.base import BaseOp, InputData
 import space.core.proto.runtime_pb2 as runtime
 from space.core.storage import Storage
-from space.core.utils.paths import StoragePaths
+from space.core.utils.paths import StoragePathsMixin
 
 
 @dataclass
@@ -53,11 +53,11 @@ class BaseInsertOp(BaseOp):
     """Insert data into storage."""
 
 
-class LocalInsertOp(BaseInsertOp, StoragePaths):
+class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
   '''Append data to a dataset.'''
 
   def __init__(self, location: str, storage: Storage, options: InsertOptions):
-    StoragePaths.__init__(self, location)
+    StoragePathsMixin.__init__(self, location)
 
     self._storage = storage
     self._metadata = self._storage.metadata

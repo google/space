@@ -32,7 +32,7 @@ from space.core.schema import arrow
 from space.core.schema import utils as schema_utils
 from space.core.utils import paths
 from space.core.utils.lazy_imports_utils import array_record_module as ar
-from space.core.utils.paths import StoragePaths
+from space.core.utils.paths import StoragePathsMixin
 
 # TODO: to obtain the values from user provided options.
 # Thresholds for writing Parquet files. The sizes are uncompressed bytes.
@@ -71,7 +71,7 @@ class _RecordWriterInfo:
       default_factory=meta.StorageStatistics)
 
 
-class LocalAppendOp(BaseAppendOp, StoragePaths):
+class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
   """Append operation running locally.
   
   It can be used as components of more complex operations and distributed
@@ -88,7 +88,7 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
     Args:
       record_address_input: if true, input record fields are addresses.
     """
-    StoragePaths.__init__(self, location)
+    StoragePathsMixin.__init__(self, location)
 
     self._metadata = metadata
     record_fields = set(self._metadata.schema.record_fields)

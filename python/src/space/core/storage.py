@@ -37,7 +37,7 @@ from space.core.utils.protos import proto_now
 _INIT_SNAPSHOT_ID = 0
 
 
-class Storage(paths.StoragePaths):
+class Storage(paths.StoragePathsMixin):
   """Storage manages data files by metadata using the Space format."""
 
   def __init__(self, location: str, metadata: meta.StorageMetadata):
