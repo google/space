@@ -12,8 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pyarrow as pa
+import pyarrow.compute as pc
+import pytest
+
 from space.core.ops import utils
-from space.core.proto import metadata_pb2 as meta
+import space.core.proto.metadata_pb2 as meta
+import space.core.proto.runtime_pb2 as runtime
 
 
 def test_update_index_storage_stats_positive():
@@ -76,3 +81,60 @@ def test_address_column():
   }]
   assert utils.address_column("data/file.array_record", 2,
                               3).to_pylist() == result
+
+
+def test_primary_key_filter(all_types_input_data):
+  filter_ = utils.primary_key_filter(["int64", "bool"],
+                                     pa.Table.from_pydict(
+                                         all_types_input_data[1]))
+  # pylint: disable=singleton-comparison
+  expected_filter = ((pc.field("int64") == 0) &
+                     (pc.field("bool") == False)) | (
+                         (pc.field("int64") == 10) &
+                         (pc.field("bool") == False))
+
+  assert str(filter_) == str(expected_filter)
+
+
+def test_primary_key_filter_fail_with_duplicated():
+  with pytest.raises(RuntimeError):
+    utils.primary_key_filter(["int64", "float64"],
+                             pa.Table.from_pydict({
+                                 "int64": [1, 2, 1],
+                                 "float64": [0.1, 0.2, 0.1],
+                                 "bool": [True, False, False],
+                                 "string": ["a", "b", "c"]
+                             }))
+
+
+def test_merge_patches():
+  append_manifests = meta.ManifestFiles(
+      index_manifest_files=["data/index_manifest0"],
+      record_manifest_files=["data/record_manifest0"])
+  append_patch = runtime.Patch(
+      addition=append_manifests,
+      storage_statistics_update=meta.StorageStatistics(
+          num_rows=123,
+          index_compressed_bytes=10,
+          index_uncompressed_bytes=20,
+          record_uncompressed_bytes=30))
+
+  delete_manifests = meta.ManifestFiles(
+      index_manifest_files=["data/index_manifest0"])
+  delete_patch = runtime.Patch(
+      deletion=delete_manifests,
+      storage_statistics_update=meta.StorageStatistics(
+          num_rows=-100,
+          index_compressed_bytes=-1,
+          index_uncompressed_bytes=-2,
+          record_uncompressed_bytes=-3))
+
+  upsert_patch = utils.merge_patches([append_patch, delete_patch])
+  assert upsert_patch == runtime.Patch(
+      addition=append_manifests,
+      deletion=delete_manifests,
+      storage_statistics_update=meta.StorageStatistics(
+          num_rows=23,
+          index_compressed_bytes=9,
+          index_uncompressed_bytes=18,
+          record_uncompressed_bytes=27))

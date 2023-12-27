@@ -75,5 +75,14 @@ class TestSpaceDataSource:
       runner.append(serializer.serialize(data))
 
     data_source = SpaceDataSource(ds, ["features"])
-    assert_equal(data_source[0], input_data[0]["features"][0])
-    assert_equal(data_source[1], input_data[1]["features"][0])
+    assert len(data_source) == 3
+
+    results = data_source[[0, 1, 2]]
+    expected = [
+        input_data[0]["features"][0], input_data[1]["features"][0],
+        input_data[1]["features"][1]
+    ]
+
+    results.sort(key=lambda v: v["image_id"])
+    expected.sort(key=lambda v: v["image_id"])
+    assert_equal(results, expected)

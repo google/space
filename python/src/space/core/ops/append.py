@@ -122,7 +122,7 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
     if not isinstance(data, pa.Table):
       data = pa.Table.from_pydict(data)
 
-    self._append_arrow(data)
+    self._write_arrow(data)
 
   def finish(self) -> Optional[runtime.Patch]:
     """Complete the append operation and return a metadata patch.
@@ -164,7 +164,7 @@ class LocalAppendOp(BaseAppendOp, StoragePaths):
     """Append external index manifest data."""
     return self._index_manifest_writer.write_arrow(index_manifest_table)
 
-  def _append_arrow(self, data: pa.Table) -> None:
+  def _write_arrow(self, data: pa.Table) -> None:
     # TODO: to verify the schema of input data.
     if data.num_rows == 0:
       return

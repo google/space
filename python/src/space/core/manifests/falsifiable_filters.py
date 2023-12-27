@@ -107,6 +107,7 @@ def _falsifiable_filter_internal(
   falsifiable_filter_fn = partial(_falsifiable_filter_internal, extensions,
                                   base_schema, field_name_ids)
 
+  # TODO: to support one side has scalar function, e.g., False | (a > 1).
   if _has_scalar_function(lhs) and _has_scalar_function(rhs):
     lhs_fn = lhs.scalar_function
     rhs_fn = rhs.scalar_function

@@ -16,7 +16,7 @@ from typing import List
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from space.core.ops import LocalAppendOp
+from space.core.ops.append import LocalAppendOp
 import space.core.proto.metadata_pb2 as meta
 from space.core.storage import Storage
 

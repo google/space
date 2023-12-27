@@ -61,6 +61,11 @@ class Storage(paths.StoragePaths):
     return self._metadata
 
   @property
+  def primary_keys(self) -> List[str]:
+    """Return the storage primary keys."""
+    return list(self._metadata.schema.primary_keys)
+
+  @property
   def logical_schema(self) -> pa.Schema:
     """Return the user specified schema."""
     return self._logical_schema

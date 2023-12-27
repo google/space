@@ -11,9 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-"""Space local data operations."""
-
-from space.core.ops.append import LocalAppendOp
-from space.core.ops.delete import FileSetDeleteOp
-from space.core.ops.read import FileSetReadOp, ReadOptions
