@@ -17,3 +17,4 @@
 from space.core.datasets import Dataset
 from space.core.runners import LocalRunner
 from space.core.schema.types import TfFeatures
+from space.core.views import MaterializedView

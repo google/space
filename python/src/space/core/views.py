@@ -142,7 +142,7 @@ class MaterializedView:
     return self._storage
 
   @property
-  def view(self) -> Optional[View]:
+  def view(self) -> View:
     """Return view of the materialized view."""
     return self._view
 
