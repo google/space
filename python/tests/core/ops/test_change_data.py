@@ -16,7 +16,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from space import Dataset
-from space.core.ops.change_data import ChangeType, read_change_data
+from space.core.ops.change_data import ChangeType
 
 
 def test_read_change_data(tmp_path, all_types_schema, all_types_input_data):
@@ -52,6 +52,29 @@ def test_read_change_data(tmp_path, all_types_schema, all_types_input_data):
                       }))
   assert changes[0] == expected_change1
 
-  changes = list(runner.diff(0, 2))
+  # Validate Upsert operation's changes.
+  upsert_data = {
+      "int64": [2, 3, 4, 5],
+      "float64": [0.1, -0.1, 0.4, 0.5],
+      "bool": [True, False, True, False],
+      "string": ["a", "A", "4", "5"]
+  }
+  runner.upsert(upsert_data)
+  changes = list(runner.diff(2, 3))
   assert len(changes) == 2
-  assert changes == [expected_change0, expected_change1]
+  expected_change2 = (ChangeType.DELETE,
+                      pa.Table.from_pydict({
+                          "int64": [2, 3],
+                          "float64": [0.2, 0.3],
+                          "bool": [False, False],
+                          "string": ["b", "c"]
+                      }))
+  expected_change3 = (ChangeType.ADD, pa.Table.from_pydict(upsert_data))
+  assert changes == [expected_change2, expected_change3]
+
+  # Validate diff with several snapshot in-between
+  changes = list(runner.diff(0, 3))
+  assert len(changes) == 4
+  assert changes == [
+      expected_change0, expected_change1, expected_change2, expected_change3
+  ]
