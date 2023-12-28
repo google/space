@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 from space.core.proto import metadata_pb2 as space_dot_core_dot_proto_dot_metadata__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1espace/core/proto/runtime.proto\x12\x0bspace.proto\x1a\x1fspace/core/proto/metadata.proto\"n\n\x08\x44\x61taFile\x12\x0c\n\x04path\x18\x01 \x01(\t\x12:\n\x12storage_statistics\x18\x02 \x01(\x0b\x32\x1e.space.proto.StorageStatistics\x12\x18\n\x10manifest_file_id\x18\x03 \x01(\x03\"\xbc\x01\n\x07\x46ileSet\x12*\n\x0bindex_files\x18\x01 \x03(\x0b\x32\x15.space.proto.DataFile\x12J\n\x14index_manifest_files\x18\x02 \x03(\x0b\x32,.space.proto.FileSet.IndexManifestFilesEntry\x1a\x39\n\x17IndexManifestFilesEntry\x12\x0b\n\x03key\x18\x01 \x01(\x03\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xa6\x01\n\x05Patch\x12,\n\x08\x61\x64\x64ition\x18\x01 \x01(\x0b\x32\x1a.space.proto.ManifestFiles\x12,\n\x08\x64\x65letion\x18\x02 \x01(\x0b\x32\x1a.space.proto.ManifestFiles\x12\x41\n\x19storage_statistics_update\x18\x03 \x01(\x0b\x32\x1e.space.proto.StorageStatistics\"\xc3\x01\n\tJobResult\x12+\n\x05state\x18\x01 \x01(\x0e\x32\x1c.space.proto.JobResult.State\x12\x41\n\x19storage_statistics_update\x18\x02 \x01(\x0b\x32\x1e.space.proto.StorageStatistics\"F\n\x05State\x12\x15\n\x11STATE_UNSPECIFIED\x10\x00\x12\r\n\tSUCCEEDED\x10\x01\x12\n\n\x06\x46\x41ILED\x10\x02\x12\x0b\n\x07SKIPPED\x10\x03\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1espace/core/proto/runtime.proto\x12\x0bspace.proto\x1a\x1fspace/core/proto/metadata.proto\"n\n\x08\x44\x61taFile\x12\x0c\n\x04path\x18\x01 \x01(\t\x12:\n\x12storage_statistics\x18\x02 \x01(\x0b\x32\x1e.space.proto.StorageStatistics\x12\x18\n\x10manifest_file_id\x18\x03 \x01(\x03\"\xbc\x01\n\x07\x46ileSet\x12*\n\x0bindex_files\x18\x01 \x03(\x0b\x32\x15.space.proto.DataFile\x12J\n\x14index_manifest_files\x18\x02 \x03(\x0b\x32,.space.proto.FileSet.IndexManifestFilesEntry\x1a\x39\n\x17IndexManifestFilesEntry\x12\x0b\n\x03key\x18\x01 \x01(\x03\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xd2\x01\n\x05Patch\x12,\n\x08\x61\x64\x64ition\x18\x01 \x01(\x0b\x32\x1a.space.proto.ManifestFiles\x12,\n\x08\x64\x65letion\x18\x02 \x01(\x0b\x32\x1a.space.proto.ManifestFiles\x12\x41\n\x19storage_statistics_update\x18\x03 \x01(\x0b\x32\x1e.space.proto.StorageStatistics\x12*\n\nchange_log\x18\x04 \x01(\x0b\x32\x16.space.proto.ChangeLog\"\xc3\x01\n\tJobResult\x12+\n\x05state\x18\x01 \x01(\x0e\x32\x1c.space.proto.JobResult.State\x12\x41\n\x19storage_statistics_update\x18\x02 \x01(\x0b\x32\x1e.space.proto.StorageStatistics\"F\n\x05State\x12\x15\n\x11STATE_UNSPECIFIED\x10\x00\x12\r\n\tSUCCEEDED\x10\x01\x12\n\n\x06\x46\x41ILED\x10\x02\x12\x0b\n\x07SKIPPED\x10\x03\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'space.core.proto.runtime_pb2', globals())
@@ -30,9 +30,9 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _FILESET_INDEXMANIFESTFILESENTRY._serialized_start=324
   _FILESET_INDEXMANIFESTFILESENTRY._serialized_end=381
   _PATCH._serialized_start=384
-  _PATCH._serialized_end=550
-  _JOBRESULT._serialized_start=553
-  _JOBRESULT._serialized_end=748
-  _JOBRESULT_STATE._serialized_start=678
-  _JOBRESULT_STATE._serialized_end=748
+  _PATCH._serialized_end=594
+  _JOBRESULT._serialized_start=597
+  _JOBRESULT._serialized_end=792
+  _JOBRESULT_STATE._serialized_start=722
+  _JOBRESULT_STATE._serialized_end=792
 # @@protoc_insertion_point(module_scope)

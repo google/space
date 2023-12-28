@@ -20,7 +20,7 @@ files that are impossible to contain the data. See
 https://vldb.org/pvldb/vol14/p3083-edara.pdf.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 from functools import partial
 
 from absl import logging  # type: ignore[import-untyped]
@@ -36,12 +36,14 @@ from space.core.schema import utils as schema_utils
 from space.core.schema import constants
 
 
-def build_manifest_filter(schema: pa.Schema, field_name_ids: Dict[str, int],
+def build_manifest_filter(schema: pa.Schema, primary_keys: Set[str],
+                          field_name_ids: Dict[str, int],
                           filter_: pc.Expression) -> Optional[pc.Expression]:
   """Build a falsifiable filter on index manifest files column statistics.
   
   Args:
     schema: the storage schema.
+    primary_keys: the primary keys.
     filter_: a filter on data fields.
     field_name_ids: a dict of field names to IDs mapping.
 
@@ -51,7 +53,8 @@ def build_manifest_filter(schema: pa.Schema, field_name_ids: Dict[str, int],
   expr = _substrait_expr(schema, filter_)
 
   try:
-    return ~_falsifiable_filter(expr, field_name_ids)  # type: ignore[operator]
+    return ~_falsifiable_filter(expr, primary_keys,
+                                field_name_ids)  # type: ignore[operator]
   except _ExpressionException as e:
     logging.info(
         "Index manifest filter push-down is not used, query may be slower; "
@@ -78,7 +81,7 @@ class _ExpressionException(Exception):
   """Raise for exceptions in Substrait expressions."""
 
 
-def _falsifiable_filter(filter_: ExtendedExpression,
+def _falsifiable_filter(filter_: ExtendedExpression, primary_keys: Set[str],
                         field_name_ids: Dict[str, int]) -> pc.Expression:
   if len(filter_.referred_expr) != 1:
     raise _ExpressionException(
@@ -87,6 +90,7 @@ def _falsifiable_filter(filter_: ExtendedExpression,
   return _falsifiable_filter_internal(
       filter_.extensions,  # type: ignore[arg-type]
       filter_.base_schema,
+      primary_keys,
       field_name_ids,
       filter_.referred_expr[0].expression.scalar_function)
 
@@ -94,7 +98,7 @@ def _falsifiable_filter(filter_: ExtendedExpression,
 # pylint: disable=too-many-locals,too-many-return-statements
 def _falsifiable_filter_internal(
     extensions: List[SimpleExtensionDeclaration], base_schema: NamedStruct,
-    field_name_ids: Dict[str, int],
+    primary_keys: Set[str], field_name_ids: Dict[str, int],
     root: Expression.ScalarFunction) -> pc.Expression:
   if len(root.arguments) != 2:
     raise _ExpressionException(
@@ -105,7 +109,7 @@ def _falsifiable_filter_internal(
   rhs = root.arguments[1].value
 
   falsifiable_filter_fn = partial(_falsifiable_filter_internal, extensions,
-                                  base_schema, field_name_ids)
+                                  base_schema, primary_keys, field_name_ids)
 
   # TODO: to support one side has scalar function, e.g., False | (a > 1).
   if _has_scalar_function(lhs) and _has_scalar_function(rhs):
@@ -135,6 +139,11 @@ def _falsifiable_filter_internal(
 
   field_index = lhs.selection.direct_reference.struct_field.field
   field_name = base_schema.names[field_index]
+  # Only primary key fields have column statistics for falsifiable filter
+  # pruning.
+  if field_name not in primary_keys:
+    return pc.scalar(False)
+
   field_id = field_name_ids[field_name]
   field_min, field_max = _stats_field_min(field_id), _stats_field_max(field_id)
   value = pc.scalar(

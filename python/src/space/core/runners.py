@@ -16,17 +16,18 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Iterator, List, Optional
+from typing import Iterator, List, Optional, Tuple, Union
 
 from absl import logging  # type: ignore[import-untyped]
 import pyarrow as pa
 import pyarrow.compute as pc
 
 from space.core.ops.append import LocalAppendOp
-from space.core.ops.insert import InsertOptions, LocalInsertOp
-from space.core.ops.delete import FileSetDeleteOp
-from space.core.ops.read import FileSetReadOp, ReadOptions
 from space.core.ops.base import InputData
+from space.core.ops.change_data import ChangeType, read_change_data
+from space.core.ops.delete import FileSetDeleteOp
+from space.core.ops.insert import InsertOptions, LocalInsertOp
+from space.core.ops.read import FileSetReadOp, ReadOptions
 import space.core.proto.runtime_pb2 as runtime
 from space.core.storage import Storage
 from space.core.loaders.array_record import ArrayRecordIndexFn
@@ -110,6 +111,14 @@ class BaseRunner(ABC):
   def delete(self, filter_: pc.Expression) -> runtime.JobResult:
     """Delete data matching the filter from the dataset."""
 
+  @abstractmethod
+  def diff(self, start_version: Union[int],
+           end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
+    """Read the change data between two versions.
+    
+    start_version is excluded; end_version is included. 
+    """
+
   def _try_commit(self, patch: Optional[runtime.Patch]) -> runtime.JobResult:
     if patch is not None:
       self._storage.commit(patch)
@@ -160,8 +169,7 @@ class LocalRunner(BaseRunner):
 
   def _insert(self, data: InputData,
               mode: InsertOptions.Mode) -> runtime.JobResult:
-    op = LocalInsertOp(self._storage.location, self._storage,
-                       InsertOptions(mode=mode))
+    op = LocalInsertOp(self._storage, InsertOptions(mode=mode))
     return self._try_commit(op.write(data))
 
   def delete(self, filter_: pc.Expression) -> runtime.JobResult:
@@ -169,6 +177,24 @@ class LocalRunner(BaseRunner):
     op = FileSetDeleteOp(self._storage.location, self._storage.metadata,
                          ds.data_files(filter_), filter_)
     return self._try_commit(op.delete())
+
+  def diff(self, start_version: Union[int],
+           end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
+    start_snapshot_id, end_snapshot_id = None, None
+
+    if isinstance(start_version, int):
+      start_snapshot_id = start_version
+
+    if isinstance(end_version, int):
+      end_snapshot_id = end_version
+
+    if start_snapshot_id is None:
+      raise RuntimeError(f"Start snapshot ID is invalid: {start_version}")
+
+    if end_snapshot_id is None:
+      raise RuntimeError(f"End snapshot ID is invalid: {end_version}")
+
+    return read_change_data(self._storage, start_snapshot_id, end_snapshot_id)
 
 
 def _job_result(patch: Optional[runtime.Patch]) -> runtime.JobResult:

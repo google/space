@@ -74,7 +74,7 @@ message Schema {
 
 // Storage snapshot persisting physical metadata such as manifest file paths.
 // It is used for obtaining all alive data file paths for a given snapshot.
-// NEXT_ID: 5
+// NEXT_ID: 6
 message Snapshot {
   // The snapshot ID.
   int64 snapshot_id = 1;
@@ -91,6 +91,9 @@ message Snapshot {
 
   // Statistics of all data in the storage.
   StorageStatistics storage_statistics = 4;
+
+  // File path of the change log of the snapshot.
+  string change_log_file = 5;
 }
 
 // Stores information of manifest files.
@@ -117,4 +120,31 @@ message StorageStatistics {
 
   // Uncompressed bytes of record data.
   int64 record_uncompressed_bytes = 4;
+}
+
+
+// Change log stores changes made by a snapshot.
+// NEXT_ID: 3
+message ChangeLog {
+  // Rows deleted in this snapshot.
+  repeated RowBitmap deleted_rows = 1;
+
+  // New rows added in this snapshot.
+  repeated RowBitmap added_rows = 2;
+}
+
+
+// Mark rows in a file by bitmap.
+// NEXT_ID: 4
+message RowBitmap {
+  // File path that the bit map applies to.
+  string file = 1;
+
+  // All rows are selected. Bitmap is empty in this case.
+  bool all_rows = 2;
+
+  oneof bitmap {
+    // Roaring bitmap.
+    bytes roaring_bitmap = 3;
+  }
 }

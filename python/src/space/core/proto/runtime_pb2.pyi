@@ -107,7 +107,7 @@ global___FileSet = FileSet
 @typing_extensions.final
 class Patch(google.protobuf.message.Message):
     """A patch describing metadata changes to the storage.
-    NEXT_ID: 4
+    NEXT_ID: 5
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -115,6 +115,7 @@ class Patch(google.protobuf.message.Message):
     ADDITION_FIELD_NUMBER: builtins.int
     DELETION_FIELD_NUMBER: builtins.int
     STORAGE_STATISTICS_UPDATE_FIELD_NUMBER: builtins.int
+    CHANGE_LOG_FIELD_NUMBER: builtins.int
     @property
     def addition(self) -> space.core.proto.metadata_pb2.ManifestFiles:
         """Manifest files to add to the storage."""
@@ -124,15 +125,19 @@ class Patch(google.protobuf.message.Message):
     @property
     def storage_statistics_update(self) -> space.core.proto.metadata_pb2.StorageStatistics:
         """The change of the storage statistics."""
+    @property
+    def change_log(self) -> space.core.proto.metadata_pb2.ChangeLog:
+        """The change log describing the changes made by the patch."""
     def __init__(
         self,
         *,
         addition: space.core.proto.metadata_pb2.ManifestFiles | None = ...,
         deletion: space.core.proto.metadata_pb2.ManifestFiles | None = ...,
         storage_statistics_update: space.core.proto.metadata_pb2.StorageStatistics | None = ...,
+        change_log: space.core.proto.metadata_pb2.ChangeLog | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["addition", b"addition", "deletion", b"deletion", "storage_statistics_update", b"storage_statistics_update"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["addition", b"addition", "deletion", b"deletion", "storage_statistics_update", b"storage_statistics_update"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["addition", b"addition", "change_log", b"change_log", "deletion", b"deletion", "storage_statistics_update", b"storage_statistics_update"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["addition", b"addition", "change_log", b"change_log", "deletion", b"deletion", "storage_statistics_update", b"storage_statistics_update"]) -> None: ...
 
 global___Patch = Patch
 

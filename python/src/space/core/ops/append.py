@@ -228,11 +228,14 @@ class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
     self._index_writer_info.writer.close()
 
     # Update metadata in manifest files.
+    file_path = self._index_writer_info.file_path
     stats = self._index_manifest_writer.write(
-        self._index_writer_info.file_path,
-        self._index_writer_info.writer.writer.metadata)
+        file_path, self._index_writer_info.writer.writer.metadata)
     utils.update_index_storage_stats(
         base=self._patch.storage_statistics_update, update=stats)
+
+    self._patch.change_log.added_rows.append(
+        meta.RowBitmap(file=file_path, all_rows=True))
 
     self._index_writer_info = None
     self._cached_index_file_bytes = 0

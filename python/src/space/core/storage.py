@@ -55,6 +55,8 @@ class Storage(paths.StoragePathsMixin):
     self._field_name_ids: Dict[str, int] = arrow.field_name_to_id_dict(
         self._physical_schema)
 
+    self._primary_keys = set(self._metadata.schema.primary_keys)
+
   @property
   def metadata(self) -> meta.StorageMetadata:
     """Return the storage metadata."""
@@ -139,9 +141,6 @@ class Storage(paths.StoragePathsMixin):
                              meta.StorageMetadata())
     return Storage(location, metadata)
 
-  def _next_snapshot_id(self) -> int:
-    return self._metadata.current_snapshot_id + 1
-
   def commit(self, patch: runtime.Patch) -> None:
     """Commit changes to the storage.
 
@@ -166,6 +165,11 @@ class Storage(paths.StoragePathsMixin):
         manifest_files=current_snapshot.manifest_files,
         storage_statistics=current_snapshot.storage_statistics)
     _patch_manifests(snapshot.manifest_files, patch)
+
+    if patch.HasField('change_log'):
+      change_log_file = self.new_change_log_path()
+      self._fs.write_proto(change_log_file, patch.change_log)
+      snapshot.change_log_file = self.short_path(change_log_file)
 
     # Update storage statistics.
     ops_utils.update_index_storage_stats(snapshot.storage_statistics,
@@ -198,6 +202,7 @@ class Storage(paths.StoragePathsMixin):
     manifest_filter = None
     if filter_ is not None:
       manifest_filter = build_manifest_filter(self._physical_schema,
+                                              self._primary_keys,
                                               self._field_name_ids, filter_)
 
     for manifest_file in manifest_files.index_manifest_files:
@@ -213,11 +218,20 @@ class Storage(paths.StoragePathsMixin):
 
     return result
 
+  @property
+  def snapshot_ids(self) -> List[int]:
+    """A list of all alive snapshot IDs in the dataset."""
+    return list(self._metadata.snapshots)
+
   def _initialize(self, metadata_path: str) -> None:
     """Initialize a new storage by creating folders and files."""
     self._fs.create_dir(self._data_dir)
     self._fs.create_dir(self._metadata_dir)
+    self._fs.create_dir(self._change_data_dir)
     self._write_metadata(metadata_path, self._metadata)
+
+  def _next_snapshot_id(self) -> int:
+    return self._metadata.current_snapshot_id + 1
 
   def _write_metadata(
       self,

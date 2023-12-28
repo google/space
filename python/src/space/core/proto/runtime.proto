@@ -42,7 +42,7 @@ message FileSet {
 }
 
 // A patch describing metadata changes to the storage.
-// NEXT_ID: 4
+// NEXT_ID: 5
 message Patch {
   // Manifest files to add to the storage.
   ManifestFiles addition = 1;
@@ -52,6 +52,9 @@ message Patch {
 
   // The change of the storage statistics.
   StorageStatistics storage_statistics_update = 3;
+
+  // The change log describing the changes made by the patch.
+  ChangeLog change_log = 4;
 }
 
 // Result of a job.

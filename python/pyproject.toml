@@ -19,6 +19,7 @@ dependencies = [
   "numpy",
   "protobuf",
   "pyarrow >= 14.0.0",
+  "pyroaring",
   "tensorflow_datasets",
   "typing_extensions",
 ]
@@ -56,6 +57,7 @@ ignored-modules = [
   "array_record",
   "datasets",
   "google.protobuf",
+  "pyroaring",
   "space.core.proto",
   "substrait"
 ]
