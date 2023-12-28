@@ -68,6 +68,11 @@ class Storage(paths.StoragePathsMixin):
     return list(self._metadata.schema.primary_keys)
 
   @property
+  def record_fields(self) -> List[str]:
+    """Return record field names."""
+    return list(self._metadata.schema.record_fields)
+
+  @property
   def logical_schema(self) -> pa.Schema:
     """Return the user specified schema."""
     return self._logical_schema
@@ -89,17 +94,24 @@ class Storage(paths.StoragePathsMixin):
 
     raise RuntimeError(f"Snapshot {snapshot_id} is not found")
 
+  # pylint: disable=too-many-arguments
   @classmethod
   def create(
-      cls, location: str, schema: pa.Schema, primary_keys: List[str],
-      record_fields: List[str]) -> Storage:  # pylint: disable=unused-argument
+      cls,
+      location: str,
+      schema: pa.Schema,
+      primary_keys: List[str],
+      record_fields: List[str],
+      logical_plan: Optional[meta.LogicalPlan] = None
+  ) -> Storage:  # pylint: disable=unused-argument
     """Create a new empty storage.
-    
+
     Args:
       location: the directory path to the storage.
       schema: the schema of the storage.
       primary_keys: un-enforced primary keys.
       record_fields: fields stored in row format (ArrayRecord).
+      logical_plan: logical plan of materialized view.
     """
     # TODO: to verify that location is an empty directory.
     # TODO: to verify primary key fields and record_fields (and types) are
@@ -121,6 +133,10 @@ class Storage(paths.StoragePathsMixin):
             record_fields=record_fields),
         current_snapshot_id=_INIT_SNAPSHOT_ID,
         type=meta.StorageMetadata.DATASET)
+
+    if logical_plan is not None:
+      metadata.type = meta.StorageMetadata.MATERIALIZED_VIEW
+      metadata.logical_plan.CopyFrom(logical_plan)
 
     new_metadata_path = paths.new_metadata_path(paths.metadata_dir(location))
 

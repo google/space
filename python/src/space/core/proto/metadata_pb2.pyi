@@ -22,6 +22,7 @@ import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
+import substrait.plan_pb2
 import substrait.type_pb2
 import sys
 import typing
@@ -61,7 +62,7 @@ class StorageMetadata(google.protobuf.message.Message):
     """Metadata persisting the current status of a storage, including logical
     metadata such as schema, and physical metadata persisted as a history of
     snapshots
-    NEXT_ID: 7
+    NEXT_ID: 8
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -74,14 +75,18 @@ class StorageMetadata(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         TYPE_UNSPECIFIED: StorageMetadata._Type.ValueType  # 0
         DATASET: StorageMetadata._Type.ValueType  # 1
-        """The dataset type supports fully managed storage features."""
+        """Dataset type supports fully managed storage features."""
+        MATERIALIZED_VIEW: StorageMetadata._Type.ValueType  # 2
+        """Materialized view type supports synchronizing changes from sources."""
 
     class Type(_Type, metaclass=_TypeEnumTypeWrapper):
         """The storage type."""
 
     TYPE_UNSPECIFIED: StorageMetadata.Type.ValueType  # 0
     DATASET: StorageMetadata.Type.ValueType  # 1
-    """The dataset type supports fully managed storage features."""
+    """Dataset type supports fully managed storage features."""
+    MATERIALIZED_VIEW: StorageMetadata.Type.ValueType  # 2
+    """Materialized view type supports synchronizing changes from sources."""
 
     @typing_extensions.final
     class SnapshotsEntry(google.protobuf.message.Message):
@@ -107,6 +112,7 @@ class StorageMetadata(google.protobuf.message.Message):
     SCHEMA_FIELD_NUMBER: builtins.int
     CURRENT_SNAPSHOT_ID_FIELD_NUMBER: builtins.int
     SNAPSHOTS_FIELD_NUMBER: builtins.int
+    LOGICAL_PLAN_FIELD_NUMBER: builtins.int
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Create time of the storage."""
@@ -122,6 +128,9 @@ class StorageMetadata(google.protobuf.message.Message):
     @property
     def snapshots(self) -> google.protobuf.internal.containers.MessageMap[builtins.int, global___Snapshot]:
         """All alive snapshots with snapshot ID as key."""
+    @property
+    def logical_plan(self) -> global___LogicalPlan:
+        """Store the logical plan for materialized views."""
     def __init__(
         self,
         *,
@@ -131,9 +140,10 @@ class StorageMetadata(google.protobuf.message.Message):
         schema: global___Schema | None = ...,
         current_snapshot_id: builtins.int = ...,
         snapshots: collections.abc.Mapping[builtins.int, global___Snapshot] | None = ...,
+        logical_plan: global___LogicalPlan | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "last_update_time", b"last_update_time", "schema", b"schema"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "current_snapshot_id", b"current_snapshot_id", "last_update_time", b"last_update_time", "schema", b"schema", "snapshots", b"snapshots", "type", b"type"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "last_update_time", b"last_update_time", "logical_plan", b"logical_plan", "schema", b"schema"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "current_snapshot_id", b"current_snapshot_id", "last_update_time", b"last_update_time", "logical_plan", b"logical_plan", "schema", b"schema", "snapshots", b"snapshots", "type", b"type"]) -> None: ...
 
 global___StorageMetadata = StorageMetadata
 
@@ -327,3 +337,48 @@ class RowBitmap(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing_extensions.Literal["bitmap", b"bitmap"]) -> typing_extensions.Literal["roaring_bitmap"] | None: ...
 
 global___RowBitmap = RowBitmap
+
+@typing_extensions.final
+class LogicalPlan(google.protobuf.message.Message):
+    """Store the logical plan of a transform.
+    NEXT_ID: 3
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class UdfsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.str
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    LOGICAL_PLAN_FIELD_NUMBER: builtins.int
+    UDFS_FIELD_NUMBER: builtins.int
+    @property
+    def logical_plan(self) -> substrait.plan_pb2.Plan:
+        """Stores the logical plan."""
+    @property
+    def udfs(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
+        """Registry of user defined functions.
+        Key is UDF name; value is pickle file path.
+        """
+    def __init__(
+        self,
+        *,
+        logical_plan: substrait.plan_pb2.Plan | None = ...,
+        udfs: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["logical_plan", b"logical_plan"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["logical_plan", b"logical_plan", "udfs", b"udfs"]) -> None: ...
+
+global___LogicalPlan = LogicalPlan

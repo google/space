@@ -18,10 +18,13 @@ from os import path
 
 from space.core.utils.uuids import uuid_
 
+# Folders of storage metadata.
 _ENTRY_POINT_FILE = "entrypoint.txtpb"
 _DATA_DIR = "data"
 _METADATA_DIR = "metadata"
 _CHANGE_DATA_DIR = "changes"
+# Folder of user defined functions for materialized views.
+UDF_DIR = 'udfs'
 
 
 def new_index_file_path(data_dir_: str):

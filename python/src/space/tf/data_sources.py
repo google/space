@@ -23,7 +23,7 @@ import pyarrow as pa
 from tensorflow_datasets.core.utils import shard_utils  # type: ignore[import-untyped]
 from tensorflow_datasets.core.utils.lazy_imports_utils import array_record_data_source as ards  # type: ignore[import-untyped]
 
-from space import Dataset
+from space.core.datasets import Dataset
 from space.core.schema import constants
 
 

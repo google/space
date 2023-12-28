@@ -15,16 +15,19 @@
 """Space dataset is the interface to interact with underlying storage."""
 
 from __future__ import annotations
-from typing import List
+from typing import Dict, List
 
 import pyarrow as pa
+from substrait.algebra_pb2 import ReadRel, Rel
 
 from space.core.runners import LocalRunner
 from space.core.serializers.base import DictSerializer
 from space.core.storage import Storage
+from space.core.utils.plans import LogicalPlanBuilder
+from space.core.views import View
 
 
-class Dataset:
+class Dataset(View):
   """Dataset is the interface to interact with Space storage."""
 
   def __init__(self, storage: Storage):
@@ -54,6 +57,14 @@ class Dataset:
     """Return the dataset schema."""
     return self._storage.logical_schema
 
+  @property
+  def primary_keys(self) -> List[str]:
+    return self._storage.primary_keys
+
+  @property
+  def record_fields(self) -> List[str]:
+    return self._storage.record_fields
+
   def serializer(self) -> DictSerializer:
     """Return a serializer (deserializer) for the dataset."""
     return DictSerializer(self.schema)
@@ -71,3 +82,12 @@ class Dataset:
   def snapshot_ids(self) -> List[int]:
     """A list of all alive snapshot IDs in the dataset."""
     return self._storage.snapshot_ids
+
+  @property
+  def sources(self) -> Dict[str, Dataset]:
+    return {self._storage.location: self}
+
+  def to_relation(self, builder: LogicalPlanBuilder) -> Rel:
+    location = self._storage.location
+    return Rel(read=ReadRel(named_table=ReadRel.NamedTable(names=[location]),
+                            base_schema=self._storage.metadata.schema.fields))

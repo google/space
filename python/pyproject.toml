@@ -16,6 +16,7 @@ requires-python = ">=3.8"
 dependencies = [
   "absl-py",
   "array-record",
+  "cloudpickle",
   "numpy",
   "protobuf",
   "pyarrow >= 14.0.0",
