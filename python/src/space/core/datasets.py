@@ -15,7 +15,7 @@
 """Space dataset is the interface to interact with underlying storage."""
 
 from __future__ import annotations
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -27,6 +27,7 @@ from space.core.storage import Storage
 from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.plans import LogicalPlanBuilder
 from space.core.views import View
+from space.ray.data_sources import SpaceDataSource
 from space.ray.runners import RayReadWriterRunner
 
 

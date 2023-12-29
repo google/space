@@ -41,7 +41,8 @@ class RayAppendOp(BaseAppendOp):
     """
     self._parallelism = parallelism
     self._actors = [
-        _AppendActor.remote(location, metadata, record_address_input)
+        _AppendActor.remote(  # type: ignore[attr-defined] # pylint: disable=no-member
+            location, metadata, record_address_input)
         for _ in range(parallelism)
     ]
 
@@ -73,10 +74,10 @@ class RayAppendOp(BaseAppendOp):
     """Append data into the dataset from multiple iterator sources in
     parallel.
     """
+    num_actors = len(self._actors)
     responses = []
-    # TODO: to handle the case that actors and sources numbers are different.
-    for actor, data_loader in zip(self._actors, sources):
-      responses.append(actor.append_from.remote(data_loader))
+    for i, source in enumerate(sources):
+      responses.append(self._actors[i % num_actors].write_from.remote(source))
 
     ray.get(responses)
 
@@ -95,14 +96,15 @@ class _AppendActor:
                record_address_input: bool = False):
     self._op = LocalAppendOp(location, metadata, record_address_input)
 
-  def append_from(self, source: Iterator[InputData]) -> None:
+  def write_from(self, source: Iterator[InputData]) -> None:
     """Append data into the dataset from an iterator source."""
     for data in source:
       self._op.write(data)
 
-  def write(self, data: InputData) -> None:
+  def write(self, data: InputData) -> bool:
     """Append data into storage."""
     self._op.write(data)
+    return True
 
   def finish(self) -> Optional[runtime.Patch]:
     """Complete the append operation and return a metadata patch."""

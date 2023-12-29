@@ -34,7 +34,6 @@ from space.core.ops.insert import InsertOptions
 import space.core.proto.runtime_pb2 as runtime
 from space.core.utils.lazy_imports_utils import ray
 from space.core.versions.utils import version_to_snapshot_id
-from space.ray.data_sources import SpaceDataSource
 from space.ray.ops.append import RayAppendOp
 from space.ray.ops.delete import RayDeleteOp
 from space.ray.ops.insert import RayInsertOp
@@ -61,7 +60,9 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
            fields: Optional[List[str]] = None,
            snapshot_id: Optional[int] = None,
            reference_read: bool = False) -> Iterator[pa.Table]:
-    return self._view.ray_dataset(filter_, fields, snapshot_id, reference_read)
+    for ref in self._view.ray_dataset(filter_, fields, snapshot_id,
+                                      reference_read).to_arrow_refs():
+      yield ray.get(ref)
 
   def diff(self, start_version: Union[int],
            end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:

@@ -18,9 +18,10 @@ from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass
 from os import path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 import pyarrow as pa
+import pyarrow.compute as pc
 from substrait.algebra_pb2 import Expression
 from substrait.algebra_pb2 import FilterRel
 from substrait.algebra_pb2 import FunctionArgument
@@ -111,7 +112,7 @@ class BaseUdfTransform(View):
         self.input_.ray_dataset(filter_, fields, snapshot_id, reference_read))
 
   @abstractmethod
-  def _transform(ds: ray.Dataset) -> ray.Dataset:
+  def _transform(self, ds: ray.Dataset) -> ray.Dataset:
     """Transform a Ray dataset using the UDF."""
 
 
@@ -144,7 +145,7 @@ class MapTransform(BaseUdfTransform):
     return MapTransform(*_load_udf(location, metadata, rel.project.
                                    expressions[0], rel.project.input, plan))
 
-  def _transform(ds: ray.Dataset) -> ray.Dataset:
+  def _transform(self, ds: ray.Dataset) -> ray.Dataset:
     batch_size = self.udf.batch_size if self.udf.batch_size >= 0 else "default"
     return ds.map_batches(self.udf.fn, batch_size=batch_size)
 
@@ -178,7 +179,7 @@ class FilterTransform(BaseUdfTransform):
     return FilterTransform(*_load_udf(location, metadata, rel.filter.condition,
                                       rel.filter.input, plan))
 
-  def _transform(ds: ray.Dataset) -> ray.Dataset:
+  def _transform(self, ds: ray.Dataset) -> ray.Dataset:
     return ds.filter(self.udf.fn)
 
 

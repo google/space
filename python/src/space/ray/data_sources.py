@@ -17,7 +17,6 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
-import pyarrow as pa
 import pyarrow.compute as pc
 from ray.data.block import Block, BlockMetadata
 from ray.data.datasource.datasource import Datasource, Reader, ReadTask
@@ -33,12 +32,14 @@ from space.core.ops.read import FileSetReadOp, ReadOptions
 class SpaceDataSource(Datasource):
   """A Ray data source for a Space dataset."""
 
-  def create_reader(self,
-                    storage: Storage,
-                    filter_: Optional[pc.Expression],
-                    fields: Optional[List[str]],
-                    snapshot_id: Optional[int],
-                    reference_read: bool = False) -> Reader:
+  # pylint: disable=arguments-differ,too-many-arguments
+  def create_reader(  # type: ignore[override]
+      self,
+      storage: Storage,
+      filter_: Optional[pc.Expression],
+      fields: Optional[List[str]],
+      snapshot_id: Optional[int],
+      reference_read: bool = False) -> Reader:
     return _SpaceDataSourceReader(storage, filter_, fields, snapshot_id,
                                   reference_read)
 
@@ -49,12 +50,14 @@ class SpaceDataSource(Datasource):
     """Write a Ray dataset into Space datasets."""
     raise NotImplementedError("Write from a Ray dataset is not supported")
 
-  def on_write_complete(self, write_results: List[WriteResult]) -> None:
+  def on_write_complete(  # type: ignore[override]
+      self, write_results: List[WriteResult]) -> None:
     raise NotImplementedError("Write from a Ray dataset is not supported")
 
 
 class _SpaceDataSourceReader(Reader):
 
+  # pylint: disable=too-many-arguments
   def __init__(self,
                storage: Storage,
                filter_: Optional[pc.Expression],
@@ -93,29 +96,21 @@ class _SpaceDataSourceReader(Reader):
           exec_stats=None,
       )
 
-      def _read_fn() -> List[Block]:
-        return [
-            _read_file_set(
-                self._storage.location,
-                self._storage.metadata.SerializeToString(),
-                task_file_set.SerializeToString(),
-                ReadOptions(self._filter, self._fields, self._reference_read))
-        ]
+      def _read_fn(location=self._storage.location,
+                   metadata=self._storage.metadata,
+                   file_set=task_file_set):
+        return _read_file_set(
+            location, metadata, file_set,
+            ReadOptions(self._filter, self._fields, self._reference_read))
 
-      # Supply a no-arg read function (which returns a block) and pre-read
-      # block metadata.
       read_tasks.append(ReadTask(_read_fn, block_metadata))
 
     return read_tasks
 
 
-def _read_file_set(location: str, metadata_bytes: bytes, file_set_bytes: bytes,
-                   read_options: ReadOptions) -> Block:
-  metadata = meta.StorageMetadata()
-  metadata.ParseFromString(metadata_bytes)
-
-  file_set = runtime.FileSet()
-  file_set.ParseFromString(file_set_bytes)
-
-  read_op = FileSetReadOp(location, metadata, file_set, read_options)
-  return pa.concat_tables(list(read_op))
+# TODO: A single index file (with record files) is a single block. To check
+# whether row group granularity is needed.
+def _read_file_set(location: str, metadata: meta.StorageMetadata,
+                   file_set: runtime.FileSet,
+                   read_options: ReadOptions) -> List[Block]:
+  return list(FileSetReadOp(location, metadata, file_set, read_options))

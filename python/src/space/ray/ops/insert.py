@@ -38,14 +38,16 @@ class RayInsertOp(LocalInsertOp):
 
   def _check_duplication(self, data_files: runtime.FileSet,
                          filter_: pc.Expression):
-    remote_duplicated = []
+    remote_duplicated_values = []
     for index_file in data_files.index_files:
-      remote_duplicated.append(
-          _remote_filter_matched.options(num_returns=1).remote(
-              self._metadata, runtime.FileSet(index_files=[index_file]),
-              filter_, self._storage.primary_keys))
+      # pylint: disable=line-too-long
+      remote_duplicated = _remote_filter_matched.options(  # type: ignore[attr-defined]
+          num_returns=1).remote(self._storage.location, self._metadata,
+                                runtime.FileSet(index_files=[index_file]),
+                                filter_, self._storage.primary_keys)
+      remote_duplicated_values.append(remote_duplicated)
 
-    for duplicated in ray.get(remote_duplicated):
+    for duplicated in ray.get(remote_duplicated_values):
       if duplicated:
         raise RuntimeError("Primary key to insert already exist")
 

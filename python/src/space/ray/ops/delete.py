@@ -50,8 +50,9 @@ class RayDeleteOp(BaseDeleteOp, StoragePathsMixin):
           # TODO: attach all manifest files here, to select related manifests.
           index_manifest_files=matched_file_set.index_manifest_files)
 
-      result = _delete_in_single_file.options(num_returns=1).remote(
-          self._storage.location, metadata, file_set, self._filter)
+      result = _delete.options(  # type: ignore[attr-defined]
+          num_returns=1).remote(self._storage.location, metadata, file_set,
+                                self._filter)
       remote_delete_patches.append(result)
 
     patches = ray.get(remote_delete_patches)
@@ -59,7 +60,7 @@ class RayDeleteOp(BaseDeleteOp, StoragePathsMixin):
 
 
 @ray.remote
-def _delete_in_single_file(location: str, metadata: meta.StorageMetadata,
-                           file_set: runtime.FileSet,
-                           filter_: pc.Expression) -> Optional[runtime.Patch]:
+def _delete(location: str, metadata: meta.StorageMetadata,
+            file_set: runtime.FileSet,
+            filter_: pc.Expression) -> Optional[runtime.Patch]:
   return FileSetDeleteOp(location, metadata, file_set, filter_).delete()
