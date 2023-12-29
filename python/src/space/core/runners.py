@@ -79,7 +79,7 @@ class StorageCommitMixin:
 
 
 class BaseReadWriteRunner(StorageCommitMixin, BaseReadOnlyRunner):
-  """Abstract base runner class."""
+  """Abstract base read and write runner class."""
 
   def __init__(self, storage: Storage):
     StorageCommitMixin.__init__(self, storage)
@@ -89,7 +89,9 @@ class BaseReadWriteRunner(StorageCommitMixin, BaseReadOnlyRunner):
     """Append data into the dataset."""
 
   @abstractmethod
-  def append_from(self, source: Iterator[InputData]) -> runtime.JobResult:
+  def append_from(
+      self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
+  ) -> runtime.JobResult:
     """Append data into the dataset from an iterator source."""
 
   @abstractmethod
@@ -154,17 +156,27 @@ class LocalRunner(BaseReadWriteRunner):
                         fields=fields,
                         reference_read=reference_read)))
 
+  def diff(self, start_version: Union[int],
+           end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
+    return read_change_data(self._storage,
+                            version_to_snapshot_id(start_version),
+                            version_to_snapshot_id(end_version))
+
   def append(self, data: InputData) -> runtime.JobResult:
-
-    def make_iter():
-      yield data
-
-    return self.append_from(make_iter())
-
-  def append_from(self, source: Iterator[InputData]) -> runtime.JobResult:
     op = LocalAppendOp(self._storage.location, self._storage.metadata)
-    for data in source:
-      op.write(data)
+    op.write(data)
+    return self._try_commit(op.finish())
+
+  def append_from(
+      self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
+  ) -> runtime.JobResult:
+    op = LocalAppendOp(self._storage.location, self._storage.metadata)
+    if not isinstance(sources, list):
+      sources = [sources]
+
+    for source in sources:
+      for data in source:
+        op.write(data)
 
     return self._try_commit(op.finish())
 
@@ -185,16 +197,9 @@ class LocalRunner(BaseReadWriteRunner):
     return self._try_commit(op.write(data))
 
   def delete(self, filter_: pc.Expression) -> runtime.JobResult:
-    ds = self._storage
     op = FileSetDeleteOp(self._storage.location, self._storage.metadata,
-                         ds.data_files(filter_), filter_)
+                         self._storage.data_files(filter_), filter_)
     return self._try_commit(op.delete())
-
-  def diff(self, start_version: Union[int],
-           end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
-    return read_change_data(self._storage,
-                            version_to_snapshot_id(start_version),
-                            version_to_snapshot_id(end_version))
 
 
 def _job_result(patch: Optional[runtime.Patch]) -> runtime.JobResult:

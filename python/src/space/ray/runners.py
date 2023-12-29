@@ -15,23 +15,39 @@
 """Ray runner implementations."""
 
 from __future__ import annotations
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from typing import Iterator, List, Optional, Tuple, Union
 
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from space.core.runners import BaseReadOnlyRunner, StorageCommitMixin
+from space.core.loaders.array_record import ArrayRecordIndexFn
+from space.core.runners import BaseReadOnlyRunner, BaseReadWriteRunner
+from space.core.runners import StorageCommitMixin
 from space.core.ops import utils
 from space.core.ops.append import LocalAppendOp
+from space.core.ops.base import InputData
 from space.core.ops.change_data import ChangeType, read_change_data
 from space.core.ops.delete import FileSetDeleteOp
+from space.core.ops.insert import InsertOptions
 import space.core.proto.runtime_pb2 as runtime
 from space.core.utils.lazy_imports_utils import ray
 from space.core.versions.utils import version_to_snapshot_id
+from space.ray.data_sources import SpaceDataSource
+from space.ray.ops.append import RayAppendOp
+from space.ray.ops.delete import RayDeleteOp
+from space.ray.ops.insert import RayInsertOp
 
 if TYPE_CHECKING:
+  from space.core.datasets import Dataset
   from space.core.views import MaterializedView, View
+
+
+@dataclass
+class RayOptions:
+  """Options of Ray runners."""
+  parallelism: int = 2
 
 
 class RayReadOnlyRunner(BaseReadOnlyRunner):
@@ -45,23 +61,24 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
            fields: Optional[List[str]] = None,
            snapshot_id: Optional[int] = None,
            reference_read: bool = False) -> Iterator[pa.Table]:
-    raise NotImplementedError()
+    return self._view.ray_dataset(filter_, fields, snapshot_id, reference_read)
 
   def diff(self, start_version: Union[int],
            end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
-    sources = self._view.sources
-    assert len(sources) == 1, "Views only support a single source dataset"
-    ds = list(sources.values())[0]
-
-    source_changes = read_change_data(ds.storage,
+    source_changes = read_change_data(self._source().storage,
                                       version_to_snapshot_id(start_version),
                                       version_to_snapshot_id(end_version))
     for change_type, data in source_changes:
       # TODO: skip processing the data for deletions; the caller is usually
       # only interested at deleted primary keys.
-      processed_ray_data = self._view.process_source(data)
-      processed_data = ray.get(processed_ray_data.to_arrow_refs())
+      processed_remote_data = self._view.process_source(data)
+      processed_data = ray.get(processed_remote_data.to_arrow_refs())
       yield change_type, pa.concat_tables(processed_data)
+
+  def _source(self) -> Dataset:
+    sources = self._view.sources
+    assert len(sources) == 1, "Views only support a single source dataset"
+    return list(sources.values())[0]
 
 
 class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
@@ -100,3 +117,49 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
     op = LocalAppendOp(self._storage.location, self._storage.metadata)
     op.write(data)
     return op.finish()
+
+
+class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
+  """Ray read write runner."""
+
+  def __init__(self, dataset: Dataset, options: Optional[RayOptions] = None):
+    RayReadOnlyRunner.__init__(self, dataset)
+    BaseReadWriteRunner.__init__(self, dataset.storage)
+
+    self._options = RayOptions() if options is None else options
+
+  def append(self, data: InputData) -> runtime.JobResult:
+    op = RayAppendOp(self._storage.location, self._storage.metadata,
+                     self._options.parallelism)
+    op.write(data)
+    return self._try_commit(op.finish())
+
+  def append_from(
+      self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
+  ) -> runtime.JobResult:
+    if not isinstance(sources, list):
+      sources = [sources]
+
+    op = RayAppendOp(self._storage.location, self._storage.metadata,
+                     self._options.parallelism)
+    op.write_from(sources)
+
+    return self._try_commit(op.finish())
+
+  def append_array_record(self, input_dir: str,
+                          index_fn: ArrayRecordIndexFn) -> runtime.JobResult:
+    raise NotImplementedError(
+        "append_array_record not supported yet in Ray runner")
+
+  def append_parquet(self, input_dir: str) -> runtime.JobResult:
+    raise NotImplementedError("append_parquet not supported yet in Ray runner")
+
+  def _insert(self, data: InputData,
+              mode: InsertOptions.Mode) -> runtime.JobResult:
+    op = RayInsertOp(self._storage, InsertOptions(mode=mode),
+                     self._options.parallelism)
+    return self._try_commit(op.write(data))
+
+  def delete(self, filter_: pc.Expression) -> runtime.JobResult:
+    op = RayDeleteOp(self._storage, filter_)
+    return self._try_commit(op.delete())

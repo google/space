@@ -15,6 +15,7 @@
 """Classes for transforming datasets and """
 
 from __future__ import annotations
+from abc import abstractmethod
 from dataclasses import dataclass
 from os import path
 from typing import Dict, List, Tuple
@@ -98,6 +99,21 @@ class BaseUdfTransform(View):
     field_id_dict = arrow.field_name_to_id_dict(self.input_.schema)
     return [_fn_arg(field_id_dict[name]) for name in input_fields]
 
+  def process_source(self, data: pa.Table) -> ray.Dataset:
+    return self._transform(self.input_.process_source(data))
+
+  def ray_dataset(self,
+                  filter_: Optional[pc.Expression] = None,
+                  fields: Optional[List[str]] = None,
+                  snapshot_id: Optional[int] = None,
+                  reference_read: bool = False) -> ray.Dataset:
+    return self._transform(
+        self.input_.ray_dataset(filter_, fields, snapshot_id, reference_read))
+
+  @abstractmethod
+  def _transform(ds: ray.Dataset) -> ray.Dataset:
+    """Transform a Ray dataset using the UDF."""
+
 
 class MapTransform(BaseUdfTransform):
   """Map a view by a user defined function."""
@@ -128,10 +144,9 @@ class MapTransform(BaseUdfTransform):
     return MapTransform(*_load_udf(location, metadata, rel.project.
                                    expressions[0], rel.project.input, plan))
 
-  def process_source(self, data: pa.Table) -> ray.Dataset:
+  def _transform(ds: ray.Dataset) -> ray.Dataset:
     batch_size = self.udf.batch_size if self.udf.batch_size >= 0 else "default"
-    return self.input_.process_source(data).map_batches(self.udf.fn,
-                                                        batch_size=batch_size)
+    return ds.map_batches(self.udf.fn, batch_size=batch_size)
 
 
 @dataclass
@@ -163,8 +178,8 @@ class FilterTransform(BaseUdfTransform):
     return FilterTransform(*_load_udf(location, metadata, rel.filter.condition,
                                       rel.filter.input, plan))
 
-  def process_source(self, data: pa.Table) -> ray.Dataset:
-    return self.input_.process_source(data).filter(self.udf.fn)
+  def _transform(ds: ray.Dataset) -> ray.Dataset:
+    return ds.filter(self.udf.fn)
 
 
 @dataclass
