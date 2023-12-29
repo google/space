@@ -26,7 +26,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pyarrow-stubs", "tensorflow", "types-protobuf"]
+dev = [
+  "pyarrow-stubs",
+  "ray",
+  "tensorflow",
+  "types-protobuf",
+]
 
 [project.urls]
 Homepage = "https://github.com/google/space"

@@ -23,6 +23,7 @@ from substrait.algebra_pb2 import ReadRel, Rel
 from space.core.runners import LocalRunner
 from space.core.serializers.base import DictSerializer
 from space.core.storage import Storage
+from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.plans import LogicalPlanBuilder
 from space.core.views import View
 
@@ -32,6 +33,11 @@ class Dataset(View):
 
   def __init__(self, storage: Storage):
     self._storage = storage
+
+  @property
+  def storage(self) -> Storage:
+    """Return storage of the dataset."""
+    return self._storage
 
   @classmethod
   def create(cls, location: str, schema: pa.Schema, primary_keys: List[str],
@@ -91,3 +97,7 @@ class Dataset(View):
     location = self._storage.location
     return Rel(read=ReadRel(named_table=ReadRel.NamedTable(names=[location]),
                             base_schema=self._storage.metadata.schema.fields))
+
+  def process_source(self, data: pa.Table) -> ray.Dataset:
+    # Dataset is the source, there is no transform, so simply return the data.
+    return ray.data.from_arrow(data)

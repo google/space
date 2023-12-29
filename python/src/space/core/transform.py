@@ -33,6 +33,7 @@ from substrait.type_pb2 import Type
 from space.core.datasets import Dataset
 import space.core.proto.metadata_pb2 as meta
 from space.core.schema import arrow
+from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.plans import SIMPLE_UDF_URI
 from space.core.utils.plans import LogicalPlanBuilder, UserDefinedFn
 from space.core.views import View
@@ -127,6 +128,11 @@ class MapTransform(BaseUdfTransform):
     return MapTransform(*_load_udf(location, metadata, rel.project.
                                    expressions[0], rel.project.input, plan))
 
+  def process_source(self, data: pa.Table) -> ray.Dataset:
+    batch_size = self.udf.batch_size if self.udf.batch_size >= 0 else 'default'
+    return self.input_.process_source(data).map_batches(self.udf.fn,
+                                                        batch_size=batch_size)
+
 
 @dataclass
 class FilterTransform(BaseUdfTransform):
@@ -156,6 +162,9 @@ class FilterTransform(BaseUdfTransform):
     """Build a FilterTransform from logical plan relation."""
     return FilterTransform(*_load_udf(location, metadata, rel.filter.condition,
                                       rel.filter.input, plan))
+
+  def process_source(self, data: pa.Table) -> ray.Dataset:
+    return self.input_.process_source(data).filter(self.udf.fn)
 
 
 @dataclass

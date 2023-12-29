@@ -114,7 +114,7 @@ class SpaceDataSource(AbcSequence):
     for file_path, indexes in zip(
         aggregated[constants.FILE_PATH_FIELD],
         aggregated[f"{constants.ROW_ID_FIELD}_list"]):
-      full_file_path = self._ds._storage.full_path(file_path)  # pylint: disable=protected-access
+      full_file_path = self._ds.storage.full_path(file_path)  # pylint: disable=protected-access
       if not indexes:
         continue
 

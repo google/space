@@ -190,3 +190,6 @@ def array_record_error_callback(**kwargs):
 
 with lazy_imports(error_callback=array_record_error_callback):
   from array_record.python import array_record_module  # type: ignore[import-untyped] # pylint: disable=unused-import
+
+with lazy_imports():
+  import ray  # type: ignore[import-untyped] # pylint: disable=unused-import
