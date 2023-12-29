@@ -22,6 +22,9 @@ from absl import logging  # type: ignore[import-untyped]
 import pyarrow as pa
 import pyarrow.compute as pc
 
+from space.core.loaders.array_record import ArrayRecordIndexFn
+from space.core.loaders.array_record import LocalArrayRecordLoadOp
+from space.core.loaders.parquet import LocalParquetLoadOp
 from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import InputData
 from space.core.ops.change_data import ChangeType, read_change_data
@@ -30,16 +33,11 @@ from space.core.ops.insert import InsertOptions, LocalInsertOp
 from space.core.ops.read import FileSetReadOp, ReadOptions
 import space.core.proto.runtime_pb2 as runtime
 from space.core.storage import Storage
-from space.core.loaders.array_record import ArrayRecordIndexFn
-from space.core.loaders.array_record import LocalArrayRecordLoadOp
-from space.core.loaders.parquet import LocalParquetLoadOp
+from space.core.versions.utils import version_to_snapshot_id
 
 
-class BaseRunner(ABC):
-  """Abstract base runner class."""
-
-  def __init__(self, storage: Storage):
-    self._storage = storage
+class BaseReadOnlyRunner(ABC):
+  """Abstract base read-only runner class."""
 
   @abstractmethod
   def read(self,
@@ -57,6 +55,21 @@ class BaseRunner(ABC):
     """Read data from the dataset as an Arrow table."""
     return pa.concat_tables(
         list(self.read(filter_, fields, snapshot_id, reference_read)))
+
+  @abstractmethod
+  def diff(self, start_version: Union[int],
+           end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
+    """Read the change data between two versions.
+    
+    start_version is excluded; end_version is included. 
+    """
+
+
+class BaseReadWriteRunner(BaseReadOnlyRunner):
+  """Abstract base runner class."""
+
+  def __init__(self, storage: Storage):
+    self._storage = storage
 
   @abstractmethod
   def append(self, data: InputData) -> runtime.JobResult:
@@ -111,14 +124,6 @@ class BaseRunner(ABC):
   def delete(self, filter_: pc.Expression) -> runtime.JobResult:
     """Delete data matching the filter from the dataset."""
 
-  @abstractmethod
-  def diff(self, start_version: Union[int],
-           end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
-    """Read the change data between two versions.
-    
-    start_version is excluded; end_version is included. 
-    """
-
   def _try_commit(self, patch: Optional[runtime.Patch]) -> runtime.JobResult:
     if patch is not None:
       self._storage.commit(patch)
@@ -126,7 +131,7 @@ class BaseRunner(ABC):
     return _job_result(patch)
 
 
-class LocalRunner(BaseRunner):
+class LocalRunner(BaseReadWriteRunner):
   """A runner that runs operations locally."""
 
   def read(self,
@@ -180,21 +185,9 @@ class LocalRunner(BaseRunner):
 
   def diff(self, start_version: Union[int],
            end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
-    start_snapshot_id, end_snapshot_id = None, None
-
-    if isinstance(start_version, int):
-      start_snapshot_id = start_version
-
-    if isinstance(end_version, int):
-      end_snapshot_id = end_version
-
-    if start_snapshot_id is None:
-      raise RuntimeError(f"Start snapshot ID is invalid: {start_version}")
-
-    if end_snapshot_id is None:
-      raise RuntimeError(f"End snapshot ID is invalid: {end_version}")
-
-    return read_change_data(self._storage, start_snapshot_id, end_snapshot_id)
+    return read_change_data(self._storage,
+                            version_to_snapshot_id(start_version),
+                            version_to_snapshot_id(end_version))
 
 
 def _job_result(patch: Optional[runtime.Patch]) -> runtime.JobResult:

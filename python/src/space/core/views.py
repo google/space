@@ -26,8 +26,10 @@ from space.core.fs.factory import create_fs
 import space.core.proto.metadata_pb2 as meta
 from space.core.schema import FieldIdManager
 from space.core.storage import Storage
+from space.core.utils.lazy_imports_utils import ray  # pylint: disable=unused-import
 from space.core.utils.paths import UDF_DIR, metadata_dir
 from space.core.utils.plans import LogicalPlanBuilder, UserDefinedFn
+from space.ray.runners import RayReadOnlyRunner
 
 if TYPE_CHECKING:
   from space.core.datasets import Dataset
@@ -36,6 +38,9 @@ if TYPE_CHECKING:
 class View(ABC):
   """A view is a dataset, or a transform applied to a dataset, or a transform
   applied to another view.
+
+  Non-dataset views must use Ray runner instead of local runner, because the
+  transforms are implemented with Ray dataset transforms.
   """
 
   @property
@@ -67,6 +72,14 @@ class View(ABC):
     
     The relation describes a dataset or a transform in the Substrait format. 
     """
+
+  @abstractmethod
+  def process_source(self, data: pa.Table) -> ray.Dataset:
+    """Process input data using the transform defined by the view."""
+
+  def ray(self) -> RayReadOnlyRunner:
+    """Return a Ray runner for the view."""
+    return RayReadOnlyRunner(self)
 
   def materialize(self, location: str) -> MaterializedView:
     """Materialize a view to files in the Space storage format.

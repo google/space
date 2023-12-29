@@ -49,7 +49,7 @@ class TestLogicalPlan:
                                    sample_map_batch_plan):
     # A sample UDF for testing.
     def _sample_map_udf(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-      batch["float64"] += 1
+      batch["float64"] = batch["float64"] + 1
       return batch
 
     view = sample_dataset.map_batches(fn=_sample_map_udf,
