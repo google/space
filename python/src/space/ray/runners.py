@@ -21,13 +21,17 @@ from typing import Iterator, List, Optional, Tuple, Union
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from space.core.runners import BaseReadOnlyRunner
+from space.core.runners import BaseReadOnlyRunner, StorageCommitMixin
+from space.core.ops import utils
+from space.core.ops.append import LocalAppendOp
 from space.core.ops.change_data import ChangeType, read_change_data
+from space.core.ops.delete import FileSetDeleteOp
+import space.core.proto.runtime_pb2 as runtime
 from space.core.utils.lazy_imports_utils import ray
 from space.core.versions.utils import version_to_snapshot_id
 
 if TYPE_CHECKING:
-  from space.core.views import View
+  from space.core.views import MaterializedView, View
 
 
 class RayReadOnlyRunner(BaseReadOnlyRunner):
@@ -58,3 +62,41 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
       processed_ray_data = self._view.process_source(data)
       processed_data = ray.get(processed_ray_data.to_arrow_refs())
       yield change_type, pa.concat_tables(processed_data)
+
+
+class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
+  """Ray runner for materialized views."""
+
+  def __init__(self, mv: MaterializedView):
+    RayReadOnlyRunner.__init__(self, mv.view)
+    StorageCommitMixin.__init__(self, mv.storage)
+
+  def refresh(self, target_version: Union[int]) -> runtime.JobResult:
+    """Refresh the materialized view by synchronizing from source dataset."""
+    start_snapshot_id = self._storage.metadata.current_snapshot_id
+    end_snapshot_id = version_to_snapshot_id(target_version)
+
+    patches: List[Optional[runtime.Patch]] = []
+    for change_type, data in self.diff(start_snapshot_id, end_snapshot_id):
+      if change_type == ChangeType.DELETE:
+        patches.append(self._process_delete(data))
+      elif change_type == ChangeType.ADD:
+        patches.append(self._process_append(data))
+      else:
+        raise NotImplementedError(f"Change type {change_type} not supported")
+
+    return self._try_commit(utils.merge_patches(patches))
+
+  def _process_delete(self, data: pa.Table) -> Optional[runtime.Patch]:
+    filter_ = utils.primary_key_filter(self._storage.primary_keys, data)
+    if filter_ is None:
+      return None
+
+    op = FileSetDeleteOp(self._storage.location, self._storage.metadata,
+                         self._storage.data_files(filter_), filter_)
+    return op.delete()
+
+  def _process_append(self, data: pa.Table) -> Optional[runtime.Patch]:
+    op = LocalAppendOp(self._storage.location, self._storage.metadata)
+    op.write(data)
+    return op.finish()

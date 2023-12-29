@@ -29,7 +29,8 @@ from space.core.storage import Storage
 from space.core.utils.lazy_imports_utils import ray  # pylint: disable=unused-import
 from space.core.utils.paths import UDF_DIR, metadata_dir
 from space.core.utils.plans import LogicalPlanBuilder, UserDefinedFn
-from space.ray.runners import RayReadOnlyRunner
+from space.core.runners import LocalRunner
+from space.ray.runners import RayMaterializedViewRunner, RayReadOnlyRunner
 
 if TYPE_CHECKING:
   from space.core.datasets import Dataset
@@ -158,6 +159,17 @@ class MaterializedView:
   def view(self) -> View:
     """Return view of the materialized view."""
     return self._view
+
+  def ray(self) -> RayMaterializedViewRunner:
+    """Return a Ray runner for the materialized view."""
+    return RayMaterializedViewRunner(self)
+
+  def local(self) -> LocalRunner:
+    """Get a runner that runs operations locally.
+    
+    TODO: should use a read-only local runner.
+    """
+    return LocalRunner(self._storage)
 
   @classmethod
   def create(cls, location: str, view: View, logical_plan: meta.LogicalPlan,

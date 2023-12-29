@@ -48,7 +48,7 @@ def sample_dataset(tmp_path, sample_schema):
 
 class TestRayReadOnlyRunner:
 
-  def test_diff_map_batches(self, sample_dataset):
+  def test_diff_map_batches(self, tmp_path, sample_dataset):
     # A sample UDF for testing.
     def _sample_map_udf(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
       batch["float64"] = batch["float64"] + 1
@@ -62,6 +62,7 @@ class TestRayReadOnlyRunner:
                                       input_fields=["int64", "binary"],
                                       output_schema=view_schema,
                                       output_record_fields=["binary"])
+    mv = view.materialize(str(tmp_path / "mv"))
 
     ds_runner = sample_dataset.local()
     view_runner = view.ray()
@@ -91,6 +92,19 @@ class TestRayReadOnlyRunner:
 
     # Test several changes.
     assert list(view_runner.diff(0, 2)) == [expected_change0, expected_change1]
+
+    # Test materialized views.
+    ray_runner = mv.ray()
+    local = mv.local()
+
+    ray_runner.refresh(1)
+    assert local.read_all() == expected_change0[1]
+
+    ray_runner.refresh(2)
+    assert local.read_all() == pa.Table.from_pydict({
+        "int64": [1, 3],
+        "float64": [1.1, 1.3],
+    })
 
   def test_diff_filter(self, sample_dataset):
     # A sample UDF for testing.
