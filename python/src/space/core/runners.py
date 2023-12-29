@@ -65,11 +65,24 @@ class BaseReadOnlyRunner(ABC):
     """
 
 
-class BaseReadWriteRunner(BaseReadOnlyRunner):
-  """Abstract base runner class."""
+class StorageCommitMixin:
+  """Provide storage commit utilities."""
 
   def __init__(self, storage: Storage):
     self._storage = storage
+
+  def _try_commit(self, patch: Optional[runtime.Patch]) -> runtime.JobResult:
+    if patch is not None:
+      self._storage.commit(patch)
+
+    return _job_result(patch)
+
+
+class BaseReadWriteRunner(StorageCommitMixin, BaseReadOnlyRunner):
+  """Abstract base runner class."""
+
+  def __init__(self, storage: Storage):
+    StorageCommitMixin.__init__(self, storage)
 
   @abstractmethod
   def append(self, data: InputData) -> runtime.JobResult:
@@ -123,12 +136,6 @@ class BaseReadWriteRunner(BaseReadOnlyRunner):
   @abstractmethod
   def delete(self, filter_: pc.Expression) -> runtime.JobResult:
     """Delete data matching the filter from the dataset."""
-
-  def _try_commit(self, patch: Optional[runtime.Patch]) -> runtime.JobResult:
-    if patch is not None:
-      self._storage.commit(patch)
-
-    return _job_result(patch)
 
 
 class LocalRunner(BaseReadWriteRunner):

@@ -81,7 +81,7 @@ class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
     data_files = self._storage.data_files(pk_filter)
 
     mode = self._options.mode
-    patches: List[runtime.Patch] = []
+    patches: List[Optional[runtime.Patch]] = []
     if data_files.index_files:
       if mode == InsertOptions.Mode.INSERT:
         read_op = FileSetReadOp(
@@ -105,14 +105,15 @@ class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
     return utils.merge_patches(patches)
 
 
-def _try_delete_data(op: BaseDeleteOp, patches: List[runtime.Patch]) -> None:
+def _try_delete_data(op: BaseDeleteOp,
+                     patches: List[Optional[runtime.Patch]]) -> None:
   patch = op.delete()
   if patch is not None:
     patches.append(patch)
 
 
 def _try_append_data(op: BaseAppendOp, data: pa.Table,
-                     patches: List[runtime.Patch]) -> None:
+                     patches: List[Optional[runtime.Patch]]) -> None:
   op.write(data)
   patch = op.finish()
   if patch is not None:

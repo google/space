@@ -89,13 +89,17 @@ def primary_key_filter(primary_keys: List[str],
   return filter_
 
 
-def merge_patches(patches: List[runtime.Patch]) -> Optional[runtime.Patch]:
+def merge_patches(
+    patches: List[Optional[runtime.Patch]]) -> Optional[runtime.Patch]:
   """Merge multiple patches into one."""
   patch = runtime.Patch()
   stats_update = meta.StorageStatistics()
 
   empty = True
   for p in patches:
+    if p is None:
+      continue
+
     if empty:
       empty = False
 
