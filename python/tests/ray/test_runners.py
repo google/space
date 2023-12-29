@@ -24,7 +24,7 @@ from space import Dataset
 from space.core.ops.change_data import ChangeType
 
 
-def setup_module(module):
+def setup_module():
   ray.init(ignore_reinit_error=True, num_cpus=1)
 
 

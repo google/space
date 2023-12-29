@@ -129,7 +129,7 @@ class MapTransform(BaseUdfTransform):
                                    expressions[0], rel.project.input, plan))
 
   def process_source(self, data: pa.Table) -> ray.Dataset:
-    batch_size = self.udf.batch_size if self.udf.batch_size >= 0 else 'default'
+    batch_size = self.udf.batch_size if self.udf.batch_size >= 0 else "default"
     return self.input_.process_source(data).map_batches(self.udf.fn,
                                                         batch_size=batch_size)
 
