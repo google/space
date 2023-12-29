@@ -153,6 +153,11 @@ def field_name_to_id_dict(schema: pa.Schema) -> Dict[str, int]:
   return {f.name: field_id(f) for f in schema}
 
 
+def field_id_to_name_dict(schema: pa.Schema) -> Dict[int, str]:
+  """Return a dict with field ID as key and field name as value."""
+  return {field_id(f): f.name for f in schema}
+
+
 def field_id_to_column_id_dict(schema: pa.Schema) -> Dict[int, int]:
   """Return a dict with field ID as key and column ID as value."""
   field_id_dict = field_name_to_id_dict(schema)

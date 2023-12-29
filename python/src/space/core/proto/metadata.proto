@@ -17,6 +17,7 @@ syntax = "proto3";
 package space.proto;
 
 import "google/protobuf/timestamp.proto";
+import "substrait/plan.proto";
 import "substrait/type.proto";
 
 // Record the current storage metadata path in a static local file.
@@ -32,7 +33,7 @@ message EntryPoint {
 // Metadata persisting the current status of a storage, including logical
 // metadata such as schema, and physical metadata persisted as a history of
 // snapshots
-// NEXT_ID: 7
+// NEXT_ID: 8
 message StorageMetadata {
   // Create time of the storage.
   google.protobuf.Timestamp create_time = 1;
@@ -43,8 +44,10 @@ message StorageMetadata {
   // The storage type.
   enum Type {
     TYPE_UNSPECIFIED = 0;
-    // The dataset type supports fully managed storage features.
+    // Dataset type supports fully managed storage features.
     DATASET = 1;
+    // Materialized view type supports synchronizing changes from sources.
+    MATERIALIZED_VIEW = 2;
   }
   Type type = 3;
 
@@ -56,6 +59,9 @@ message StorageMetadata {
 
   // All alive snapshots with snapshot ID as key.
   map<int64, Snapshot> snapshots = 6;
+
+  // Store the logical plan for materialized views.
+  LogicalPlan logical_plan = 7;
 }
 
 // The storage logical schema where user provided types are persisted instead
@@ -147,4 +153,15 @@ message RowBitmap {
     // Roaring bitmap.
     bytes roaring_bitmap = 3;
   }
+}
+
+// Store the logical plan of a transform.
+// NEXT_ID: 3
+message LogicalPlan {
+  // Stores the logical plan.
+  substrait.Plan logical_plan = 1;
+
+  // Registry of user defined functions.
+  // Key is UDF name; value is pickle file path.
+  map<string, string> udfs = 2;
 }
