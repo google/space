@@ -24,7 +24,7 @@ from space.core.fs.base import BaseFileSystem
 from space.core.fs.factory import create_fs
 from space.core.ops.read import FileSetReadOp
 import space.core.proto.metadata_pb2 as meta
-import space.core.proto.runtime_pb2 as runtime
+import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
 from space.core.utils.paths import StoragePathsMixin
 
@@ -97,8 +97,7 @@ class _LocalChangeDataReadOp(StoragePathsMixin):
 
   def _read_bitmap_rows(self, change_type: ChangeType,
                         bitmap: meta.RowBitmap) -> Tuple[ChangeType, pa.Table]:
-    file_set = runtime.FileSet(
-        index_files=[runtime.DataFile(path=bitmap.file)])
+    file_set = rt.FileSet(index_files=[rt.DataFile(path=bitmap.file)])
     read_op = FileSetReadOp(self._storage.location, self._metadata, file_set)
 
     data = pa.concat_tables(list(iter(read_op)))

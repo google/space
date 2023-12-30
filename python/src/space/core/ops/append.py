@@ -27,7 +27,7 @@ from space.core.manifests import RecordManifestWriter
 from space.core.ops import utils
 from space.core.ops.base import BaseOp, InputData
 from space.core.proto import metadata_pb2 as meta
-from space.core.proto import runtime_pb2 as runtime
+from space.core.proto import runtime_pb2 as rt
 from space.core.schema import arrow
 from space.core.schema import utils as schema_utils
 from space.core.utils import paths
@@ -49,7 +49,7 @@ class BaseAppendOp(BaseOp):
     """Append data into storage."""
 
   @abstractmethod
-  def finish(self) -> Optional[runtime.Patch]:
+  def finish(self) -> Optional[rt.Patch]:
     """Complete the append operation and return a metadata patch."""
 
 
@@ -106,7 +106,6 @@ class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
     # Key is field name.
     self._record_writers: Dict[str, _RecordWriterInfo] = {}
 
-    # Local runtime caches.
     self._cached_index_data: Optional[pa.Table] = None
     self._cached_index_file_bytes = 0
 
@@ -116,7 +115,7 @@ class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
         self._metadata.schema.primary_keys)  # type: ignore[arg-type]
     self._record_manifest_writer = RecordManifestWriter(self._metadata_dir)
 
-    self._patch = runtime.Patch()
+    self._patch = rt.Patch()
 
   def write(self, data: InputData) -> None:
     if not isinstance(data, pa.Table):
@@ -124,7 +123,7 @@ class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
 
     self._write_arrow(data)
 
-  def finish(self) -> Optional[runtime.Patch]:
+  def finish(self) -> Optional[rt.Patch]:
     """Complete the append operation and return a metadata patch.
 
     Returns:

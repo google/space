@@ -25,7 +25,7 @@ from ray.types import ObjectRef
 
 from space.core.storage import Storage
 import space.core.proto.metadata_pb2 as meta
-import space.core.proto.runtime_pb2 as runtime
+import space.core.proto.runtime_pb2 as rt
 from space.core.ops.read import FileSetReadOp, ReadOptions
 
 
@@ -83,7 +83,7 @@ class _SpaceDataSourceReader(Reader):
     file_set = self._storage.data_files(self._filter, self._snapshot_id)
 
     for index_file in file_set.index_files:
-      task_file_set = runtime.FileSet(index_files=[index_file])
+      task_file_set = rt.FileSet(index_files=[index_file])
 
       # The metadata about the block that we know prior to actually executing
       # the read task.
@@ -111,6 +111,6 @@ class _SpaceDataSourceReader(Reader):
 # TODO: A single index file (with record files) is a single block. To check
 # whether row group granularity is needed.
 def _read_file_set(location: str, metadata: meta.StorageMetadata,
-                   file_set: runtime.FileSet,
+                   file_set: rt.FileSet,
                    read_options: ReadOptions) -> List[Block]:
   return list(FileSetReadOp(location, metadata, file_set, read_options))

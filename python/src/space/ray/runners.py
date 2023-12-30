@@ -31,7 +31,7 @@ from space.core.ops.base import InputData
 from space.core.ops.change_data import ChangeType, read_change_data
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions
-import space.core.proto.runtime_pb2 as runtime
+import space.core.proto.runtime_pb2 as rt
 from space.core.utils.lazy_imports_utils import ray
 from space.core.versions.utils import version_to_snapshot_id
 from space.ray.ops.append import RayAppendOp
@@ -89,12 +89,12 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
     RayReadOnlyRunner.__init__(self, mv.view)
     StorageCommitMixin.__init__(self, mv.storage)
 
-  def refresh(self, target_version: Union[int]) -> runtime.JobResult:
+  def refresh(self, target_version: Union[int]) -> rt.JobResult:
     """Refresh the materialized view by synchronizing from source dataset."""
     start_snapshot_id = self._storage.metadata.current_snapshot_id
     end_snapshot_id = version_to_snapshot_id(target_version)
 
-    patches: List[Optional[runtime.Patch]] = []
+    patches: List[Optional[rt.Patch]] = []
     for change_type, data in self.diff(start_snapshot_id, end_snapshot_id):
       if change_type == ChangeType.DELETE:
         patches.append(self._process_delete(data))
@@ -105,7 +105,7 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
 
     return self._try_commit(utils.merge_patches(patches))
 
-  def _process_delete(self, data: pa.Table) -> Optional[runtime.Patch]:
+  def _process_delete(self, data: pa.Table) -> Optional[rt.Patch]:
     filter_ = utils.primary_key_filter(self._storage.primary_keys, data)
     if filter_ is None:
       return None
@@ -114,7 +114,7 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
                          self._storage.data_files(filter_), filter_)
     return op.delete()
 
-  def _process_append(self, data: pa.Table) -> Optional[runtime.Patch]:
+  def _process_append(self, data: pa.Table) -> Optional[rt.Patch]:
     op = LocalAppendOp(self._storage.location, self._storage.metadata)
     op.write(data)
     return op.finish()
@@ -129,7 +129,7 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
 
     self._options = RayOptions() if options is None else options
 
-  def append(self, data: InputData) -> runtime.JobResult:
+  def append(self, data: InputData) -> rt.JobResult:
     op = RayAppendOp(self._storage.location, self._storage.metadata,
                      self._options.parallelism)
     op.write(data)
@@ -137,7 +137,7 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
 
   def append_from(
       self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
-  ) -> runtime.JobResult:
+  ) -> rt.JobResult:
     if not isinstance(sources, list):
       sources = [sources]
 
@@ -148,19 +148,18 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
     return self._try_commit(op.finish())
 
   def append_array_record(self, input_dir: str,
-                          index_fn: ArrayRecordIndexFn) -> runtime.JobResult:
+                          index_fn: ArrayRecordIndexFn) -> rt.JobResult:
     raise NotImplementedError(
         "append_array_record not supported yet in Ray runner")
 
-  def append_parquet(self, input_dir: str) -> runtime.JobResult:
+  def append_parquet(self, input_dir: str) -> rt.JobResult:
     raise NotImplementedError("append_parquet not supported yet in Ray runner")
 
-  def _insert(self, data: InputData,
-              mode: InsertOptions.Mode) -> runtime.JobResult:
+  def _insert(self, data: InputData, mode: InsertOptions.Mode) -> rt.JobResult:
     op = RayInsertOp(self._storage, InsertOptions(mode=mode),
                      self._options.parallelism)
     return self._try_commit(op.write(data))
 
-  def delete(self, filter_: pc.Expression) -> runtime.JobResult:
+  def delete(self, filter_: pc.Expression) -> rt.JobResult:
     op = RayDeleteOp(self._storage, filter_)
     return self._try_commit(op.delete())

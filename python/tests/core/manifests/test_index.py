@@ -20,7 +20,7 @@ from space.core.manifests import IndexManifestWriter
 from space.core.manifests.index import read_index_manifests
 from space.core.fs.parquet import write_parquet_file
 import space.core.proto.metadata_pb2 as meta
-import space.core.proto.runtime_pb2 as runtime
+import space.core.proto.runtime_pb2 as rt
 from space.core.schema.arrow import field_metadata
 
 _SCHEMA = pa.schema([
@@ -155,33 +155,32 @@ class TestIndexManifestWriter:
       expected_manifests[k] = v + expected_manifests[k]
 
     assert pq.read_table(manifest_path).to_pydict() == expected_manifests
-    assert read_index_manifests(
-        manifest_path, 123) == runtime.FileSet(index_files=[
-            runtime.DataFile(path="data/file2",
-                             manifest_file_id=123,
-                             storage_statistics=meta.StorageStatistics(
-                                 num_rows=10,
-                                 index_compressed_bytes=100,
-                                 index_uncompressed_bytes=300)),
-            runtime.DataFile(path="data/file3",
-                             manifest_file_id=123,
-                             storage_statistics=meta.StorageStatistics(
-                                 num_rows=20,
-                                 index_compressed_bytes=200,
-                                 index_uncompressed_bytes=400)),
-            runtime.DataFile(path="data/file0",
-                             manifest_file_id=123,
-                             storage_statistics=meta.StorageStatistics(
-                                 num_rows=5,
-                                 index_compressed_bytes=645,
-                                 index_uncompressed_bytes=624)),
-            runtime.DataFile(path="data/file1",
-                             manifest_file_id=123,
-                             storage_statistics=meta.StorageStatistics(
-                                 num_rows=2,
-                                 index_compressed_bytes=334,
-                                 index_uncompressed_bytes=320))
-        ])
+    assert read_index_manifests(manifest_path, 123) == rt.FileSet(index_files=[
+        rt.DataFile(path="data/file2",
+                    manifest_file_id=123,
+                    storage_statistics=meta.StorageStatistics(
+                        num_rows=10,
+                        index_compressed_bytes=100,
+                        index_uncompressed_bytes=300)),
+        rt.DataFile(path="data/file3",
+                    manifest_file_id=123,
+                    storage_statistics=meta.StorageStatistics(
+                        num_rows=20,
+                        index_compressed_bytes=200,
+                        index_uncompressed_bytes=400)),
+        rt.DataFile(path="data/file0",
+                    manifest_file_id=123,
+                    storage_statistics=meta.StorageStatistics(
+                        num_rows=5,
+                        index_compressed_bytes=645,
+                        index_uncompressed_bytes=624)),
+        rt.DataFile(path="data/file1",
+                    manifest_file_id=123,
+                    storage_statistics=meta.StorageStatistics(
+                        num_rows=2,
+                        index_compressed_bytes=334,
+                        index_uncompressed_bytes=320))
+    ])
 
     # Test index manifest filtering.
     # TODO: to move it to a separate test and add more test cases.

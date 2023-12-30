@@ -22,7 +22,7 @@ import pyarrow.compute as pc
 
 from space.core.schema import arrow
 from space.core.proto import metadata_pb2 as meta
-from space.core.proto import runtime_pb2 as runtime
+from space.core.proto import runtime_pb2 as rt
 
 
 def update_index_storage_stats(
@@ -89,10 +89,9 @@ def primary_key_filter(primary_keys: List[str],
   return filter_
 
 
-def merge_patches(
-    patches: List[Optional[runtime.Patch]]) -> Optional[runtime.Patch]:
+def merge_patches(patches: List[Optional[rt.Patch]]) -> Optional[rt.Patch]:
   """Merge multiple patches into one."""
-  patch = runtime.Patch()
+  patch = rt.Patch()
   stats_update = meta.StorageStatistics()
 
   empty = True

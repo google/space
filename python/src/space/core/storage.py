@@ -26,7 +26,7 @@ from space.core.manifests.falsifiable_filters import build_manifest_filter
 from space.core.manifests.index import read_index_manifests
 from space.core.ops import utils as ops_utils
 import space.core.proto.metadata_pb2 as meta
-import space.core.proto.runtime_pb2 as runtime
+import space.core.proto.runtime_pb2 as rt
 from space.core.schema import FieldIdManager
 from space.core.schema import arrow
 from space.core.schema import substrait as substrait_schema
@@ -157,7 +157,7 @@ class Storage(paths.StoragePathsMixin):
                              meta.StorageMetadata())
     return Storage(location, metadata)
 
-  def commit(self, patch: runtime.Patch) -> None:
+  def commit(self, patch: rt.Patch) -> None:
     """Commit changes to the storage.
 
     TODO: only support a single writer; to ensure atomicity in commit by
@@ -200,7 +200,7 @@ class Storage(paths.StoragePathsMixin):
 
   def data_files(self,
                  filter_: Optional[pc.Expression] = None,
-                 snapshot_id: Optional[int] = None) -> runtime.FileSet:
+                 snapshot_id: Optional[int] = None) -> rt.FileSet:
     """Return the data files and the manifest files containing them.
     
     Args:
@@ -208,7 +208,7 @@ class Storage(paths.StoragePathsMixin):
       snapshot_id: read a specified snapshot instead of the current.
     """
     manifest_files = self.snapshot(snapshot_id).manifest_files
-    result = runtime.FileSet()
+    result = rt.FileSet()
 
     # A temporily assigned identifier for tracking manifest files.
     # Start from 1 to detect unassigned values 0 that is default.
@@ -261,7 +261,7 @@ class Storage(paths.StoragePathsMixin):
         meta.EntryPoint(metadata_file=self.short_path(metadata_path)))
 
 
-def _patch_manifests(manifest_files: meta.ManifestFiles, patch: runtime.Patch):
+def _patch_manifests(manifest_files: meta.ManifestFiles, patch: rt.Patch):
   """Apply changes in a patch to manifest files for a commit."""
   # Process deleted index manifest files.
   deleted_manifests = set(patch.deletion.index_manifest_files)

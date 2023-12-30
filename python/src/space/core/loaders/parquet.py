@@ -21,7 +21,7 @@ import pyarrow.parquet as pq
 from space.core.manifests import IndexManifestWriter
 from space.core.loaders.utils import list_files
 from space.core.proto import metadata_pb2 as meta
-from space.core.proto import runtime_pb2 as runtime
+from space.core.proto import runtime_pb2 as rt
 from space.core.ops import utils
 from space.core.schema import arrow
 from space.core.utils.paths import StoragePathsMixin
@@ -44,12 +44,12 @@ class LocalParquetLoadOp(StoragePathsMixin):
                                                physical=True)
     self._input_files = list_files(input_dir, suffix=".parquet")
 
-  def write(self) -> Optional[runtime.Patch]:
+  def write(self) -> Optional[rt.Patch]:
     """Write metadata files to load Parquet files to Space dataset."""
     index_manifest_writer = IndexManifestWriter(
         self._metadata_dir, self._physical_schema,
         self._metadata.schema.primary_keys)  # type: ignore[arg-type]
-    patch = runtime.Patch()
+    patch = rt.Patch()
 
     for f in self._input_files:
       stats = _write_index_manifest(index_manifest_writer, f)

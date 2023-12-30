@@ -21,7 +21,7 @@ from substrait.type_pb2 import NamedStruct, Type
 from space.core.fs.parquet import write_parquet_file
 from space.core.manifests import IndexManifestWriter
 import space.core.proto.metadata_pb2 as meta
-import space.core.proto.runtime_pb2 as runtime
+import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
 from space.core.utils.paths import _ENTRY_POINT_FILE
 
@@ -124,8 +124,8 @@ class TestStorage:
         index_compressed_bytes=10,
         index_uncompressed_bytes=20,
         record_uncompressed_bytes=30)
-    patch = runtime.Patch(addition=added_manifest_files,
-                          storage_statistics_update=added_storage_statistics)
+    patch = rt.Patch(addition=added_manifest_files,
+                     storage_statistics_update=added_storage_statistics)
     storage.commit(patch)
 
     assert storage.snapshot(0) is not None
@@ -140,10 +140,10 @@ class TestStorage:
         index_compressed_bytes=100,
         index_uncompressed_bytes=200,
         record_uncompressed_bytes=300)
-    patch = runtime.Patch(addition=meta.ManifestFiles(
+    patch = rt.Patch(addition=meta.ManifestFiles(
         index_manifest_files=["data/index_manifest1"],
         record_manifest_files=["data/record_manifest1"]),
-                          storage_statistics_update=added_storage_statistics2)
+                     storage_statistics_update=added_storage_statistics2)
     storage.commit(patch)
 
     new_snapshot = storage.snapshot(2)
@@ -159,13 +159,13 @@ class TestStorage:
         record_uncompressed_bytes=330)
 
     # Test deletion.
-    patch = runtime.Patch(deletion=meta.ManifestFiles(
+    patch = rt.Patch(deletion=meta.ManifestFiles(
         index_manifest_files=["data/index_manifest0"]),
-                          storage_statistics_update=meta.StorageStatistics(
-                              num_rows=-123,
-                              index_compressed_bytes=-10,
-                              index_uncompressed_bytes=-20,
-                              record_uncompressed_bytes=-30))
+                     storage_statistics_update=meta.StorageStatistics(
+                         num_rows=-123,
+                         index_compressed_bytes=-10,
+                         index_uncompressed_bytes=-20,
+                         record_uncompressed_bytes=-30))
     storage.commit(patch)
     new_snapshot = storage.snapshot(3)
     assert new_snapshot.manifest_files.index_manifest_files == [
@@ -189,7 +189,7 @@ class TestStorage:
                                  primary_keys=["int64"])
 
     def commit_add_index_manifest(manifest_path: str):
-      patch = runtime.Patch(addition=meta.ManifestFiles(
+      patch = rt.Patch(addition=meta.ManifestFiles(
           index_manifest_files=[storage.short_path(manifest_path)]))
       storage.commit(patch)
 
@@ -206,14 +206,14 @@ class TestStorage:
     commit_add_index_manifest(manifest_file)
     manifests_dict1 = {1: storage.short_path(manifest_file)}
 
-    index_file0 = runtime.DataFile(path="data/file0",
-                                   manifest_file_id=1,
-                                   storage_statistics=meta.StorageStatistics(
-                                       num_rows=3,
-                                       index_compressed_bytes=110,
-                                       index_uncompressed_bytes=109))
+    index_file0 = rt.DataFile(path="data/file0",
+                              manifest_file_id=1,
+                              storage_statistics=meta.StorageStatistics(
+                                  num_rows=3,
+                                  index_compressed_bytes=110,
+                                  index_uncompressed_bytes=109))
 
-    assert storage.data_files() == runtime.FileSet(
+    assert storage.data_files() == rt.FileSet(
         index_files=[index_file0], index_manifest_files=manifests_dict1)
 
     # Write the 2nd data file, generate manifest, and commit.
@@ -231,25 +231,24 @@ class TestStorage:
     manifests_dict2 = manifests_dict1.copy()
     manifests_dict2[2] = storage.short_path(manifest_file)
 
-    index_file1 = runtime.DataFile(path="data/file1",
-                                   manifest_file_id=2,
-                                   storage_statistics=meta.StorageStatistics(
-                                       num_rows=2,
-                                       index_compressed_bytes=104,
-                                       index_uncompressed_bytes=100))
+    index_file1 = rt.DataFile(path="data/file1",
+                              manifest_file_id=2,
+                              storage_statistics=meta.StorageStatistics(
+                                  num_rows=2,
+                                  index_compressed_bytes=104,
+                                  index_uncompressed_bytes=100))
 
-    assert storage.data_files() == runtime.FileSet(
+    assert storage.data_files() == rt.FileSet(
         index_files=[index_file0, index_file1],
         index_manifest_files=manifests_dict2)
 
     # Test time travel data_files().
-    assert storage.data_files(snapshot_id=0) == runtime.FileSet()
-    assert storage.data_files(snapshot_id=1) == runtime.FileSet(
+    assert storage.data_files(snapshot_id=0) == rt.FileSet()
+    assert storage.data_files(snapshot_id=1) == rt.FileSet(
         index_files=[index_file0], index_manifest_files=manifests_dict1)
 
     # Test data_files() with filters.
     index_file1.manifest_file_id = 1
-    assert storage.data_files(
-        filter_=pc.field("int64") > 1000) == runtime.FileSet(
-            index_files=[index_file1],
-            index_manifest_files={1: manifests_dict2[2]})
+    assert storage.data_files(filter_=pc.field("int64") > 1000) == rt.FileSet(
+        index_files=[index_file1],
+        index_manifest_files={1: manifests_dict2[2]})

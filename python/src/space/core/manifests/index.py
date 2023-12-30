@@ -24,7 +24,7 @@ import pyarrow.parquet as pq
 
 from space.core.fs.parquet import write_parquet_file
 import space.core.proto.metadata_pb2 as meta
-import space.core.proto.runtime_pb2 as runtime
+import space.core.proto.runtime_pb2 as rt
 from space.core.schema import constants
 from space.core.schema import utils as schema_utils
 from space.core.schema.arrow import field_id, field_id_to_column_id_dict
@@ -223,7 +223,7 @@ class _IndexManifests:
 def read_index_manifests(
     manifest_path: str,
     manifest_file_id: int,
-    filter_: Optional[pc.Expression] = None) -> runtime.FileSet:
+    filter_: Optional[pc.Expression] = None) -> rt.FileSet:
   """Read an index manifest file.
   
   Args:
@@ -239,15 +239,15 @@ def read_index_manifests(
 
   manifests = _index_manifests(table)
 
-  file_set = runtime.FileSet()
+  file_set = rt.FileSet()
   for i in range(table.num_rows):
     stats = meta.StorageStatistics(
         num_rows=manifests.num_rows[i].as_py(),
         index_compressed_bytes=manifests.index_compressed_bytes[i].as_py(),
         index_uncompressed_bytes=manifests.index_uncompressed_bytes[i].as_py())
-    file = runtime.DataFile(path=manifests.file_path[i].as_py(),
-                            manifest_file_id=manifest_file_id,
-                            storage_statistics=stats)
+    file = rt.DataFile(path=manifests.file_path[i].as_py(),
+                       manifest_file_id=manifest_file_id,
+                       storage_statistics=stats)
     file_set.index_files.append(file)
 
   return file_set

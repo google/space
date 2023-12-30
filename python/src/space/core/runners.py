@@ -31,7 +31,7 @@ from space.core.ops.change_data import ChangeType, read_change_data
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions, LocalInsertOp
 from space.core.ops.read import FileSetReadOp, ReadOptions
-import space.core.proto.runtime_pb2 as runtime
+import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
 from space.core.versions.utils import version_to_snapshot_id
 
@@ -71,7 +71,7 @@ class StorageCommitMixin:
   def __init__(self, storage: Storage):
     self._storage = storage
 
-  def _try_commit(self, patch: Optional[runtime.Patch]) -> runtime.JobResult:
+  def _try_commit(self, patch: Optional[rt.Patch]) -> rt.JobResult:
     if patch is not None:
       self._storage.commit(patch)
 
@@ -85,18 +85,18 @@ class BaseReadWriteRunner(StorageCommitMixin, BaseReadOnlyRunner):
     StorageCommitMixin.__init__(self, storage)
 
   @abstractmethod
-  def append(self, data: InputData) -> runtime.JobResult:
+  def append(self, data: InputData) -> rt.JobResult:
     """Append data into the dataset."""
 
   @abstractmethod
   def append_from(
       self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
-  ) -> runtime.JobResult:
+  ) -> rt.JobResult:
     """Append data into the dataset from an iterator source."""
 
   @abstractmethod
   def append_array_record(self, input_dir: str,
-                          index_fn: ArrayRecordIndexFn) -> runtime.JobResult:
+                          index_fn: ArrayRecordIndexFn) -> rt.JobResult:
     """Append data from ArrayRecord files without copying data.
     
     TODO: to support a pattern of files to expand.
@@ -107,7 +107,7 @@ class BaseReadWriteRunner(StorageCommitMixin, BaseReadOnlyRunner):
     """
 
   @abstractmethod
-  def append_parquet(self, input_dir: str) -> runtime.JobResult:
+  def append_parquet(self, input_dir: str) -> rt.JobResult:
     """Append data from Parquet files without copying data.
     
     TODO: to support a pattern of files to expand.
@@ -116,14 +116,14 @@ class BaseReadWriteRunner(StorageCommitMixin, BaseReadOnlyRunner):
       input_dir: the folder of Parquet files.
     """
 
-  def upsert(self, data: InputData) -> runtime.JobResult:
+  def upsert(self, data: InputData) -> rt.JobResult:
     """Upsert data into the dataset.
     
     Update existing data if primary key are found.
     """
     return self._insert(data, InsertOptions.Mode.UPSERT)
 
-  def insert(self, data: InputData) -> runtime.JobResult:
+  def insert(self, data: InputData) -> rt.JobResult:
     """Insert data into the dataset.
     
     Fail the operation if primary key are found.
@@ -131,12 +131,11 @@ class BaseReadWriteRunner(StorageCommitMixin, BaseReadOnlyRunner):
     return self._insert(data, InsertOptions.Mode.INSERT)
 
   @abstractmethod
-  def _insert(self, data: InputData,
-              mode: InsertOptions.Mode) -> runtime.JobResult:
+  def _insert(self, data: InputData, mode: InsertOptions.Mode) -> rt.JobResult:
     """Insert data into the dataset."""
 
   @abstractmethod
-  def delete(self, filter_: pc.Expression) -> runtime.JobResult:
+  def delete(self, filter_: pc.Expression) -> rt.JobResult:
     """Delete data matching the filter from the dataset."""
 
 
@@ -162,14 +161,14 @@ class LocalRunner(BaseReadWriteRunner):
                             version_to_snapshot_id(start_version),
                             version_to_snapshot_id(end_version))
 
-  def append(self, data: InputData) -> runtime.JobResult:
+  def append(self, data: InputData) -> rt.JobResult:
     op = LocalAppendOp(self._storage.location, self._storage.metadata)
     op.write(data)
     return self._try_commit(op.finish())
 
   def append_from(
       self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
-  ) -> runtime.JobResult:
+  ) -> rt.JobResult:
     op = LocalAppendOp(self._storage.location, self._storage.metadata)
     if not isinstance(sources, list):
       sources = [sources]
@@ -181,34 +180,33 @@ class LocalRunner(BaseReadWriteRunner):
     return self._try_commit(op.finish())
 
   def append_array_record(self, input_dir: str,
-                          index_fn: ArrayRecordIndexFn) -> runtime.JobResult:
+                          index_fn: ArrayRecordIndexFn) -> rt.JobResult:
     op = LocalArrayRecordLoadOp(self._storage.location, self._storage.metadata,
                                 input_dir, index_fn)
     return self._try_commit(op.write())
 
-  def append_parquet(self, input_dir: str) -> runtime.JobResult:
+  def append_parquet(self, input_dir: str) -> rt.JobResult:
     op = LocalParquetLoadOp(self._storage.location, self._storage.metadata,
                             input_dir)
     return self._try_commit(op.write())
 
-  def _insert(self, data: InputData,
-              mode: InsertOptions.Mode) -> runtime.JobResult:
+  def _insert(self, data: InputData, mode: InsertOptions.Mode) -> rt.JobResult:
     op = LocalInsertOp(self._storage, InsertOptions(mode=mode))
     return self._try_commit(op.write(data))
 
-  def delete(self, filter_: pc.Expression) -> runtime.JobResult:
+  def delete(self, filter_: pc.Expression) -> rt.JobResult:
     op = FileSetDeleteOp(self._storage.location, self._storage.metadata,
                          self._storage.data_files(filter_), filter_)
     return self._try_commit(op.delete())
 
 
-def _job_result(patch: Optional[runtime.Patch]) -> runtime.JobResult:
+def _job_result(patch: Optional[rt.Patch]) -> rt.JobResult:
   if patch is None:
-    result = runtime.JobResult(state=runtime.JobResult.State.SKIPPED)
+    result = rt.JobResult(state=rt.JobResult.State.SKIPPED)
   else:
     # TODO: to catch failures and report failed state.
-    result = runtime.JobResult(
-        state=runtime.JobResult.State.SUCCEEDED,
+    result = rt.JobResult(
+        state=rt.JobResult.State.SUCCEEDED,
         storage_statistics_update=patch.storage_statistics_update)
 
   logging.info(f"Job result:\n{result}")
