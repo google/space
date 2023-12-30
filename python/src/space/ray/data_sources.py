@@ -15,7 +15,7 @@
 """Implement Ray data sources for Space datasets."""
 
 from __future__ import annotations
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 import pyarrow.compute as pc
 from ray.data.block import Block, BlockMetadata
@@ -23,10 +23,12 @@ from ray.data.datasource.datasource import Datasource, Reader, ReadTask
 from ray.data.datasource.datasource import WriteResult
 from ray.types import ObjectRef
 
-from space.core.storage import Storage
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.ops.read import FileSetReadOp, ReadOptions
+
+if TYPE_CHECKING:
+  from space.core.storage import Storage
 
 
 class SpaceDataSource(Datasource):

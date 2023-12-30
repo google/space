@@ -60,6 +60,13 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
            fields: Optional[List[str]] = None,
            snapshot_id: Optional[int] = None,
            reference_read: bool = False) -> Iterator[pa.Table]:
+    """Read data from the dataset as an iterator.
+    
+    The view runner applies transforms on top of source dataset. It always
+    transforms the whole dataset using Ray.
+
+    Dataset itself is a special view without any transforms.
+    """
     for ref in self._view.ray_dataset(filter_, fields, snapshot_id,
                                       reference_read).to_arrow_refs():
       yield ray.get(ref)
@@ -88,6 +95,26 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
   def __init__(self, mv: MaterializedView):
     RayReadOnlyRunner.__init__(self, mv.view)
     StorageCommitMixin.__init__(self, mv.storage)
+
+  def read(self,
+           filter_: Optional[pc.Expression] = None,
+           fields: Optional[List[str]] = None,
+           snapshot_id: Optional[int] = None,
+           reference_read: bool = False) -> Iterator[pa.Table]:
+    """Read data from the dataset as an iterator.
+    
+    Different from view's default runner (RayReadOnlyRunner), a runner of
+    materialized view always reads from the storage to avoid transforming the
+    source dataset, to save computation cost.
+
+    The result may be stale, call refresh(...) to bring the MV up-to-date.
+
+    To use RayReadOnlyRunner, use `runner = mv.view.ray()` instead of
+    `mv.ray()`.
+    """
+    for ref in self._storage.ray_dataset(filter_, fields, snapshot_id,
+                                         reference_read).to_arrow_refs():
+      yield ray.get(ref)
 
   def refresh(self, target_version: Union[int]) -> rt.JobResult:
     """Refresh the materialized view by synchronizing from source dataset."""

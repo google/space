@@ -31,7 +31,9 @@ from space.core.schema import FieldIdManager
 from space.core.schema import arrow
 from space.core.schema import substrait as substrait_schema
 from space.core.utils import paths
+from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.protos import proto_now
+from space.ray.data_sources import SpaceDataSource
 
 # Initial snapshot ID.
 _INIT_SNAPSHOT_ID = 0
@@ -238,6 +240,19 @@ class Storage(paths.StoragePathsMixin):
   def snapshot_ids(self) -> List[int]:
     """A list of all alive snapshot IDs in the dataset."""
     return list(self._metadata.snapshots)
+
+  def ray_dataset(self,
+                  filter_: Optional[pc.Expression] = None,
+                  fields: Optional[List[str]] = None,
+                  snapshot_id: Optional[int] = None,
+                  reference_read: bool = False) -> ray.Dataset:
+    """Return a Ray dataset for a Space storage."""
+    return ray.data.read_datasource(SpaceDataSource(),
+                                    storage=self,
+                                    filter_=filter_,
+                                    fields=fields,
+                                    snapshot_id=snapshot_id,
+                                    reference_read=reference_read)
 
   def _initialize(self, metadata_path: str) -> None:
     """Initialize a new storage by creating folders and files."""
