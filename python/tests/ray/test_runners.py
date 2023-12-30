@@ -169,7 +169,7 @@ class TestRayReadWriteRunner:
     assert local_runner.read_all() == expected_change0[1]
     assert ray_runner.read_all() == expected_change0[1]
 
-    ray_runner.refresh(2)
+    ray_runner.refresh()
     assert local_runner.read_all() == pa.Table.from_pydict({
         "int64": [1, 3],
         "float64": [1.1, 1.3],
@@ -178,6 +178,9 @@ class TestRayReadWriteRunner:
         "int64": [1, 3],
         "float64": [1.1, 1.3],
     })
+
+    with pytest.raises(RuntimeError):
+      ray_runner.refresh(3)
 
   def test_diff_filter(self, sample_dataset):
     # A sample UDF for testing.
