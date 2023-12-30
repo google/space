@@ -23,7 +23,7 @@ from space.ray.ops.append import RayAppendOp
 from space.core.ops.insert import InsertOptions, LocalInsertOp
 from space.core.ops.insert import filter_matched
 import space.core.proto.metadata_pb2 as meta
-import space.core.proto.runtime_pb2 as runtime
+import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
 from space.core.utils.lazy_imports_utils import ray
 
@@ -36,23 +36,21 @@ class RayInsertOp(LocalInsertOp):
     LocalInsertOp.__init__(self, storage, options)
     self._parallelism = parallelism
 
-  def _check_duplication(self, data_files: runtime.FileSet,
-                         filter_: pc.Expression):
+  def _check_duplication(self, data_files: rt.FileSet, filter_: pc.Expression):
     remote_duplicated_values = []
     for index_file in data_files.index_files:
       # pylint: disable=line-too-long
       remote_duplicated = _remote_filter_matched.options(  # type: ignore[attr-defined]
           num_returns=1).remote(self._storage.location, self._metadata,
-                                runtime.FileSet(index_files=[index_file]),
-                                filter_, self._storage.primary_keys)
+                                rt.FileSet(index_files=[index_file]), filter_,
+                                self._storage.primary_keys)
       remote_duplicated_values.append(remote_duplicated)
 
     for duplicated in ray.get(remote_duplicated_values):
       if duplicated:
         raise RuntimeError("Primary key to insert already exist")
 
-  def _append(self, data: pa.Table,
-              patches: List[Optional[runtime.Patch]]) -> None:
+  def _append(self, data: pa.Table, patches: List[Optional[rt.Patch]]) -> None:
     append_op = RayAppendOp(self._location, self._metadata, self._parallelism)
     append_op.write(data)
     patches.append(append_op.finish())
@@ -60,8 +58,7 @@ class RayInsertOp(LocalInsertOp):
 
 @ray.remote
 def _remote_filter_matched(location: str, metadata: meta.StorageMetadata,
-                           data_files: runtime.FileSet,
-                           pk_filter: pc.Expression,
+                           data_files: rt.FileSet, pk_filter: pc.Expression,
                            primary_keys: List[str]) -> bool:
   return filter_matched(location, metadata, data_files, pk_filter,
                         primary_keys)

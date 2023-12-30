@@ -18,7 +18,7 @@ import pytest
 
 from space.core.ops import utils
 import space.core.proto.metadata_pb2 as meta
-import space.core.proto.runtime_pb2 as runtime
+import space.core.proto.runtime_pb2 as rt
 
 
 def test_update_index_storage_stats_positive():
@@ -111,26 +111,24 @@ def test_merge_patches():
   append_manifests = meta.ManifestFiles(
       index_manifest_files=["data/index_manifest0"],
       record_manifest_files=["data/record_manifest0"])
-  append_patch = runtime.Patch(
-      addition=append_manifests,
-      storage_statistics_update=meta.StorageStatistics(
-          num_rows=123,
-          index_compressed_bytes=10,
-          index_uncompressed_bytes=20,
-          record_uncompressed_bytes=30))
+  append_patch = rt.Patch(addition=append_manifests,
+                          storage_statistics_update=meta.StorageStatistics(
+                              num_rows=123,
+                              index_compressed_bytes=10,
+                              index_uncompressed_bytes=20,
+                              record_uncompressed_bytes=30))
 
   delete_manifests = meta.ManifestFiles(
       index_manifest_files=["data/index_manifest0"])
-  delete_patch = runtime.Patch(
-      deletion=delete_manifests,
-      storage_statistics_update=meta.StorageStatistics(
-          num_rows=-100,
-          index_compressed_bytes=-1,
-          index_uncompressed_bytes=-2,
-          record_uncompressed_bytes=-3))
+  delete_patch = rt.Patch(deletion=delete_manifests,
+                          storage_statistics_update=meta.StorageStatistics(
+                              num_rows=-100,
+                              index_compressed_bytes=-1,
+                              index_uncompressed_bytes=-2,
+                              record_uncompressed_bytes=-3))
 
   upsert_patch = utils.merge_patches([append_patch, delete_patch])
-  assert upsert_patch == runtime.Patch(
+  assert upsert_patch == rt.Patch(
       addition=append_manifests,
       deletion=delete_manifests,
       storage_statistics_update=meta.StorageStatistics(

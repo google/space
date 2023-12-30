@@ -27,7 +27,7 @@ from space.core.ops import utils
 from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import BaseOp
 from space.core.proto import metadata_pb2 as meta
-from space.core.proto import runtime_pb2 as runtime
+from space.core.proto import runtime_pb2 as rt
 from space.core.utils.paths import StoragePathsMixin
 from space.core.schema import constants
 
@@ -43,7 +43,7 @@ class BaseDeleteOp(BaseOp):
   """
 
   @abstractmethod
-  def delete(self) -> Optional[runtime.Patch]:
+  def delete(self) -> Optional[rt.Patch]:
     """Delete data matching the filter from the storage.
     
     TODO: a class is not needed for the current single thread implementation.
@@ -61,7 +61,7 @@ class FileSetDeleteOp(BaseDeleteOp, StoragePathsMixin):
   """
 
   def __init__(self, location: str, metadata: meta.StorageMetadata,
-               file_set: runtime.FileSet, filter_: pc.Expression):
+               file_set: rt.FileSet, filter_: pc.Expression):
     StoragePathsMixin.__init__(self, location)
 
     if not _validate_files(file_set):
@@ -75,10 +75,10 @@ class FileSetDeleteOp(BaseDeleteOp, StoragePathsMixin):
                                     metadata,
                                     record_address_input=True)
 
-  def delete(self) -> Optional[runtime.Patch]:
+  def delete(self) -> Optional[rt.Patch]:
     # The index files and manifests deleted, to remove them from index
     # manifests.
-    patch = runtime.Patch()
+    patch = rt.Patch()
     deleted_files: List[str] = []
     deleted_manifest_ids: Set[int] = set()
 
@@ -194,7 +194,7 @@ def _read_index_statistics(manifest_data: pa.Table) -> meta.StorageStatistics:
                                     constants.INDEX_UNCOMPRESSED_BYTES_FIELD))
 
 
-def _validate_files(file_set: runtime.FileSet) -> bool:
+def _validate_files(file_set: rt.FileSet) -> bool:
   """Return false if the file set does not contain sufficient information for
   deletion.
   """
@@ -206,7 +206,7 @@ def _validate_files(file_set: runtime.FileSet) -> bool:
   return len(file_set.index_manifest_files) > 0
 
 
-def _build_bitmap(file: runtime.DataFile, index_data: pa.Table,
+def _build_bitmap(file: rt.DataFile, index_data: pa.Table,
                   all_deleted: bool) -> meta.RowBitmap:
   row_bitmap = meta.RowBitmap(file=file.path)
   if all_deleted:

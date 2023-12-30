@@ -22,7 +22,7 @@ from typing_extensions import TypeAlias
 from space.core.fs.array_record import read_record_file
 from space.core.loaders.utils import list_files
 from space.core.proto import metadata_pb2 as meta
-from space.core.proto import runtime_pb2 as runtime
+from space.core.proto import runtime_pb2 as rt
 from space.core.ops import utils
 from space.core.ops.append import LocalAppendOp
 from space.core.schema import arrow
@@ -60,7 +60,7 @@ class LocalArrayRecordLoadOp(StoragePathsMixin):
     self._serializer = DictSerializer(logical_schema)
     self._input_files = list_files(input_dir, substr=".array_record")
 
-  def write(self) -> Optional[runtime.Patch]:
+  def write(self) -> Optional[rt.Patch]:
     """Write index files to load ArrayRecord files to Space dataset."""
     append_op = LocalAppendOp(self._location,
                               self._metadata,

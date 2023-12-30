@@ -23,7 +23,7 @@ from space.core.ops import utils
 from space.core.ops.append import BaseAppendOp, LocalAppendOp
 from space.core.ops.base import InputData
 from space.core.proto import metadata_pb2 as meta
-from space.core.proto import runtime_pb2 as runtime
+from space.core.proto import runtime_pb2 as rt
 from space.core.utils.lazy_imports_utils import ray
 
 
@@ -81,7 +81,7 @@ class RayAppendOp(BaseAppendOp):
 
     ray.get(responses)
 
-  def finish(self) -> Optional[runtime.Patch]:
+  def finish(self) -> Optional[rt.Patch]:
     patches = ray.get([actor.finish.remote() for actor in self._actors])
     return utils.merge_patches(patches)
 
@@ -106,6 +106,6 @@ class _AppendActor:
     self._op.write(data)
     return True
 
-  def finish(self) -> Optional[runtime.Patch]:
+  def finish(self) -> Optional[rt.Patch]:
     """Complete the append operation and return a metadata patch."""
     return self._op.finish()

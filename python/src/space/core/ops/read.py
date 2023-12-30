@@ -27,7 +27,7 @@ import pyarrow.compute as pc
 from space.core.fs.array_record import read_record_file
 from space.core.ops.base import BaseOp
 from space.core.proto import metadata_pb2 as meta
-from space.core.proto import runtime_pb2 as runtime
+from space.core.proto import runtime_pb2 as rt
 from space.core.schema import arrow
 from space.core.schema.constants import FILE_PATH_FIELD, ROW_ID_FIELD
 from space.core.schema import utils as schema_utils
@@ -68,7 +68,7 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
   def __init__(self,
                location: str,
                metadata: meta.StorageMetadata,
-               file_set: runtime.FileSet,
+               file_set: rt.FileSet,
                options: Optional[ReadOptions] = None):
     StoragePathsMixin.__init__(self, location)
 

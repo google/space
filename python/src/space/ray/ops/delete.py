@@ -22,7 +22,7 @@ import pyarrow.compute as pc
 from space.core.ops import utils
 from space.core.ops.delete import BaseDeleteOp, FileSetDeleteOp
 from space.core.proto import metadata_pb2 as meta
-from space.core.proto import runtime_pb2 as runtime
+from space.core.proto import runtime_pb2 as rt
 from space.core.storage import Storage
 from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.paths import StoragePathsMixin
@@ -37,7 +37,7 @@ class RayDeleteOp(BaseDeleteOp, StoragePathsMixin):
     self._storage = storage
     self._filter = filter_
 
-  def delete(self) -> Optional[runtime.Patch]:
+  def delete(self) -> Optional[rt.Patch]:
     """Delete data matching the filter from the dataset."""
     metadata = self._storage.metadata
     matched_file_set = self._storage.data_files(self._filter)
@@ -45,7 +45,7 @@ class RayDeleteOp(BaseDeleteOp, StoragePathsMixin):
     remote_delete_patches = []
     for index_file in matched_file_set.index_files:
       # Deletion only needs index file information (no record file information).
-      file_set = runtime.FileSet(
+      file_set = rt.FileSet(
           index_files=[index_file],
           # TODO: attach all manifest files here, to select related manifests.
           index_manifest_files=matched_file_set.index_manifest_files)
@@ -61,6 +61,6 @@ class RayDeleteOp(BaseDeleteOp, StoragePathsMixin):
 
 @ray.remote
 def _delete(location: str, metadata: meta.StorageMetadata,
-            file_set: runtime.FileSet,
-            filter_: pc.Expression) -> Optional[runtime.Patch]:
+            file_set: rt.FileSet,
+            filter_: pc.Expression) -> Optional[rt.Patch]:
   return FileSetDeleteOp(location, metadata, file_set, filter_).delete()

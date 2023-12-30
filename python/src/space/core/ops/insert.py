@@ -28,7 +28,7 @@ from space.core.ops.read import FileSetReadOp, ReadOptions
 from space.core.ops import utils
 from space.core.ops.base import BaseOp, InputData
 import space.core.proto.metadata_pb2 as meta
-import space.core.proto.runtime_pb2 as runtime
+import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
 from space.core.utils.paths import StoragePathsMixin
 
@@ -51,7 +51,7 @@ class InsertOptions:
 class BaseInsertOp(BaseOp):
   """Abstract base insert operation class."""
 
-  def write(self, data: InputData) -> Optional[runtime.Patch]:
+  def write(self, data: InputData) -> Optional[rt.Patch]:
     """Insert data into storage."""
 
 
@@ -66,13 +66,13 @@ class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
 
     self._options = InsertOptions() if options is None else options
 
-  def write(self, data: InputData) -> Optional[runtime.Patch]:
+  def write(self, data: InputData) -> Optional[rt.Patch]:
     if not isinstance(data, pa.Table):
       data = pa.Table.from_pydict(data)
 
     return self._write_arrow(data)
 
-  def _write_arrow(self, data: pa.Table) -> Optional[runtime.Patch]:
+  def _write_arrow(self, data: pa.Table) -> Optional[rt.Patch]:
     if data.num_rows == 0:
       return None
 
@@ -82,7 +82,7 @@ class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
     data_files = self._storage.data_files(filter_)
 
     mode = self._options.mode
-    patches: List[Optional[runtime.Patch]] = []
+    patches: List[Optional[rt.Patch]] = []
     if data_files.index_files:
       if mode == InsertOptions.Mode.INSERT:
         self._check_duplication(data_files, filter_)
@@ -94,27 +94,25 @@ class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
     self._append(data, patches)
     return utils.merge_patches(patches)
 
-  def _check_duplication(self, data_files: runtime.FileSet,
-                         filter_: pc.Expression):
+  def _check_duplication(self, data_files: rt.FileSet, filter_: pc.Expression):
     if filter_matched(self._location, self._metadata, data_files, filter_,
                       self._storage.primary_keys):
       raise RuntimeError("Primary key to insert already exist")
 
-  def _delete(self, filter_: pc.Expression, data_files: runtime.FileSet,
-              patches: List[Optional[runtime.Patch]]) -> None:
+  def _delete(self, filter_: pc.Expression, data_files: rt.FileSet,
+              patches: List[Optional[rt.Patch]]) -> None:
     delete_op = FileSetDeleteOp(self._location, self._metadata, data_files,
                                 filter_)
     patches.append(delete_op.delete())
 
-  def _append(self, data: pa.Table,
-              patches: List[Optional[runtime.Patch]]) -> None:
+  def _append(self, data: pa.Table, patches: List[Optional[rt.Patch]]) -> None:
     append_op = LocalAppendOp(self._location, self._metadata)
     append_op.write(data)
     patches.append(append_op.finish())
 
 
 def filter_matched(location: str, metadata: meta.StorageMetadata,
-                   data_files: runtime.FileSet, filter_: pc.Expression,
+                   data_files: rt.FileSet, filter_: pc.Expression,
                    primary_keys: List[str]) -> bool:
   """Return True if there are data matching the provided filter."""
   op = FileSetReadOp(location, metadata, data_files,
