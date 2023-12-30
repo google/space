@@ -29,9 +29,19 @@ from space.core.manifests import falsifiable_filters as ff
          (pc.field("_STATS_f0", "_MAX") <= 10) |
          ((pc.field("_STATS_f1", "_MIN") > 1) |
           (pc.field("_STATS_f1", "_MAX") < 1))),
+        ((pc.field("a") != 10), (pc.field("_STATS_f0", "_MIN") == 10) &
+         (pc.field("_STATS_f0", "_MAX") == 10)),
         # Only primary keys are used.
         ((pc.field("a") < 10) | (pc.field("c") > "a"),
-         (pc.field("_STATS_f0", "_MIN") >= 10) & False)
+         (pc.field("_STATS_f0", "_MIN") >= 10) & False),
+        # Corner cases.
+        (pc.scalar(False), ~pc.scalar(False)),
+        ((pc.scalar(False) | (pc.field("a") <= 10)),
+         (~pc.scalar(False) & (pc.field("_STATS_f0", "_MIN") > 10))),
+        (~(pc.field("a") >= 10), ~(pc.field("_STATS_f0", "_MAX") < 10)),
+        (pc.field("a") > pc.field("a"), pc.field("_STATS_f0", "_MAX")
+         <= pc.field("_STATS_f0", "_MIN")),
+        (pc.scalar(1) < pc.scalar(2), pc.scalar(1) >= pc.scalar(2))
     ])
 def test_build_manifest_filter(filter_, expected_falsifiable_filter):
   arrow_schema = pa.schema([("a", pa.int64()), ("b", pa.float64()),
@@ -43,8 +53,7 @@ def test_build_manifest_filter(filter_, expected_falsifiable_filter):
   assert str(manifest_filter) == str(~expected_falsifiable_filter)
 
 
-@pytest.mark.parametrize("filter_", [(pc.field("a") != 10),
-                                     (~(pc.field("a") > 10))])
+@pytest.mark.parametrize("filter_", [pc.field("a")])
 def test_build_manifest_filter_not_supported_return_none(filter_):
   arrow_schema = pa.schema([("a", pa.int64()), ("b", pa.float64())])
   field_name_ids = {"a": 0, "b": 1}
