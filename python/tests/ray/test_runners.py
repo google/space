@@ -163,13 +163,18 @@ class TestRayReadWriteRunner:
 
     # Test materialized views.
     ray_runner = mv.ray()
-    local = mv.local()
+    local_runner = mv.local()
 
     ray_runner.refresh(1)
-    assert local.read_all() == expected_change0[1]
+    assert local_runner.read_all() == expected_change0[1]
+    assert ray_runner.read_all() == expected_change0[1]
 
     ray_runner.refresh(2)
-    assert local.read_all() == pa.Table.from_pydict({
+    assert local_runner.read_all() == pa.Table.from_pydict({
+        "int64": [1, 3],
+        "float64": [1.1, 1.3],
+    })
+    assert ray_runner.read_all() == pa.Table.from_pydict({
         "int64": [1, 3],
         "float64": [1.1, 1.3],
     })

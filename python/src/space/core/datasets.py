@@ -27,7 +27,6 @@ from space.core.storage import Storage
 from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.plans import LogicalPlanBuilder
 from space.core.views import View
-from space.ray.data_sources import SpaceDataSource
 from space.ray.runners import RayReadWriterRunner
 
 
@@ -111,12 +110,8 @@ class Dataset(View):
                   snapshot_id: Optional[int] = None,
                   reference_read: bool = False) -> ray.Dataset:
     """Return a Ray dataset for a Space dataset."""
-    return ray.data.read_datasource(SpaceDataSource(),
-                                    storage=self._storage,
-                                    filter_=filter_,
-                                    fields=fields,
-                                    snapshot_id=snapshot_id,
-                                    reference_read=reference_read)
+    return self._storage.ray_dataset(filter_, fields, snapshot_id,
+                                     reference_read)
 
   def ray(self) -> RayReadWriterRunner:
     """Get a Ray runner."""
