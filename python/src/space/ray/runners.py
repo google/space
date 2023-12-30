@@ -116,10 +116,20 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
                                          reference_read).to_arrow_refs():
       yield ray.get(ref)
 
-  def refresh(self, target_version: Union[int]) -> rt.JobResult:
+  def refresh(self,
+              target_version: Optional[Union[int]] = None) -> rt.JobResult:
     """Refresh the materialized view by synchronizing from source dataset."""
+    source_snapshot_id = self._source().storage.metadata.current_snapshot_id
+    if target_version is None:
+      end_snapshot_id = source_snapshot_id
+    else:
+      end_snapshot_id = version_to_snapshot_id(target_version)
+      if end_snapshot_id > source_snapshot_id:
+        raise RuntimeError(
+            f"Target snapshot ID {end_snapshot_id} higher than source dataset "
+            "version")
+
     start_snapshot_id = self._storage.metadata.current_snapshot_id
-    end_snapshot_id = version_to_snapshot_id(target_version)
 
     patches: List[Optional[rt.Patch]] = []
     for change_type, data in self.diff(start_snapshot_id, end_snapshot_id):
