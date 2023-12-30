@@ -20,7 +20,7 @@ files that are impossible to contain the data. See
 https://vldb.org/pvldb/vol14/p3083-edara.pdf.
 """
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 from functools import partial
 
 from absl import logging  # type: ignore[import-untyped]
@@ -40,7 +40,16 @@ def build_manifest_filter(schema: pa.Schema, primary_keys: Set[str],
                           field_name_ids: Dict[str, int],
                           filter_: pc.Expression) -> Optional[pc.Expression]:
   """Build a falsifiable filter on index manifest files column statistics.
+
+  Return None when it fails to build a manifest filter, then manifest pruning
+  is skipped and read may be slower.
   
+  TODO: known limitations, to fix:
+  - pc.field("a"): field without value to compare, should evaluate using
+    default zero values.
+  - pc.field("a") + 1 < pc.field("b"): left or right side contains a
+    computation.
+
   Args:
     schema: the storage schema.
     primary_keys: the primary keys.
@@ -53,12 +62,16 @@ def build_manifest_filter(schema: pa.Schema, primary_keys: Set[str],
   expr = _substrait_expr(schema, filter_)
 
   try:
-    return ~_falsifiable_filter(expr, primary_keys,
-                                field_name_ids)  # type: ignore[operator]
+    ff = _falsifiable_filter(expr, primary_keys, field_name_ids)
+    if ff is None:
+      logging.info("Index manifest filter is empty, query may be slower")
+      return None
+
+    return ~ff  # pylint: disable=invalid-unary-operand-type
   except _ExpressionException as e:
-    logging.info(
-        "Index manifest filter push-down is not used, query may be slower; "
-        f"error: {e}")
+    logging.warning(
+        f"Fail to build index manifest filter, query may be slower; error: {e}"
+    )
     return None
 
 
@@ -81,8 +94,9 @@ class _ExpressionException(Exception):
   """Raise for exceptions in Substrait expressions."""
 
 
-def _falsifiable_filter(filter_: ExtendedExpression, primary_keys: Set[str],
-                        field_name_ids: Dict[str, int]) -> pc.Expression:
+def _falsifiable_filter(
+    filter_: ExtendedExpression, primary_keys: Set[str],
+    field_name_ids: Dict[str, int]) -> Optional[pc.Expression]:
   if len(filter_.referred_expr) != 1:
     raise _ExpressionException(
         f"Expect 1 referred expr, found: {len(filter_.referred_expr)}")
@@ -100,7 +114,7 @@ def _falsifiable_filter_internal(extensions: List[SimpleExtensionDeclaration],
                                  base_schema: NamedStruct,
                                  primary_keys: Set[str],
                                  field_name_ids: Dict[str, int],
-                                 expr: Expression) -> pc.Expression:
+                                 expr: Expression) -> Optional[pc.Expression]:
   if not _has_scalar_function(expr):
     if _has_literal(expr):
       return ~_value(expr)
@@ -117,7 +131,12 @@ def _falsifiable_filter_internal(extensions: List[SimpleExtensionDeclaration],
   fn = extensions[scalar_fn.function_reference].extension_function.name
 
   if len(scalar_fn.arguments) == 1 and fn == "not":
-    return ~falsifiable_filter_fn(scalar_fn.arguments[0].value)
+    ff = falsifiable_filter_fn(
+        scalar_fn.arguments[0].value)  # type: ignore[operator]
+    if ff is None:
+      return None
+
+    return ~ff  # pylint: disable=invalid-unary-operand-type
 
   if len(scalar_fn.arguments) != 2:
     raise _ExpressionException(
@@ -128,59 +147,30 @@ def _falsifiable_filter_internal(extensions: List[SimpleExtensionDeclaration],
 
   # Supported case: expression [and, or] expression, start recursion.
   if _has_scalar_function(lhs) or _has_scalar_function(rhs):
+    l_ff, r_ff = falsifiable_filter_fn(lhs), falsifiable_filter_fn(rhs)
     # TODO: to support more functions.
     if fn == "and":
-      return falsifiable_filter_fn(lhs) | falsifiable_filter_fn(
-          rhs)  # type: ignore[operator]
+      if l_ff is None:
+        return r_ff
+      if r_ff is None:
+        return l_ff
+
+      return l_ff | r_ff
     elif fn == "or":
-      return falsifiable_filter_fn(lhs) & falsifiable_filter_fn(
-          rhs)  # type: ignore[operator]
+      if l_ff is None or r_ff is None:
+        return None
+
+      return l_ff & r_ff
     else:
       raise _ExpressionException(f"Unsupported fn: {fn}")
 
   # Supported case: field [op] field
   if _has_selection(lhs) and _has_selection(rhs):
-    l_min, l_max, l_is_pk = min_max_fn(lhs)
-    r_min, r_max, r_is_pk = min_max_fn(rhs)
-
-    if not (l_is_pk and r_is_pk):
-      return pc.scalar(False)
-
-    # TODO: to support more functions.
-    if fn == "gt":
-      return l_max <= r_min
-    if fn == "gte":
-      return l_max < r_min
-    elif fn == "lt":
-      return l_min >= r_max
-    elif fn == "lte":
-      return l_min > r_max
-    elif fn == "equal":
-      return (l_max < r_min) | (r_max < l_min)
-    elif fn == "not_equal":
-      return (l_max >= r_min) & (r_max >= l_min)
-
-    raise _ExpressionException(f"Unsupported fn: {fn}")
+    return _falsifiable_condition_fields(fn, lhs, rhs, min_max_fn)
 
   # Supported case: value [op] value
   if _has_literal(lhs) and _has_literal(rhs):
-    lv, rv = _value(lhs), _value(rhs)
-
-    # TODO: to support more functions.
-    if fn == "gt":
-      return lv <= rv
-    if fn == "gte":
-      return lv < rv
-    elif fn == "lt":
-      return lv >= rv
-    elif fn == "lte":
-      return lv > rv
-    elif fn == "equal":
-      return lv != rv
-    elif fn == "not_equal":
-      return lv == rv
-
-    raise _ExpressionException(f"Unsupported fn: {fn}")
+    return _falsifiable_condition_literals(fn, lhs, rhs)
 
   # Supported case: field [op] value
   if not ((_has_selection(lhs) and _has_literal(rhs)) or
@@ -193,44 +183,7 @@ def _falsifiable_filter_internal(extensions: List[SimpleExtensionDeclaration],
     tmp, lhs = lhs, rhs
     rhs = tmp
 
-  field_min, field_max, is_pk = min_max_fn(lhs)
-  if not is_pk:
-    return pc.scalar(False)
-
-  value = _value(rhs)
-
-  # TODO: to support more functions.
-  if fn == "gt":
-    return field_max <= value
-  if fn == "gte":
-    return field_max < value
-  elif fn == "lt":
-    return field_min >= value
-  elif fn == "lte":
-    return field_min > value
-  elif fn == "equal":
-    return (field_min > value) | (field_max < value)
-  elif fn == "not_equal":
-    return (field_min == value) & (field_max == value)
-
-  raise _ExpressionException(f"Unsupported fn: {fn}")
-
-
-def _value(v):
-  return pc.scalar(
-      getattr(v.literal,
-              v.literal.WhichOneof("literal_type")))  # type: ignore[arg-type]
-
-
-def _min_max(base_schema, primary_keys, field_name_ids,
-             v) -> Tuple[pc.Expression, pc.Expression, bool]:
-  field_index = v.selection.direct_reference.struct_field.field
-  field_name = base_schema.names[field_index]
-  field_id = field_name_ids[field_name]
-
-  # Only primary key supports falsifiable filter because of column stats.
-  is_pk = field_name in primary_keys
-  return _stats_field_min(field_id), _stats_field_max(field_id), is_pk
+  return _falsifiable_condition_field_literal(fn, lhs, rhs, min_max_fn)
 
 
 def _stats_field_min(field_id: int) -> pc.Expression:
@@ -251,3 +204,92 @@ def _has_selection(msg: Expression) -> bool:
 
 def _has_literal(msg: Expression) -> bool:
   return msg.HasField("literal")
+
+
+def _falsifiable_condition_fields(
+    fn: str, lhs: Expression, rhs: Expression,
+    min_max_fn: Callable) -> Optional[pc.Expression]:
+  l_min, l_max, l_is_pk = min_max_fn(lhs)
+  r_min, r_max, r_is_pk = min_max_fn(rhs)
+
+  if not (l_is_pk and r_is_pk):
+    return None
+
+  if fn == "gt":
+    return l_max <= r_min
+  if fn == "gte":
+    return l_max < r_min
+  elif fn == "lt":
+    return l_min >= r_max
+  elif fn == "lte":
+    return l_min > r_max
+  elif fn == "equal":
+    return (l_max < r_min) | (r_max < l_min)
+  elif fn == "not_equal":
+    return (l_max >= r_min) & (r_max >= l_min)
+
+  raise _ExpressionException(f"Unsupported fn: {fn}")
+
+
+def _falsifiable_condition_literals(fn: str, lhs: Expression,
+                                    rhs: Expression) -> pc.Expression:
+  lv, rv = _value(lhs), _value(rhs)
+
+  if fn == "gt":
+    return lv <= rv
+  if fn == "gte":
+    return lv < rv
+  elif fn == "lt":
+    return lv >= rv
+  elif fn == "lte":
+    return lv > rv
+  elif fn == "equal":
+    return lv != rv
+  elif fn == "not_equal":
+    return lv == rv
+
+  raise _ExpressionException(f"Unsupported fn: {fn}")
+
+
+def _falsifiable_condition_field_literal(
+    fn: str, lhs: Expression, rhs: Expression,
+    min_max_fn: Callable) -> Optional[pc.Expression]:
+  field_min, field_max, is_pk = min_max_fn(lhs)
+  if not is_pk:
+    return None
+
+  value = _value(rhs)
+
+  if fn == "gt":
+    return field_max <= value
+  if fn == "gte":
+    return field_max < value
+  elif fn == "lt":
+    return field_min >= value
+  elif fn == "lte":
+    return field_min > value
+  elif fn == "equal":
+    return (field_min > value) | (field_max < value)
+  elif fn == "not_equal":
+    return (field_min == value) & (field_max == value)
+
+  raise _ExpressionException(f"Unsupported fn: {fn}")
+
+
+def _value(v: Expression):
+  return pc.scalar(
+      getattr(v.literal,
+              v.literal.WhichOneof("literal_type")))  # type: ignore[arg-type]
+
+
+def _min_max(base_schema, primary_keys, field_name_ids,
+             v: Expression) -> Tuple[pc.Expression, pc.Expression, bool]:
+  field_index = v.selection.direct_reference.struct_field.field
+  field_name = base_schema.names[field_index]
+  field_id = field_name_ids[field_name]
+
+  # Only primary key supports falsifiable filter because of column stats.
+  # TODO: to support clustering keys that have column stats but are not primary
+  # keys.
+  is_pk = field_name in primary_keys
+  return _stats_field_min(field_id), _stats_field_max(field_id), is_pk
