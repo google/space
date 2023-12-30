@@ -20,6 +20,7 @@ from os import path
 from typing import Callable, Dict, List, Optional, TYPE_CHECKING
 
 import pyarrow as pa
+import pyarrow.compute as pc
 from substrait.algebra_pb2 import Rel
 
 from space.core.fs.factory import create_fs
@@ -77,6 +78,14 @@ class View(ABC):
   @abstractmethod
   def process_source(self, data: pa.Table) -> ray.Dataset:
     """Process input data using the transform defined by the view."""
+
+  @abstractmethod
+  def ray_dataset(self,
+                  filter_: Optional[pc.Expression] = None,
+                  fields: Optional[List[str]] = None,
+                  snapshot_id: Optional[int] = None,
+                  reference_read: bool = False) -> ray.Dataset:
+    """Return a Ray dataset for a Space view."""
 
   def ray(self) -> RayReadOnlyRunner:
     """Return a Ray runner for the view."""

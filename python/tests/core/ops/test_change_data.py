@@ -27,12 +27,8 @@ def test_read_change_data(tmp_path, all_types_schema, all_types_input_data):
                       record_fields=[])
 
   # Validate ADD changes.
-  def make_iter():
-    for d in all_types_input_data:
-      yield d
-
   runner = ds.local()
-  runner.append_from(make_iter())
+  runner.append_from(iter(all_types_input_data))
 
   changes = list(runner.diff(0, 1))
   assert len(changes) == 1

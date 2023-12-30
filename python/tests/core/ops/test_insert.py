@@ -30,12 +30,8 @@ class TestLocalInsertOp:
                         primary_keys=["int64"],
                         record_fields=[])
 
-    def make_iter():
-      for d in all_types_input_data:
-        yield d
-
     runner = ds.local()
-    runner.append_from(make_iter())
+    runner.append_from(iter(all_types_input_data))
 
     # Test insert.
     with pytest.raises(RuntimeError):

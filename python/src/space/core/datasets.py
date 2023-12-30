@@ -15,9 +15,10 @@
 """Space dataset is the interface to interact with underlying storage."""
 
 from __future__ import annotations
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pyarrow as pa
+import pyarrow.compute as pc
 from substrait.algebra_pb2 import ReadRel, Rel
 
 from space.core.runners import LocalRunner
@@ -26,6 +27,8 @@ from space.core.storage import Storage
 from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.plans import LogicalPlanBuilder
 from space.core.views import View
+from space.ray.data_sources import SpaceDataSource
+from space.ray.runners import RayReadWriterRunner
 
 
 class Dataset(View):
@@ -101,3 +104,20 @@ class Dataset(View):
   def process_source(self, data: pa.Table) -> ray.Dataset:
     # Dataset is the source, there is no transform, so simply return the data.
     return ray.data.from_arrow(data)
+
+  def ray_dataset(self,
+                  filter_: Optional[pc.Expression] = None,
+                  fields: Optional[List[str]] = None,
+                  snapshot_id: Optional[int] = None,
+                  reference_read: bool = False) -> ray.Dataset:
+    """Return a Ray dataset for a Space dataset."""
+    return ray.data.read_datasource(SpaceDataSource(),
+                                    storage=self._storage,
+                                    filter_=filter_,
+                                    fields=fields,
+                                    snapshot_id=snapshot_id,
+                                    reference_read=reference_read)
+
+  def ray(self) -> RayReadWriterRunner:
+    """Get a Ray runner."""
+    return RayReadWriterRunner(self)

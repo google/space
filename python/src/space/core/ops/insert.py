@@ -20,12 +20,14 @@ from enum import Enum
 from typing import List, Optional
 
 import pyarrow as pa
+import pyarrow.compute as pc
 
-from space.core.ops.append import BaseAppendOp, LocalAppendOp
-from space.core.ops.delete import BaseDeleteOp, FileSetDeleteOp
+from space.core.ops.append import LocalAppendOp
+from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.read import FileSetReadOp, ReadOptions
 from space.core.ops import utils
 from space.core.ops.base import BaseOp, InputData
+import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as runtime
 from space.core.storage import Storage
 from space.core.utils.paths import StoragePathsMixin
@@ -54,7 +56,7 @@ class BaseInsertOp(BaseOp):
 
 
 class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
-  '''Append data to a dataset.'''
+  """Insert data to a dataset."""
 
   def __init__(self, storage: Storage, options: InsertOptions):
     StoragePathsMixin.__init__(self, storage.location)
@@ -74,47 +76,54 @@ class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
     if data.num_rows == 0:
       return None
 
-    pk_filter = utils.primary_key_filter(
-        list(self._metadata.schema.primary_keys), data)
-    assert pk_filter is not None
+    filter_ = utils.primary_key_filter(self._storage.primary_keys, data)
+    assert filter_ is not None
 
-    data_files = self._storage.data_files(pk_filter)
+    data_files = self._storage.data_files(filter_)
 
     mode = self._options.mode
     patches: List[Optional[runtime.Patch]] = []
     if data_files.index_files:
       if mode == InsertOptions.Mode.INSERT:
-        read_op = FileSetReadOp(
-            self._location, self._metadata, data_files,
-            ReadOptions(filter_=pk_filter, fields=self._storage.primary_keys))
-
-        for batch in iter(read_op):
-          if batch.num_rows > 0:
-            # TODO: to customize the error and converted it to JobResult failed
-            # status.
-            raise RuntimeError('Primary key to insert already exist')
+        self._check_duplication(data_files, filter_)
       elif mode == InsertOptions.Mode.UPSERT:
-        _try_delete_data(
-            FileSetDeleteOp(self._location, self._metadata, data_files,
-                            pk_filter), patches)
+        self._delete(filter_, data_files, patches)
       else:
         raise RuntimeError(f"Insert mode {mode} not supported")
 
-    _try_append_data(LocalAppendOp(self._location, self._metadata), data,
-                     patches)
+    self._append(data, patches)
     return utils.merge_patches(patches)
 
+  def _check_duplication(self, data_files: runtime.FileSet,
+                         filter_: pc.Expression):
+    if filter_matched(self._location, self._metadata, data_files, filter_,
+                      self._storage.primary_keys):
+      raise RuntimeError("Primary key to insert already exist")
 
-def _try_delete_data(op: BaseDeleteOp,
-                     patches: List[Optional[runtime.Patch]]) -> None:
-  patch = op.delete()
-  if patch is not None:
-    patches.append(patch)
+  def _delete(self, filter_: pc.Expression, data_files: runtime.FileSet,
+              patches: List[Optional[runtime.Patch]]) -> None:
+    delete_op = FileSetDeleteOp(self._location, self._metadata, data_files,
+                                filter_)
+    patches.append(delete_op.delete())
+
+  def _append(self, data: pa.Table,
+              patches: List[Optional[runtime.Patch]]) -> None:
+    append_op = LocalAppendOp(self._location, self._metadata)
+    append_op.write(data)
+    patches.append(append_op.finish())
 
 
-def _try_append_data(op: BaseAppendOp, data: pa.Table,
-                     patches: List[Optional[runtime.Patch]]) -> None:
-  op.write(data)
-  patch = op.finish()
-  if patch is not None:
-    patches.append(patch)
+def filter_matched(location: str, metadata: meta.StorageMetadata,
+                   data_files: runtime.FileSet, filter_: pc.Expression,
+                   primary_keys: List[str]) -> bool:
+  """Return True if there are data matching the provided filter."""
+  op = FileSetReadOp(location, metadata, data_files,
+                     ReadOptions(filter_=filter_, fields=primary_keys))
+
+  for data in iter(op):
+    if data.num_rows > 0:
+      # TODO: to customize the error and converted it to JobResult failed
+      # status.
+      return True
+
+  return False
