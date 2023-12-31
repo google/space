@@ -23,8 +23,8 @@ import pyarrow.compute as pc
 from tensorflow_datasets import features as f
 
 from space import Dataset, LocalRunner, TfFeatures
+from space.core.jobs import JobResult
 from space.core.ops.change_data import ChangeType
-import space.core.proto.runtime_pb2 as rt
 
 
 class TestLocalRunner:
@@ -67,7 +67,7 @@ class TestLocalRunner:
         "name": [],
         "feat1": [],
         "feat2": []
-    }).state == rt.JobResult.SKIPPED
+    }).state == JobResult.State.SKIPPED
 
   # pylint: disable=consider-using-with
   def test_conflict_commit_should_fail(self, sample_dataset):
@@ -100,7 +100,7 @@ class TestLocalRunner:
     lock1.release()
     t.join()
 
-    assert job_result[0].state == rt.JobResult.FAILED
+    assert job_result[0].state == JobResult.State.FAILED
     assert "has been modified" in job_result[0].error_message
 
   def test_read_and_write_should_reload_storage(self, sample_dataset):

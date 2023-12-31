@@ -24,6 +24,7 @@ import pyarrow.compute as pc
 
 from space.core.fs.base import BaseFileSystem
 from space.core.fs.factory import create_fs
+from space.core.jobs import JobResult
 from space.core.manifests.falsifiable_filters import build_manifest_filter
 from space.core.manifests.index import read_index_manifests
 from space.core.ops import utils as ops_utils
@@ -339,7 +340,7 @@ class Transaction:
     # The storage snapshot ID when the transaction starts.
     self._snapshot_id: Optional[int] = None
 
-    self._result: Optional[rt.JobResult] = None
+    self._result: Optional[JobResult] = None
 
   def commit(self, patch: Optional[rt.Patch]) -> None:
     """Commit the transaction."""
@@ -349,21 +350,20 @@ class Transaction:
     assert self._snapshot_id is not None
     self._storage.reload()
     if self._snapshot_id != self._storage.metadata.current_snapshot_id:
-      self._result = rt.JobResult(
-          state=rt.JobResult.FAILED,
-          error_message="Abort commit because the storage has been modified.")
+      self._result = JobResult(
+          JobResult.State.FAILED, None,
+          "Abort commit because the storage has been modified.")
       return
 
     if patch is None:
-      self._result = rt.JobResult(state=rt.JobResult.SKIPPED)
+      self._result = JobResult(JobResult.State.SKIPPED)
       return
 
     self._storage.commit(patch)
-    self._result = rt.JobResult(
-        state=rt.JobResult.SUCCEEDED,
-        storage_statistics_update=patch.storage_statistics_update)
+    self._result = JobResult(JobResult.State.SUCCEEDED,
+                             patch.storage_statistics_update)
 
-  def result(self) -> rt.JobResult:
+  def result(self) -> JobResult:
     """Get job result after transaction is committed."""
     if self._result is None:
       raise errors.TransactionError(

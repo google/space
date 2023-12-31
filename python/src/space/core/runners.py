@@ -23,6 +23,7 @@ from absl import logging  # type: ignore[import-untyped]
 import pyarrow as pa
 import pyarrow.compute as pc
 
+from space.core.jobs import JobResult
 from space.core.loaders.array_record import ArrayRecordIndexFn
 from space.core.loaders.array_record import LocalArrayRecordLoadOp
 from space.core.loaders.parquet import LocalParquetLoadOp
@@ -75,7 +76,7 @@ class StorageMixin:
 
   @staticmethod
   def transactional(
-      fn: Callable[..., Optional[rt.Patch]]) -> Callable[..., rt.JobResult]:
+      fn: Callable[..., Optional[rt.Patch]]) -> Callable[..., JobResult]:
     """A decorator that commits the result of a data operation."""
 
     @wraps(fn)
@@ -87,7 +88,7 @@ class StorageMixin:
           logging.info(f"Job result:\n{r}")
           return r
       except (errors.SpaceRuntimeError, errors.UserInputError) as e:
-        r = rt.JobResult(state=rt.JobResult.FAILED, error_message=repr(e))
+        r = JobResult(JobResult.State.FAILED, None, repr(e))
         logging.warning(f"Job result:\n{r}")
         return r
 
@@ -112,18 +113,18 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
     StorageMixin.__init__(self, storage)
 
   @abstractmethod
-  def append(self, data: InputData) -> rt.JobResult:
+  def append(self, data: InputData) -> JobResult:
     """Append data into the dataset."""
 
   @abstractmethod
   def append_from(
-      self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
-  ) -> rt.JobResult:
+      self, sources: Union[Iterator[InputData],
+                           List[Iterator[InputData]]]) -> JobResult:
     """Append data into the dataset from an iterator source."""
 
   @abstractmethod
   def append_array_record(self, input_dir: str,
-                          index_fn: ArrayRecordIndexFn) -> rt.JobResult:
+                          index_fn: ArrayRecordIndexFn) -> JobResult:
     """Append data from ArrayRecord files without copying data.
     
     TODO: to support a pattern of files to expand.
@@ -134,7 +135,7 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
     """
 
   @abstractmethod
-  def append_parquet(self, input_dir: str) -> rt.JobResult:
+  def append_parquet(self, input_dir: str) -> JobResult:
     """Append data from Parquet files without copying data.
     
     TODO: to support a pattern of files to expand.
@@ -143,14 +144,14 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
       input_dir: the folder of Parquet files.
     """
 
-  def upsert(self, data: InputData) -> rt.JobResult:
+  def upsert(self, data: InputData) -> JobResult:
     """Upsert data into the dataset.
     
     Update existing data if primary key are found.
     """
     return self._insert(data, InsertOptions.Mode.UPSERT)
 
-  def insert(self, data: InputData) -> rt.JobResult:
+  def insert(self, data: InputData) -> JobResult:
     """Insert data into the dataset.
     
     Fail the operation if primary key are found.
@@ -158,11 +159,11 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
     return self._insert(data, InsertOptions.Mode.INSERT)
 
   @abstractmethod
-  def _insert(self, data: InputData, mode: InsertOptions.Mode) -> rt.JobResult:
+  def _insert(self, data: InputData, mode: InsertOptions.Mode) -> JobResult:
     """Insert data into the dataset."""
 
   @abstractmethod
-  def delete(self, filter_: pc.Expression) -> rt.JobResult:
+  def delete(self, filter_: pc.Expression) -> JobResult:
     """Delete data matching the filter from the dataset."""
 
 
