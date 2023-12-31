@@ -99,7 +99,7 @@ class StorageMixin:
 
     @wraps(fn)
     def decorated(self, *args, **kwargs):
-      self._storage.reload()
+      self._storage.reload()  # pylint: disable=protected-access
       return fn(self, *args, **kwargs)
 
     return decorated

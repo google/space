@@ -41,6 +41,7 @@ from space.ray.ops.insert import RayInsertOp
 
 if TYPE_CHECKING:
   from space.core.datasets import Dataset
+  from space.core.storage import Storage
   from space.core.views import MaterializedView, View
 
 

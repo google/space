@@ -51,7 +51,19 @@ class Storage(paths.StoragePathsMixin):
   def __init__(self, location: str, metadata: meta.StorageMetadata):
     super().__init__(location)
     self._fs = create_fs(location)
-    self._initialize_metadata(metadata)
+    self._metadata = metadata
+
+    record_fields = set(self._metadata.schema.record_fields)
+    self._logical_schema = arrow.arrow_schema(self._metadata.schema.fields,
+                                              record_fields,
+                                              physical=False)
+    self._physical_schema = arrow.logical_to_physical_schema(
+        self._logical_schema, record_fields)
+
+    self._field_name_ids: Dict[str, int] = arrow.field_name_to_id_dict(
+        self._physical_schema)
+
+    self._primary_keys = set(self._metadata.schema.primary_keys)
 
   @property
   def metadata(self) -> meta.StorageMetadata:
@@ -161,7 +173,7 @@ class Storage(paths.StoragePathsMixin):
       return False
 
     metadata = _read_metadata(self._fs, self._location, entry_point)
-    self._initialize_metadata(metadata)
+    self.__init__(self.location, metadata)  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
     logging.info(
         f"Storage reloaded to snapshot: {self._metadata.current_snapshot_id}")
     return True
@@ -267,22 +279,6 @@ class Storage(paths.StoragePathsMixin):
                                     fields=fields,
                                     snapshot_id=snapshot_id,
                                     reference_read=reference_read)
-
-  def _initialize_metadata(self, metadata: meta.StorageMetadata) -> None:
-    """Initialize the storage's in-memory metadata."""
-    self._metadata = metadata
-
-    record_fields = set(self._metadata.schema.record_fields)
-    self._logical_schema = arrow.arrow_schema(self._metadata.schema.fields,
-                                              record_fields,
-                                              physical=False)
-    self._physical_schema = arrow.logical_to_physical_schema(
-        self._logical_schema, record_fields)
-
-    self._field_name_ids: Dict[str, int] = arrow.field_name_to_id_dict(
-        self._physical_schema)
-
-    self._primary_keys = set(self._metadata.schema.primary_keys)
 
   def _initialize_files(self, metadata_path: str) -> None:
     """Initialize a new storage by creating folders and files."""
