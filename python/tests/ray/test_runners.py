@@ -22,8 +22,8 @@ import pytest
 import ray
 
 from space import Dataset
+from space.core.jobs import JobResult
 from space.core.ops.change_data import ChangeType
-import space.core.proto.runtime_pb2 as rt
 from space.core.utils.uuids import random_id
 
 
@@ -80,7 +80,7 @@ class TestRayReadWriteRunner:
 
     # Test insert.
     result = runner.insert(generate_data([7, 12]))
-    assert result.state == rt.JobResult.FAILED
+    assert result.state == JobResult.State.FAILED
     assert "Primary key to insert already exist" in result.error_message
 
     runner.upsert(generate_data([7, 12]))
@@ -179,7 +179,7 @@ class TestRayReadWriteRunner:
     })
 
     result = ray_runner.refresh(3)
-    assert result.state == rt.JobResult.FAILED
+    assert result.state == JobResult.State.FAILED
     assert ("Target snapshot ID 3 higher than source dataset version"
             in result.error_message)
 

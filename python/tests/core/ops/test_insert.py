@@ -16,7 +16,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from space import Dataset
-import space.core.proto.runtime_pb2 as rt
+from space.core.jobs import JobResult
 
 
 class TestLocalInsertOp:
@@ -40,7 +40,7 @@ class TestLocalInsertOp:
         "bool": [False, False],
         "string": ["d", "e"]
     })
-    assert result.state == rt.JobResult.FAILED
+    assert result.state == JobResult.State.FAILED
     assert "Primary key to insert already exist" in result.error_message
 
     input_data = {

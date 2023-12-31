@@ -19,13 +19,11 @@ import builtins
 import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
-import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import space.core.proto.metadata_pb2
 import sys
-import typing
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
@@ -140,51 +138,3 @@ class Patch(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["addition", b"addition", "change_log", b"change_log", "deletion", b"deletion", "storage_statistics_update", b"storage_statistics_update"]) -> None: ...
 
 global___Patch = Patch
-
-@typing_extensions.final
-class JobResult(google.protobuf.message.Message):
-    """Result of a job.
-    NEXT_ID: 4
-    """
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    class _State:
-        ValueType = typing.NewType("ValueType", builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-
-    class _StateEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[JobResult._State.ValueType], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        STATE_UNSPECIFIED: JobResult._State.ValueType  # 0
-        SUCCEEDED: JobResult._State.ValueType  # 1
-        FAILED: JobResult._State.ValueType  # 2
-        SKIPPED: JobResult._State.ValueType  # 3
-
-    class State(_State, metaclass=_StateEnumTypeWrapper):
-        """Job result state."""
-
-    STATE_UNSPECIFIED: JobResult.State.ValueType  # 0
-    SUCCEEDED: JobResult.State.ValueType  # 1
-    FAILED: JobResult.State.ValueType  # 2
-    SKIPPED: JobResult.State.ValueType  # 3
-
-    STATE_FIELD_NUMBER: builtins.int
-    STORAGE_STATISTICS_UPDATE_FIELD_NUMBER: builtins.int
-    ERROR_MESSAGE_FIELD_NUMBER: builtins.int
-    state: global___JobResult.State.ValueType
-    @property
-    def storage_statistics_update(self) -> space.core.proto.metadata_pb2.StorageStatistics:
-        """The change of the storage statistics."""
-    error_message: builtins.str
-    """Error message if the job failed."""
-    def __init__(
-        self,
-        *,
-        state: global___JobResult.State.ValueType = ...,
-        storage_statistics_update: space.core.proto.metadata_pb2.StorageStatistics | None = ...,
-        error_message: builtins.str = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["storage_statistics_update", b"storage_statistics_update"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["error_message", b"error_message", "state", b"state", "storage_statistics_update", b"storage_statistics_update"]) -> None: ...
-
-global___JobResult = JobResult
