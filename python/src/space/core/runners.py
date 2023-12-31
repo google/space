@@ -67,7 +67,7 @@ class BaseReadOnlyRunner(ABC):
     """
 
 
-class StorageCommitMixin:
+class StorageMixin:
   """Provide storage commit utilities."""
 
   def __init__(self, storage: Storage):
@@ -93,12 +93,23 @@ class StorageCommitMixin:
 
     return decorated
 
+  @staticmethod
+  def reload(fn: Callable) -> Callable:
+    """A decorator that reloads the storage before a data operation."""
 
-class BaseReadWriteRunner(StorageCommitMixin, BaseReadOnlyRunner):
+    @wraps(fn)
+    def decorated(self, *args, **kwargs):
+      self._storage.reload()
+      return fn(self, *args, **kwargs)
+
+    return decorated
+
+
+class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
   """Abstract base read and write runner class."""
 
   def __init__(self, storage: Storage):
-    StorageCommitMixin.__init__(self, storage)
+    StorageMixin.__init__(self, storage)
 
   @abstractmethod
   def append(self, data: InputData) -> rt.JobResult:
@@ -158,6 +169,7 @@ class BaseReadWriteRunner(StorageCommitMixin, BaseReadOnlyRunner):
 class LocalRunner(BaseReadWriteRunner):
   """A runner that runs operations locally."""
 
+  @StorageMixin.reload
   def read(self,
            filter_: Optional[pc.Expression] = None,
            fields: Optional[List[str]] = None,
@@ -171,19 +183,20 @@ class LocalRunner(BaseReadWriteRunner):
                         fields=fields,
                         reference_read=reference_read)))
 
+  @StorageMixin.reload
   def diff(self, start_version: Union[int],
            end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
     return read_change_data(self._storage,
                             version_to_snapshot_id(start_version),
                             version_to_snapshot_id(end_version))
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def append(self, data: InputData) -> Optional[rt.Patch]:
     op = LocalAppendOp(self._storage.location, self._storage.metadata)
     op.write(data)
     return op.finish()
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def append_from(
       self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
   ) -> Optional[rt.Patch]:
@@ -197,26 +210,26 @@ class LocalRunner(BaseReadWriteRunner):
 
     return op.finish()
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def append_array_record(self, input_dir: str,
                           index_fn: ArrayRecordIndexFn) -> Optional[rt.Patch]:
     op = LocalArrayRecordLoadOp(self._storage.location, self._storage.metadata,
                                 input_dir, index_fn)
     return op.write()
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def append_parquet(self, input_dir: str) -> Optional[rt.Patch]:
     op = LocalParquetLoadOp(self._storage.location, self._storage.metadata,
                             input_dir)
     return op.write()
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def _insert(self, data: InputData,
               mode: InsertOptions.Mode) -> Optional[rt.Patch]:
     op = LocalInsertOp(self._storage, InsertOptions(mode=mode))
     return op.write(data)
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def delete(self, filter_: pc.Expression) -> Optional[rt.Patch]:
     op = FileSetDeleteOp(self._storage.location, self._storage.metadata,
                          self._storage.data_files(filter_), filter_)

@@ -184,7 +184,7 @@ global___Schema = Schema
 class Snapshot(google.protobuf.message.Message):
     """Storage snapshot persisting physical metadata such as manifest file paths.
     It is used for obtaining all alive data file paths for a given snapshot.
-    NEXT_ID: 6
+    NEXT_ID: 7
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -194,6 +194,7 @@ class Snapshot(google.protobuf.message.Message):
     MANIFEST_FILES_FIELD_NUMBER: builtins.int
     STORAGE_STATISTICS_FIELD_NUMBER: builtins.int
     CHANGE_LOG_FILE_FIELD_NUMBER: builtins.int
+    METADATA_FILE_FIELD_NUMBER: builtins.int
     snapshot_id: builtins.int
     """The snapshot ID."""
     @property
@@ -209,6 +210,10 @@ class Snapshot(google.protobuf.message.Message):
         """Statistics of all data in the storage."""
     change_log_file: builtins.str
     """File path of the change log of the snapshot."""
+    metadata_file: builtins.str
+    """The metadata file path (StorageMetadata) that uses this snapshot as the
+    current snapshot.
+    """
     def __init__(
         self,
         *,
@@ -217,9 +222,10 @@ class Snapshot(google.protobuf.message.Message):
         manifest_files: global___ManifestFiles | None = ...,
         storage_statistics: global___StorageStatistics | None = ...,
         change_log_file: builtins.str = ...,
+        metadata_file: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "data_info", b"data_info", "manifest_files", b"manifest_files", "storage_statistics", b"storage_statistics"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["change_log_file", b"change_log_file", "create_time", b"create_time", "data_info", b"data_info", "manifest_files", b"manifest_files", "snapshot_id", b"snapshot_id", "storage_statistics", b"storage_statistics"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["change_log_file", b"change_log_file", "create_time", b"create_time", "data_info", b"data_info", "manifest_files", b"manifest_files", "metadata_file", b"metadata_file", "snapshot_id", b"snapshot_id", "storage_statistics", b"storage_statistics"]) -> None: ...
     def WhichOneof(self, oneof_group: typing_extensions.Literal["data_info", b"data_info"]) -> typing_extensions.Literal["manifest_files"] | None: ...
 
 global___Snapshot = Snapshot

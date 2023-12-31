@@ -23,6 +23,7 @@ import pyarrow.compute as pc
 from tensorflow_datasets import features as f
 
 from space import Dataset, LocalRunner, TfFeatures
+from space.core.ops.change_data import ChangeType
 import space.core.proto.runtime_pb2 as rt
 
 
@@ -101,6 +102,29 @@ class TestLocalRunner:
 
     assert job_result[0].state == rt.JobResult.FAILED
     assert "has been modified" in job_result[0].error_message
+
+  def test_read_and_write_should_reload_storage(self, sample_dataset):
+    ds1 = sample_dataset
+    ds2 = Dataset.load(ds1.storage.location)
+    local_runner1 = ds1.local()
+    local_runner2 = ds2.local()
+
+    sample_data1 = _generate_data([1, 2])
+    local_runner1.append(sample_data1)
+    assert local_runner2.read_all() == sample_data1
+
+    sample_data2 = _generate_data([3, 4])
+    local_runner1.append(sample_data2)
+    assert list(local_runner2.diff(0, 2)) == [(ChangeType.ADD, sample_data1),
+                                              (ChangeType.ADD, sample_data2)]
+
+    sample_data3 = _generate_data([5])
+    sample_data4 = _generate_data([6])
+    local_runner1.append(sample_data3)
+    local_runner2.append(sample_data4)
+
+    assert local_runner1.read_all() == pa.concat_tables(
+        [sample_data1, sample_data2, sample_data3, sample_data4])
 
 
 def _read_pyarrow(runner: LocalRunner,

@@ -24,7 +24,7 @@ import pyarrow.compute as pc
 
 from space.core.loaders.array_record import ArrayRecordIndexFn
 from space.core.runners import BaseReadOnlyRunner, BaseReadWriteRunner
-from space.core.runners import StorageCommitMixin
+from space.core.runners import StorageMixin
 from space.core.ops import utils
 from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import InputData
@@ -68,13 +68,15 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
 
     Dataset itself is a special view without any transforms.
     """
+    self._source_storage.reload()
     for ref in self._view.ray_dataset(filter_, fields, snapshot_id,
                                       reference_read).to_arrow_refs():
       yield ray.get(ref)
 
   def diff(self, start_version: Union[int],
            end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
-    source_changes = read_change_data(self._source().storage,
+    self._source_storage.reload()
+    source_changes = read_change_data(self._source_storage,
                                       version_to_snapshot_id(start_version),
                                       version_to_snapshot_id(end_version))
     for change_type, data in source_changes:
@@ -84,19 +86,22 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
       processed_data = ray.get(processed_remote_data.to_arrow_refs())
       yield change_type, pa.concat_tables(processed_data)
 
-  def _source(self) -> Dataset:
+  @property
+  def _source_storage(self) -> Storage:
+    """Obtain storage of the source dataset, never write to it."""
     sources = self._view.sources
     assert len(sources) == 1, "Views only support a single source dataset"
-    return list(sources.values())[0]
+    return list(sources.values())[0].storage
 
 
-class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
+class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
   """Ray runner for materialized views."""
 
   def __init__(self, mv: MaterializedView):
     RayReadOnlyRunner.__init__(self, mv.view)
-    StorageCommitMixin.__init__(self, mv.storage)
+    StorageMixin.__init__(self, mv.storage)
 
+  @StorageMixin.reload
   def read(self,
            filter_: Optional[pc.Expression] = None,
            fields: Optional[List[str]] = None,
@@ -117,12 +122,12 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
                                          reference_read).to_arrow_refs():
       yield ray.get(ref)
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def refresh(self,
               target_version: Optional[Union[int]] = None
               ) -> Optional[rt.Patch]:
     """Refresh the materialized view by synchronizing from source dataset."""
-    source_snapshot_id = self._source().storage.metadata.current_snapshot_id
+    source_snapshot_id = self._source_storage.metadata.current_snapshot_id
     if target_version is None:
       end_snapshot_id = source_snapshot_id
     else:
@@ -136,6 +141,8 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
 
     patches: List[Optional[rt.Patch]] = []
     for change_type, data in self.diff(start_snapshot_id, end_snapshot_id):
+      # In the scope of changes from the same snapshot, must process DELETE
+      # before ADD.
       if change_type == ChangeType.DELETE:
         patches.append(self._process_delete(data))
       elif change_type == ChangeType.ADD:
@@ -169,14 +176,14 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
 
     self._options = RayOptions() if options is None else options
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def append(self, data: InputData) -> Optional[rt.Patch]:
     op = RayAppendOp(self._storage.location, self._storage.metadata,
                      self._options.parallelism)
     op.write(data)
     return op.finish()
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def append_from(
       self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
   ) -> Optional[rt.Patch]:
@@ -189,24 +196,24 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
 
     return op.finish()
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def append_array_record(self, input_dir: str,
                           index_fn: ArrayRecordIndexFn) -> Optional[rt.Patch]:
     raise NotImplementedError(
         "append_array_record not supported yet in Ray runner")
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def append_parquet(self, input_dir: str) -> Optional[rt.Patch]:
     raise NotImplementedError("append_parquet not supported yet in Ray runner")
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def _insert(self, data: InputData,
               mode: InsertOptions.Mode) -> Optional[rt.Patch]:
     op = RayInsertOp(self._storage, InsertOptions(mode=mode),
                      self._options.parallelism)
     return op.write(data)
 
-  @StorageCommitMixin.transactional
+  @StorageMixin.transactional
   def delete(self, filter_: pc.Expression) -> Optional[rt.Patch]:
     op = RayDeleteOp(self._storage, filter_)
     return op.delete()
