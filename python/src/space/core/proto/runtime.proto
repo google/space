@@ -58,17 +58,20 @@ message Patch {
 }
 
 // Result of a job.
-// NEXT_ID: 3
+// NEXT_ID: 4
 message JobResult {
+  // Job result state.
   enum State {
     STATE_UNSPECIFIED = 0;
     SUCCEEDED = 1;
     FAILED = 2;
     SKIPPED = 3;
   }
-
   State state = 1;
 
   // The change of the storage statistics.
   StorageStatistics storage_statistics_update = 2;
+
+  // Error message if the job failed.
+  string error_message = 3;
 }

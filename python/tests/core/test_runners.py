@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import threading
 from typing import Iterable, Optional
+
+import pytest
 
 import numpy as np
 import pyarrow as pa
@@ -20,11 +23,13 @@ import pyarrow.compute as pc
 from tensorflow_datasets import features as f
 
 from space import Dataset, LocalRunner, TfFeatures
+import space.core.proto.runtime_pb2 as rt
 
 
 class TestLocalRunner:
 
-  def test_data_mutation_and_read(self, tmp_path):
+  @pytest.fixture
+  def sample_dataset(self, tmp_path):
     simple_tf_features_dict = f.FeaturesDict({
         "image":
         f.Image(shape=(None, None, 3), dtype=np.uint8),
@@ -32,11 +37,13 @@ class TestLocalRunner:
     schema = pa.schema([("id", pa.int64()), ("name", pa.string()),
                         ("feat1", TfFeatures(simple_tf_features_dict)),
                         ("feat2", TfFeatures(simple_tf_features_dict))])
-    ds = Dataset.create(str(tmp_path / "dataset"),
-                        schema,
-                        primary_keys=["id"],
-                        record_fields=["feat1", "feat2"])
-    local_runner = ds.local()
+    return Dataset.create(str(tmp_path / "dataset"),
+                          schema,
+                          primary_keys=["id"],
+                          record_fields=["feat1", "feat2"])
+
+  def test_data_mutation_and_read(self, sample_dataset):
+    local_runner = sample_dataset.local()
 
     id_batches = [range(0, 50), range(50, 90)]
     data_batches = [_generate_data(id_batch) for id_batch in id_batches]
@@ -50,6 +57,50 @@ class TestLocalRunner:
 
     local_runner.delete(pc.field("id") >= 10)
     assert _read_pyarrow(local_runner) == _generate_data(range(10))
+
+  def test_append_empty_data_should_skip_commit(self, sample_dataset):
+    local_runner = sample_dataset.local()
+
+    assert local_runner.append({
+        "id": [],
+        "name": [],
+        "feat1": [],
+        "feat2": []
+    }).state == rt.JobResult.SKIPPED
+
+  # pylint: disable=consider-using-with
+  def test_conflict_commit_should_fail(self, sample_dataset):
+    local_runner = sample_dataset.local()
+    lock1 = threading.Lock()
+    lock2 = threading.Lock()
+    lock1.acquire()
+    lock2.acquire()
+
+    sample_data = _generate_data([1, 2])
+
+    def make_iter():
+      yield sample_data
+      lock2.release()
+      lock1.acquire()
+      yield sample_data
+      lock1.release()
+
+    job_result = [None]
+
+    def append_data():
+      job_result[0] = local_runner.append_from(make_iter())
+
+    t = threading.Thread(target=append_data)
+    t.start()
+
+    lock2.acquire()
+    local_runner.append(sample_data)
+    lock2.release()
+    lock1.release()
+    t.join()
+
+    assert job_result[0].state == rt.JobResult.FAILED
+    assert "has been modified" in job_result[0].error_message
 
 
 def _read_pyarrow(runner: LocalRunner,

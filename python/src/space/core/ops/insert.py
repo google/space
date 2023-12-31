@@ -30,6 +30,7 @@ from space.core.ops.base import BaseOp, InputData
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
+from space.core.utils import errors
 from space.core.utils.paths import StoragePathsMixin
 
 
@@ -89,7 +90,7 @@ class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
       elif mode == InsertOptions.Mode.UPSERT:
         self._delete(filter_, data_files, patches)
       else:
-        raise RuntimeError(f"Insert mode {mode} not supported")
+        raise errors.SpaceRuntimeError(f"Insert mode {mode} not supported")
 
     self._append(data, patches)
     return utils.merge_patches(patches)
@@ -97,7 +98,7 @@ class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
   def _check_duplication(self, data_files: rt.FileSet, filter_: pc.Expression):
     if filter_matched(self._location, self._metadata, data_files, filter_,
                       self._storage.primary_keys):
-      raise RuntimeError("Primary key to insert already exist")
+      raise errors.SpaceRuntimeError("Primary key to insert already exist")
 
   def _delete(self, filter_: pc.Expression, data_files: rt.FileSet,
               patches: List[Optional[rt.Patch]]) -> None:

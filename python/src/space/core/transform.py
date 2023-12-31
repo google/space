@@ -35,6 +35,7 @@ from substrait.type_pb2 import Type
 from space.core.datasets import Dataset
 import space.core.proto.metadata_pb2 as meta
 from space.core.schema import arrow
+from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.plans import SIMPLE_UDF_URI
 from space.core.utils.plans import LogicalPlanBuilder, UserDefinedFn
@@ -223,7 +224,8 @@ def _load_udf(location: str, metadata: meta.StorageMetadata,
   # Sanity check.
   if plan.ext_uri_dict[fn_extension.extension_function.
                        extension_uri_reference].uri != SIMPLE_UDF_URI:
-    raise RuntimeError("Only UDF is supported in logical plan extension URIs")
+    raise errors.LogicalPlanError(
+        "Only UDF is supported in logical plan extension URIs")
 
   # Load the UDF from file.
   pickle_path = metadata.logical_plan.udfs[
@@ -258,7 +260,7 @@ def load_view_(location: str, metadata: meta.StorageMetadata, rel: Rel,
   elif rel.HasField("filter"):
     return FilterTransform.from_relation(location, metadata, rel, plan)
 
-  raise RuntimeError(f"Substrait relation not supported: {rel}")
+  raise errors.LogicalPlanError(f"Substrait relation not supported: {rel}")
 
 
 def _fn_arg(field_id: int) -> FunctionArgument:

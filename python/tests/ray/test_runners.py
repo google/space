@@ -23,6 +23,7 @@ import ray
 
 from space import Dataset
 from space.core.ops.change_data import ChangeType
+import space.core.proto.runtime_pb2 as rt
 from space.core.utils.uuids import random_id
 
 
@@ -78,8 +79,9 @@ class TestRayReadWriteRunner:
              input_data4]).sort_by("int64"))
 
     # Test insert.
-    with pytest.raises(RuntimeError):
-      runner.insert(generate_data([7, 12]))
+    result = runner.insert(generate_data([7, 12]))
+    assert result.state == rt.JobResult.FAILED
+    assert "Primary key to insert already exist" in result.error_message
 
     runner.upsert(generate_data([7, 12]))
     assert_equal(
@@ -179,8 +181,10 @@ class TestRayReadWriteRunner:
         "float64": [1.1, 1.3],
     })
 
-    with pytest.raises(RuntimeError):
-      ray_runner.refresh(3)
+    result = ray_runner.refresh(3)
+    assert result.state == rt.JobResult.FAILED
+    assert ("Target snapshot ID 3 higher than source dataset version"
+            in result.error_message)
 
   def test_diff_filter(self, sample_dataset):
     # A sample UDF for testing.

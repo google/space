@@ -16,6 +16,8 @@
 
 from typing import Union
 
+from space.core.utils import errors
+
 
 def version_to_snapshot_id(version: Union[int]) -> int:
   """Convert a version to a snapshot ID."""
@@ -25,6 +27,6 @@ def version_to_snapshot_id(version: Union[int]) -> int:
     snapshot_id = version
 
   if snapshot_id is None:
-    raise RuntimeError(f"Invalid version: {version}")
+    raise errors.SnapshotNotFoundError(f"Invalid version: {version}")
 
   return snapshot_id

@@ -32,6 +32,7 @@ from space.core.ops.change_data import ChangeType, read_change_data
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions
 import space.core.proto.runtime_pb2 as rt
+from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray
 from space.core.versions.utils import version_to_snapshot_id
 from space.ray.ops.append import RayAppendOp
@@ -116,8 +117,10 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
                                          reference_read).to_arrow_refs():
       yield ray.get(ref)
 
+  @StorageCommitMixin.transactional
   def refresh(self,
-              target_version: Optional[Union[int]] = None) -> rt.JobResult:
+              target_version: Optional[Union[int]] = None
+              ) -> Optional[rt.Patch]:
     """Refresh the materialized view by synchronizing from source dataset."""
     source_snapshot_id = self._source().storage.metadata.current_snapshot_id
     if target_version is None:
@@ -125,9 +128,9 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
     else:
       end_snapshot_id = version_to_snapshot_id(target_version)
       if end_snapshot_id > source_snapshot_id:
-        raise RuntimeError(
+        raise errors.SnapshotNotFoundError(
             f"Target snapshot ID {end_snapshot_id} higher than source dataset "
-            "version")
+            "version {source_snapshot_id}")
 
     start_snapshot_id = self._storage.metadata.current_snapshot_id
 
@@ -140,7 +143,7 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageCommitMixin):
       else:
         raise NotImplementedError(f"Change type {change_type} not supported")
 
-    return self._try_commit(utils.merge_patches(patches))
+    return utils.merge_patches(patches)
 
   def _process_delete(self, data: pa.Table) -> Optional[rt.Patch]:
     filter_ = utils.primary_key_filter(self._storage.primary_keys, data)
@@ -166,15 +169,17 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
 
     self._options = RayOptions() if options is None else options
 
-  def append(self, data: InputData) -> rt.JobResult:
+  @StorageCommitMixin.transactional
+  def append(self, data: InputData) -> Optional[rt.Patch]:
     op = RayAppendOp(self._storage.location, self._storage.metadata,
                      self._options.parallelism)
     op.write(data)
-    return self._try_commit(op.finish())
+    return op.finish()
 
+  @StorageCommitMixin.transactional
   def append_from(
       self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
-  ) -> rt.JobResult:
+  ) -> Optional[rt.Patch]:
     if not isinstance(sources, list):
       sources = [sources]
 
@@ -182,21 +187,26 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
                      self._options.parallelism)
     op.write_from(sources)
 
-    return self._try_commit(op.finish())
+    return op.finish()
 
+  @StorageCommitMixin.transactional
   def append_array_record(self, input_dir: str,
-                          index_fn: ArrayRecordIndexFn) -> rt.JobResult:
+                          index_fn: ArrayRecordIndexFn) -> Optional[rt.Patch]:
     raise NotImplementedError(
         "append_array_record not supported yet in Ray runner")
 
-  def append_parquet(self, input_dir: str) -> rt.JobResult:
+  @StorageCommitMixin.transactional
+  def append_parquet(self, input_dir: str) -> Optional[rt.Patch]:
     raise NotImplementedError("append_parquet not supported yet in Ray runner")
 
-  def _insert(self, data: InputData, mode: InsertOptions.Mode) -> rt.JobResult:
+  @StorageCommitMixin.transactional
+  def _insert(self, data: InputData,
+              mode: InsertOptions.Mode) -> Optional[rt.Patch]:
     op = RayInsertOp(self._storage, InsertOptions(mode=mode),
                      self._options.parallelism)
-    return self._try_commit(op.write(data))
+    return op.write(data)
 
-  def delete(self, filter_: pc.Expression) -> rt.JobResult:
+  @StorageCommitMixin.transactional
+  def delete(self, filter_: pc.Expression) -> Optional[rt.Patch]:
     op = RayDeleteOp(self._storage, filter_)
-    return self._try_commit(op.delete())
+    return op.delete()
