@@ -50,9 +50,7 @@ class BaseUdfTransform(View):
   udf: UserDefinedFn
   # The input view to apply the UDF to.
   input_: View
-  # The fields to read from the input view.
-  # TODO: to push input field selection down to the input view, for reading
-  # less data from the sources.
+  # The fields to read from the input view or dataset.
   input_fields: List[str]
 
   @property
@@ -94,23 +92,35 @@ class BaseUdfTransform(View):
     Fields are represented by field IDs.
     """
     if not self.input_fields:
-      input_fields = self.input_.schema.names
-    else:
-      input_fields = self.input_fields
+      raise errors.SpaceRuntimeError("View's input fields are empty.")
 
     field_id_dict = arrow.field_name_to_id_dict(self.input_.schema)
-    return [_fn_arg(field_id_dict[name]) for name in input_fields]
+    return [_fn_arg(field_id_dict[name]) for name in self.input_fields]
 
   def process_source(self, data: pa.Table) -> ray.Dataset:
-    return self._transform(self.input_.process_source(data))
+    return self._transform(
+        self.input_.process_source(data).select_columns(self.input_fields))
 
   def ray_dataset(self,
                   filter_: Optional[pc.Expression] = None,
                   fields: Optional[List[str]] = None,
                   snapshot_id: Optional[int] = None,
                   reference_read: bool = False) -> ray.Dataset:
-    return self._transform(
-        self.input_.ray_dataset(filter_, fields, snapshot_id, reference_read))
+    if fields is not None:
+      raise errors.UserInputError(
+          "`fields` is not supported for views, use `input_fields` of "
+          "transforms (map_batches, filter) instead")
+
+    if isinstance(self.input_, Dataset):
+      # Push input_fields down to the dataset to read less data.
+      ray_ds = self.input_.ray_dataset(filter_, self.input_fields, snapshot_id,
+                                       reference_read)
+    else:
+      ray_ds = self.input_.ray_dataset(filter_, fields, snapshot_id,
+                                       reference_read).select_columns(
+                                           self.input_fields)
+
+    return self._transform(ray_ds)
 
   @abstractmethod
   def _transform(self, ds: ray.Dataset) -> ray.Dataset:
