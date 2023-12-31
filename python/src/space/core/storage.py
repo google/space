@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 from os import path
-from typing import Dict, List, Optional
+from typing import Collection, Dict, List, Optional
 
 from absl import logging  # type: ignore[import-untyped]
 import pyarrow as pa
@@ -32,6 +32,7 @@ import space.core.proto.runtime_pb2 as rt
 from space.core.schema import FieldIdManager
 from space.core.schema import arrow
 from space.core.schema import substrait as substrait_schema
+from space.core.schema.utils import validate_logical_schema
 from space.core.utils import errors, paths
 from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.protos import proto_now
@@ -122,15 +123,12 @@ class Storage(paths.StoragePathsMixin):
       logical_plan: logical plan of materialized view.
     """
     # TODO: to verify that location is an empty directory.
-    # TODO: to verify primary key fields and record_fields (and types) are
-    # valid.
-    # TODO: to auto infer record_fields.
+    validate_logical_schema(schema, primary_keys, record_fields)
 
     field_id_mgr = FieldIdManager()
     schema = field_id_mgr.assign_field_ids(schema)
 
     now = proto_now()
-    # TODO: to convert Arrow schema to Substrait schema.
     metadata = meta.StorageMetadata(
         create_time=now,
         last_update_time=now,
@@ -188,18 +186,16 @@ class Storage(paths.StoragePathsMixin):
     TODO: only support a single writer; to ensure atomicity in commit by
     concurrent writers.
 
-    TODO: to detect incompatible patch and fail the commit.
-
     Args:
       patch: a patch describing changes made to the storage.
     """
-    new_metadata = meta.StorageMetadata()
-    new_metadata.CopyFrom(self._metadata)
-
-    new_snapshot_id = self._next_snapshot_id()
-    new_metadata.current_snapshot_id = new_snapshot_id
     current_snapshot = self.snapshot()
 
+    new_metadata = meta.StorageMetadata()
+    new_metadata.CopyFrom(self._metadata)
+    new_snapshot_id = self._next_snapshot_id()
+    new_metadata.current_snapshot_id = new_snapshot_id
+    new_metadata.last_update_time.CopyFrom(proto_now())
     new_metadata_path = self.new_metadata_path()
 
     snapshot = meta.Snapshot(
@@ -308,7 +304,12 @@ def _patch_manifests(manifest_files: meta.ManifestFiles, patch: rt.Patch):
   deleted_manifests = set(patch.deletion.index_manifest_files)
   for i in range(len(manifest_files.index_manifest_files) - 1, -1, -1):
     if manifest_files.index_manifest_files[i] in deleted_manifests:
+      deleted_manifests.remove(manifest_files.index_manifest_files[i])
       del manifest_files.index_manifest_files[i]
+
+  if deleted_manifests:
+    raise errors.SpaceRuntimeError(
+        f"Index manifest to delete does not exist: {deleted_manifests}")
 
   # Process added manifest files.
   for f in patch.addition.index_manifest_files:
@@ -316,6 +317,17 @@ def _patch_manifests(manifest_files: meta.ManifestFiles, patch: rt.Patch):
 
   for f in patch.addition.record_manifest_files:
     manifest_files.record_manifest_files.append(f)
+
+  # TODO: may slightly impact speed but prefer to have more sanity checks.
+  _check_duplicated(manifest_files.index_manifest_files)
+  _check_duplicated(manifest_files.record_manifest_files)
+
+
+def _check_duplicated(manifest_files: Collection[str]):
+  manifest_files_set = set(manifest_files)
+  if len(manifest_files_set) != len(manifest_files):
+    raise errors.SpaceRuntimeError(
+        f"Found duplicated manifest files: {manifest_files}")
 
 
 class Transaction:

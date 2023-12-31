@@ -164,7 +164,11 @@ class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
     return self._index_manifest_writer.write_arrow(index_manifest_table)
 
   def _write_arrow(self, data: pa.Table) -> None:
-    # TODO: to verify the schema of input data.
+    """Write an Arrow table into the storage.
+
+    The Parquet writer uses storage physical schema, it checks `data`'s schema
+    is compatible at write time.
+    """
     if data.num_rows == 0:
       return
 

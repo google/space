@@ -23,12 +23,13 @@ from space.core.manifests import IndexManifestWriter
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
+from space.core.utils import errors
 from space.core.utils.paths import _ENTRY_POINT_FILE
 
 _SNAPSHOT_ID = 100
 _SCHEMA = pa.schema(
     [pa.field("int64", pa.int64()),
-     pa.field("string", pa.string())])
+     pa.field("binary", pa.binary())])
 
 
 class TestStorage:
@@ -73,7 +74,7 @@ class TestStorage:
     storage = Storage.create(location=str(location),
                              schema=_SCHEMA,
                              primary_keys=["int64"],
-                             record_fields=["string"])
+                             record_fields=["binary"])
 
     entry_point_file = location / "metadata" / _ENTRY_POINT_FILE
     assert entry_point_file.exists()
@@ -87,13 +88,13 @@ class TestStorage:
             snapshot.create_time)
 
     assert metadata.schema == meta.Schema(fields=NamedStruct(
-        names=["int64", "string"],
+        names=["int64", "binary"],
         struct=Type.Struct(types=[
             Type(i64=Type.I64(type_variation_reference=0)),
-            Type(string=Type.String(type_variation_reference=1))
+            Type(binary=Type.Binary(type_variation_reference=1))
         ])),
                                           primary_keys=["int64"],
-                                          record_fields=["string"])
+                                          record_fields=["binary"])
 
   def test_load_storage(self, tmp_path):
     location = tmp_path / "dataset"
@@ -114,7 +115,7 @@ class TestStorage:
     storage = Storage.create(location=str(location),
                              schema=_SCHEMA,
                              primary_keys=["int64"],
-                             record_fields=["string"])
+                             record_fields=["binary"])
 
     added_manifest_files = meta.ManifestFiles(
         index_manifest_files=["data/index_manifest0"],
@@ -199,7 +200,7 @@ class TestStorage:
         write_parquet_file(str(data_dir / "file0"), schema, [
             pa.Table.from_pydict({
                 "int64": [1, 2, 3],
-                "string": ["a", "b", "c"]
+                "binary": [b"a", b"b", b"c"]
             })
         ]))
     manifest_file = manifest_writer.finish()
@@ -223,7 +224,7 @@ class TestStorage:
         write_parquet_file(str(data_dir / "file1"), schema, [
             pa.Table.from_pydict({
                 "int64": [1000, 1000000],
-                "string": ["abcedf", "ABCDEF"]
+                "binary": [b"abcedf", b"ABCDEF"]
             })
         ]))
     manifest_file = manifest_writer.finish()
@@ -252,3 +253,54 @@ class TestStorage:
     assert storage.data_files(filter_=pc.field("int64") > 1000) == rt.FileSet(
         index_files=[index_file1],
         index_manifest_files={1: manifests_dict2[2]})
+
+  def test_create_storage_schema_validation(self, tmp_path):
+    location = tmp_path / "dataset"
+
+    with pytest.raises(errors.UserInputError,
+                       match=r".*Must specify at least one primary key.*"):
+      Storage.create(location=str(location),
+                     schema=pa.schema([pa.field("int64", pa.int64())]),
+                     primary_keys=[],
+                     record_fields=[])
+
+    with pytest.raises(errors.UserInputError,
+                       match=r".*Primary key not_exist not found in schema.*"):
+      Storage.create(location=str(location),
+                     schema=pa.schema([pa.field("int64", pa.int64())]),
+                     primary_keys=["not_exist"],
+                     record_fields=[])
+
+    with pytest.raises(
+        errors.UserInputError,
+        match=r".*Record field int64 cannot be a primary key.*"):
+      Storage.create(location=str(location),
+                     schema=pa.schema([pa.field("int64", pa.int64())]),
+                     primary_keys=["int64"],
+                     record_fields=["int64"])
+
+    with pytest.raises(
+        errors.UserInputError,
+        match=r".*Record field not_exist not found in schema.*"):
+      Storage.create(location=str(location),
+                     schema=pa.schema([pa.field("int64", pa.int64())]),
+                     primary_keys=["int64"],
+                     record_fields=["not_exist"])
+
+    with pytest.raises(errors.UserInputError,
+                       match=r".*Primary key type not supported.*"):
+      Storage.create(location=str(location),
+                     schema=pa.schema(
+                         [pa.field("list", pa.list_(pa.string()))]),
+                     primary_keys=["list"],
+                     record_fields=["list"])
+
+    with pytest.raises(errors.UserInputError,
+                       match=r".*Record field type not supported.*"):
+      Storage.create(location=str(location),
+                     schema=pa.schema([
+                         pa.field("int64", pa.int64()),
+                         pa.field("list", pa.list_(pa.string()))
+                     ]),
+                     primary_keys=["int64"],
+                     record_fields=["list"])

@@ -22,6 +22,7 @@ from substrait.plan_pb2 import Plan
 
 from space.core.datasets import Dataset
 import space.core.proto.metadata_pb2 as meta
+from space.core.utils import errors
 from space.core.views import MaterializedView, View
 
 
@@ -43,14 +44,21 @@ def sample_dataset(tmp_path, sample_schema):
   return ds
 
 
+# A sample UDF for testing.
+def _sample_map_udf(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+  batch["float64"] = batch["float64"] + 1
+  return batch
+
+
+# A sample UDF for testing.
+def _sample_filter_udf(row: Dict[str, Any]) -> Dict[str, Any]:
+  return row["float64"] > 100
+
+
 class TestLogicalPlan:
 
   def test_map_batches_to_relation(self, tmp_path, sample_dataset,
                                    sample_map_batch_plan):
-    # A sample UDF for testing.
-    def _sample_map_udf(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-      batch["float64"] = batch["float64"] + 1
-      return batch
 
     view = sample_dataset.map_batches(fn=_sample_map_udf,
                                       input_fields=["int64", "binary"],
@@ -67,10 +75,6 @@ class TestLogicalPlan:
 
   def test_filter_to_relation(self, tmp_path, sample_dataset,
                               sample_filter_plan):
-    # A sample UDF for testing.
-    def _sample_filter_udf(row: Dict[str, Any]) -> Dict[str, Any]:
-      return row["float64"] > 100
-
     view = sample_dataset.filter(fn=_sample_filter_udf,
                                  input_fields=["int64", "float64"])
     mv = view.materialize(str(tmp_path / "mv"))
@@ -81,6 +85,32 @@ class TestLogicalPlan:
     expected_plan = text_format.Parse(sample_filter_plan, Plan())
     _verify_logical_plan_and_view(view, mv, sample_dataset, expected_plan,
                                   named_table_names)
+
+  def test_create_view_with_invalid_schema(self, sample_dataset):
+    with pytest.raises(
+        errors.UserInputError,
+        match=r".*Record field binary_not_exists not found in schema.*"):
+      sample_dataset.map_batches(fn=_sample_map_udf,
+                                 output_schema=sample_dataset.schema,
+                                 output_record_fields=["binary_not_exists"])
+
+    with pytest.raises(
+        errors.UserInputError,
+        match=r".*Input fields \['float64'\] must contain all primary keys "
+        r"\['int64'\].*"):
+      sample_dataset.map_batches(fn=_sample_map_udf,
+                                 input_fields=["float64"],
+                                 output_schema=sample_dataset.schema,
+                                 output_record_fields=["binary"])
+
+    with pytest.raises(
+        errors.UserInputError,
+        match=r".*Input fields \['int64', 'int32'\] must be a subtset of "
+        r"input schema.*"):
+      sample_dataset.map_batches(fn=_sample_map_udf,
+                                 input_fields=["int64", "int32"],
+                                 output_schema=sample_dataset.schema,
+                                 output_record_fields=["binary"])
 
 
 def _verify_logical_plan_and_view(view: View, mv: MaterializedView,

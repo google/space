@@ -104,7 +104,6 @@ class TestRayReadWriteRunner:
       return batch
 
     view = sample_dataset.map_batches(fn=_sample_map_udf,
-                                      input_fields=["int64", "binary"],
                                       output_schema=sample_dataset.schema,
                                       output_record_fields=["binary"])
     view_runner = view.ray()
@@ -122,16 +121,14 @@ class TestRayReadWriteRunner:
     # A sample UDF for testing.
     def _sample_map_udf(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
       batch["float64"] = batch["float64"] + 1
-      del batch["binary"]
       return batch
 
     view_schema = pa.schema(
         [pa.field("int64", pa.int64()),
          pa.field("float64", pa.float64())])
     view = sample_dataset.map_batches(fn=_sample_map_udf,
-                                      input_fields=["int64", "binary"],
-                                      output_schema=view_schema,
-                                      output_record_fields=["binary"])
+                                      input_fields=["int64", "float64"],
+                                      output_schema=view_schema)
     mv = view.materialize(str(tmp_path / "mv"))
 
     ds_runner = sample_dataset.local()
@@ -207,8 +204,7 @@ class TestRayReadWriteRunner:
     expected_change0 = (ChangeType.ADD,
                         pa.Table.from_pydict({
                             "int64": [2, 3],
-                            "float64": [0.2, 0.3],
-                            "binary": [b"b2", b"b3"]
+                            "float64": [0.2, 0.3]
                         }))
     assert list(view_runner.diff(0, 1)) == [expected_change0]
 
@@ -217,8 +213,7 @@ class TestRayReadWriteRunner:
     expected_change1 = (ChangeType.DELETE,
                         pa.Table.from_pydict({
                             "int64": [2],
-                            "float64": [0.2],
-                            "binary": [b"b2"]
+                            "float64": [0.2]
                         }))
     assert list(view_runner.diff(1, 2)) == [expected_change1]
 

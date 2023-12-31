@@ -27,10 +27,12 @@ from space.core.fs.factory import create_fs
 import space.core.proto.metadata_pb2 as meta
 from space.core.schema import FieldIdManager
 from space.core.storage import Storage
+from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray  # pylint: disable=unused-import
 from space.core.utils.paths import UDF_DIR, metadata_dir
 from space.core.utils.plans import LogicalPlanBuilder, UserDefinedFn
 from space.core.runners import LocalRunner
+from space.core.schema.utils import validate_logical_schema
 from space.ray.runners import RayMaterializedViewRunner, RayReadOnlyRunner
 
 if TYPE_CHECKING:
@@ -48,7 +50,13 @@ class View(ABC):
   @property
   @abstractmethod
   def schema(self) -> pa.Schema:
-    """Return the view schema."""
+    """Return the view schema.
+    
+    For materialized view, the schema is used to create storage. The writer
+    checks view's read data is compatible with the schema at write time.
+
+    TODO: it is not checked if view is not materialized, to enforce this check.
+    """
 
   @property
   @abstractmethod
@@ -106,21 +114,32 @@ class View(ABC):
   # pylint: disable=too-many-arguments
   def map_batches(self,
                   fn: Callable,
-                  input_fields: List[str],
                   output_schema: pa.Schema,
-                  output_record_fields: List[str],
+                  input_fields: Optional[List[str]] = None,
+                  output_record_fields: Optional[List[str]] = None,
                   batch_size: int = -1) -> View:
     """Transform batches of data by a user defined function.
 
     Args:
       fn: a user defined function on batches.
-      input_fields: the fields to read from the input view.
+      input_fields: the fields to read from the input view, default to all
+        fields.
       output_schema: the output schema.
+      output_record_fields: record fields in the output, default to empty.
       batch_size: the number of rows per batch.
     """
     # Assign field IDs to the output schema.
     field_id_mgr = FieldIdManager(next_field_id=0)
     output_schema = field_id_mgr.assign_field_ids(output_schema)
+
+    input_fields = self._default_or_validate_input_fields(
+        self.schema, input_fields)
+
+    if output_record_fields is None:
+      output_record_fields = []
+
+    validate_logical_schema(output_schema, self.primary_keys,
+                            output_record_fields)
 
     # pylint: disable=cyclic-import,import-outside-toplevel
     from space.core.transform import MapTransform
@@ -135,15 +154,36 @@ class View(ABC):
     
     Args:
       fn: a user defined function on batches.
-      input_fields: the fields to read from the input view.
+      input_fields: the fields to read from the input view, default to all
+        fields.
     """
-    if input_fields is None:
-      input_fields = []
+    input_fields = self._default_or_validate_input_fields(
+        self.schema, input_fields)
 
     # pylint: disable=cyclic-import,import-outside-toplevel
     from space.core.transform import FilterTransform
     return FilterTransform(UserDefinedFn(fn, self.schema, self.record_fields),
                            self, input_fields)
+
+  def _default_or_validate_input_fields(
+      self, input_schema: pa.Schema,
+      input_fields: Optional[List[str]]) -> List[str]:
+    if input_fields is None:
+      return self.schema.names
+
+    input_fields_sets = set(input_fields)
+
+    if not set(self.primary_keys).issubset(input_fields_sets):
+      raise errors.UserInputError(
+          f"Input fields {input_fields} must contain all primary keys "
+          f"{self.primary_keys}")
+
+    if not input_fields_sets.issubset(set(input_schema.names)):
+      raise errors.UserInputError(
+          f"Input fields {input_fields} must be a subtset of input schema: "
+          f"{input_schema}")
+
+    return input_fields
 
 
 class MaterializedView:
