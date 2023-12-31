@@ -24,6 +24,7 @@ import pyarrow.compute as pc
 from substrait.algebra_pb2 import Rel
 
 from space.core.fs.factory import create_fs
+from space.core.ops.utils import FileOptions
 import space.core.proto.metadata_pb2 as meta
 from space.core.schema import FieldIdManager
 from space.core.storage import Storage
@@ -209,9 +210,11 @@ class MaterializedView:
     """Return view of the materialized view."""
     return self._view
 
-  def ray(self) -> RayMaterializedViewRunner:
+  def ray(
+      self,
+      file_options: Optional[FileOptions] = None) -> RayMaterializedViewRunner:
     """Return a Ray runner for the materialized view."""
-    return RayMaterializedViewRunner(self)
+    return RayMaterializedViewRunner(self, file_options)
 
   def local(self) -> LocalRunner:
     """Get a runner that runs operations locally.

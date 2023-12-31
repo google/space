@@ -20,6 +20,7 @@ from typing import Iterator, List, Optional
 import pyarrow as pa
 
 from space.core.ops import utils
+from space.core.ops.utils import FileOptions
 from space.core.ops.append import BaseAppendOp, LocalAppendOp
 from space.core.ops.base import InputData
 from space.core.proto import metadata_pb2 as meta
@@ -30,10 +31,12 @@ from space.core.utils.lazy_imports_utils import ray
 class RayAppendOp(BaseAppendOp):
   """Ray append operation writing files distributedly."""
 
+  # pylint: disable=too-many-arguments
   def __init__(self,
                location: str,
                metadata: meta.StorageMetadata,
                parallelism: int,
+               file_options: FileOptions,
                record_address_input: bool = False):
     """
     Args:
@@ -42,7 +45,7 @@ class RayAppendOp(BaseAppendOp):
     self._parallelism = parallelism
     self._actors = [
         _AppendActor.remote(  # type: ignore[attr-defined] # pylint: disable=no-member
-            location, metadata, record_address_input)
+            location, metadata, file_options, record_address_input)
         for _ in range(parallelism)
     ]
 
@@ -93,8 +96,10 @@ class _AppendActor:
   def __init__(self,
                location: str,
                metadata: meta.StorageMetadata,
+               file_options: FileOptions,
                record_address_input: bool = False):
-    self._op = LocalAppendOp(location, metadata, record_address_input)
+    self._op = LocalAppendOp(location, metadata, file_options,
+                             record_address_input)
 
   def write_from(self, source: Iterator[InputData]) -> None:
     """Append data into the dataset from an iterator source."""

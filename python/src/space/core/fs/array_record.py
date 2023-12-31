@@ -14,9 +14,17 @@
 #
 """ArrayRecord file utilities."""
 
+from dataclasses import dataclass
 from typing import List, Optional
 
 from space.core.utils.lazy_imports_utils import array_record_module as ar
+
+
+@dataclass
+class ArrayRecordOptions:
+  """Options of ArrayRecord file writer."""
+  # Max uncompressed bytes per file.
+  max_uncompressed_file_bytes = 100 * 1024 * 1024
 
 
 def read_record_file(file_path: str,

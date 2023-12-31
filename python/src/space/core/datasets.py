@@ -21,13 +21,14 @@ import pyarrow as pa
 import pyarrow.compute as pc
 from substrait.algebra_pb2 import ReadRel, Rel
 
+from space.core.ops.utils import FileOptions
 from space.core.runners import LocalRunner
 from space.core.serializers.base import DictSerializer
 from space.core.storage import Storage
 from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.plans import LogicalPlanBuilder
 from space.core.views import View
-from space.ray.runners import RayReadWriterRunner
+from space.ray.runners import RayOptions, RayReadWriterRunner
 
 
 class Dataset(View):
@@ -77,9 +78,9 @@ class Dataset(View):
     """Return a serializer (deserializer) for the dataset."""
     return DictSerializer(self.schema)
 
-  def local(self) -> LocalRunner:
+  def local(self, file_options: Optional[FileOptions] = None) -> LocalRunner:
     """Get a runner that runs operations locally."""
-    return LocalRunner(self._storage)
+    return LocalRunner(self._storage, file_options)
 
   def index_files(self) -> List[str]:
     """A list of full path of index files."""
@@ -113,6 +114,8 @@ class Dataset(View):
     return self._storage.ray_dataset(filter_, fields, snapshot_id,
                                      reference_read)
 
-  def ray(self) -> RayReadWriterRunner:
+  def ray(self,
+          file_options: Optional[FileOptions] = None,
+          ray_options: Optional[RayOptions] = None) -> RayReadWriterRunner:
     """Get a Ray runner."""
-    return RayReadWriterRunner(self)
+    return RayReadWriterRunner(self, file_options, ray_options)

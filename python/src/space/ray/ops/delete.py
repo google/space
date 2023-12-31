@@ -20,6 +20,7 @@ from typing import Optional
 import pyarrow.compute as pc
 
 from space.core.ops import utils
+from space.core.ops.utils import FileOptions
 from space.core.ops.delete import BaseDeleteOp, FileSetDeleteOp
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
@@ -31,11 +32,13 @@ from space.core.utils.paths import StoragePathsMixin
 class RayDeleteOp(BaseDeleteOp, StoragePathsMixin):
   """Ray delete operation processing files distributedly."""
 
-  def __init__(self, storage: Storage, filter_: pc.Expression):
+  def __init__(self, storage: Storage, filter_: pc.Expression,
+               file_options: FileOptions):
     StoragePathsMixin.__init__(self, storage.location)
 
     self._storage = storage
     self._filter = filter_
+    self._file_options = file_options
 
   def delete(self) -> Optional[rt.Patch]:
     """Delete data matching the filter from the dataset."""
@@ -52,7 +55,7 @@ class RayDeleteOp(BaseDeleteOp, StoragePathsMixin):
 
       result = _delete.options(  # type: ignore[attr-defined]
           num_returns=1).remote(self._storage.location, metadata, file_set,
-                                self._filter)
+                                self._filter, self._file_options)
       remote_delete_patches.append(result)
 
     patches = ray.get(remote_delete_patches)
@@ -61,6 +64,7 @@ class RayDeleteOp(BaseDeleteOp, StoragePathsMixin):
 
 @ray.remote
 def _delete(location: str, metadata: meta.StorageMetadata,
-            file_set: rt.FileSet,
-            filter_: pc.Expression) -> Optional[rt.Patch]:
-  return FileSetDeleteOp(location, metadata, file_set, filter_).delete()
+            file_set: rt.FileSet, filter_: pc.Expression,
+            file_options: FileOptions) -> Optional[rt.Patch]:
+  return FileSetDeleteOp(location, metadata, file_set, filter_,
+                         file_options).delete()

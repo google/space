@@ -17,8 +17,11 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from space.core.ops.append import LocalAppendOp
+from space.core.ops.utils import FileOptions
 import space.core.proto.metadata_pb2 as meta
 from space.core.storage import Storage
+
+_default_file_options = FileOptions()
 
 
 class TestLocalAppendOp:
@@ -33,7 +36,7 @@ class TestLocalAppendOp:
                              primary_keys=["int64"],
                              record_fields=[])
 
-    op = LocalAppendOp(str(location), storage.metadata)
+    op = LocalAppendOp(str(location), storage.metadata, _default_file_options)
     for batch in all_types_input_data:
       op.write(batch)
 
@@ -70,7 +73,7 @@ class TestLocalAppendOp:
                              primary_keys=["int64"],
                              record_fields=["images", "objects"])
 
-    op = LocalAppendOp(str(location), storage.metadata)
+    op = LocalAppendOp(str(location), storage.metadata, _default_file_options)
     for batch in record_fields_input_data:
       op.write(batch)
 
@@ -122,7 +125,7 @@ class TestLocalAppendOp:
                              primary_keys=["int64"],
                              record_fields=[])
 
-    op = LocalAppendOp(str(location), storage.metadata)
+    op = LocalAppendOp(str(location), storage.metadata, _default_file_options)
     assert op.finish() is None
 
   def _read_manifests(self, storage: Storage,

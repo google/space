@@ -16,9 +16,12 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from space.core.ops.append import LocalAppendOp
+from space.core.ops.utils import FileOptions
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.read import FileSetReadOp
 from space.core.storage import Storage
+
+_default_file_options = FileOptions()
 
 
 class TestFileSetDeleteOp:
@@ -32,7 +35,8 @@ class TestFileSetDeleteOp:
                              primary_keys=["int64"],
                              record_fields=[])
 
-    append_op = LocalAppendOp(str(location), storage.metadata)
+    append_op = LocalAppendOp(str(location), storage.metadata,
+                              _default_file_options)
     # TODO: the test should cover all types supported by column stats.
     input_data = [pa.Table.from_pydict(d) for d in all_types_input_data]
     for batch in input_data:
@@ -46,7 +50,8 @@ class TestFileSetDeleteOp:
         storage.metadata,
         storage.data_files(),
         # pylint: disable=singleton-comparison
-        filter_=pc.field("bool") == False)
+        pc.field("bool") == False,
+        _default_file_options)
     patch = delete_op.delete()
     assert patch is not None
     storage.commit(patch)
