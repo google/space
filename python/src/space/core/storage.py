@@ -18,6 +18,7 @@ from __future__ import annotations
 from os import path
 from typing import Dict, List, Optional
 
+from absl import logging  # type: ignore[import-untyped]
 import pyarrow as pa
 import pyarrow.compute as pc
 
@@ -30,9 +31,10 @@ import space.core.proto.runtime_pb2 as rt
 from space.core.schema import FieldIdManager
 from space.core.schema import arrow
 from space.core.schema import substrait as substrait_schema
-from space.core.utils import paths
+from space.core.utils import errors, paths
 from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.protos import proto_now
+from space.core.utils.uuids import uuid_
 from space.ray.data_sources import SpaceDataSource
 
 # Initial snapshot ID.
@@ -94,7 +96,7 @@ class Storage(paths.StoragePathsMixin):
     if snapshot_id in self._metadata.snapshots:
       return self._metadata.snapshots[snapshot_id]
 
-    raise RuntimeError(f"Snapshot {snapshot_id} is not found")
+    raise errors.SnapshotNotFoundError(f"Snapshot {snapshot_id} is not found")
 
   # pylint: disable=too-many-arguments
   @classmethod
@@ -159,11 +161,17 @@ class Storage(paths.StoragePathsMixin):
                              meta.StorageMetadata())
     return Storage(location, metadata)
 
+  def transaction(self) -> Transaction:
+    """Start a transaction."""
+    return Transaction(self)
+
   def commit(self, patch: rt.Patch) -> None:
     """Commit changes to the storage.
 
     TODO: only support a single writer; to ensure atomicity in commit by
     concurrent writers.
+
+    TODO: to detect incompatible patch and fail the commit.
 
     Args:
       patch: a patch describing changes made to the storage.
@@ -290,3 +298,54 @@ def _patch_manifests(manifest_files: meta.ManifestFiles, patch: rt.Patch):
 
   for f in patch.addition.record_manifest_files:
     manifest_files.record_manifest_files.append(f)
+
+
+class Transaction:
+  """A transaction contains data operations happening atomically."""
+
+  def __init__(self, storage: Storage):
+    self._storage = storage
+    self._txn_id = uuid_()
+    # The storage snapshot ID when the transaction starts.
+    self._snapshot_id: Optional[int] = None
+
+    self._result: Optional[rt.JobResult] = None
+
+  def commit(self, patch: Optional[rt.Patch]) -> None:
+    """Commit the transaction."""
+    assert self._result is None
+
+    # Check that no other commit has taken place.
+    assert self._snapshot_id is not None
+    # TODO: to refresh storage from files.
+    if self._snapshot_id != self._storage.metadata.current_snapshot_id:
+      self._result = rt.JobResult(
+          state=rt.JobResult.FAILED,
+          error_message="Abort commit because the storage has been modified.")
+      return
+
+    if patch is None:
+      self._result = rt.JobResult(state=rt.JobResult.SKIPPED)
+      return
+
+    self._storage.commit(patch)
+    self._result = rt.JobResult(
+        state=rt.JobResult.SUCCEEDED,
+        storage_statistics_update=patch.storage_statistics_update)
+
+  def result(self) -> rt.JobResult:
+    """Get job result after transaction is committed."""
+    if self._result is None:
+      raise errors.TransactionError(
+          f"Transaction {self._txn_id} is not committed")
+
+    return self._result
+
+  def __enter__(self) -> Transaction:
+    # TODO: to refresh storage from files.
+    self._snapshot_id = self._storage.metadata.current_snapshot_id
+    logging.info(f"Start transaction {self._txn_id}")
+    return self
+
+  def __exit__(self, exc_type, exc_value, traceback) -> None:
+    ...

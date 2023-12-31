@@ -14,9 +14,9 @@
 
 import pyarrow as pa
 import pyarrow.compute as pc
-import pytest
 
 from space import Dataset
+import space.core.proto.runtime_pb2 as rt
 
 
 class TestLocalInsertOp:
@@ -34,13 +34,14 @@ class TestLocalInsertOp:
     runner.append_from(iter(all_types_input_data))
 
     # Test insert.
-    with pytest.raises(RuntimeError):
-      runner.insert({
-          "int64": [3, 4],
-          "float64": [0.3, 0.4],
-          "bool": [False, False],
-          "string": ["d", "e"]
-      })
+    result = runner.insert({
+        "int64": [3, 4],
+        "float64": [0.3, 0.4],
+        "bool": [False, False],
+        "string": ["d", "e"]
+    })
+    assert result.state == rt.JobResult.FAILED
+    assert "Primary key to insert already exist" in result.error_message
 
     input_data = {
         "int64": [4, 5],

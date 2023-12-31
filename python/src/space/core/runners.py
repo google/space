@@ -16,7 +16,8 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Iterator, List, Optional, Tuple, Union
+from functools import wraps
+from typing import Callable, Iterator, List, Optional, Tuple, Union
 
 from absl import logging  # type: ignore[import-untyped]
 import pyarrow as pa
@@ -33,6 +34,7 @@ from space.core.ops.insert import InsertOptions, LocalInsertOp
 from space.core.ops.read import FileSetReadOp, ReadOptions
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
+from space.core.utils import errors
 from space.core.versions.utils import version_to_snapshot_id
 
 
@@ -71,11 +73,25 @@ class StorageCommitMixin:
   def __init__(self, storage: Storage):
     self._storage = storage
 
-  def _try_commit(self, patch: Optional[rt.Patch]) -> rt.JobResult:
-    if patch is not None:
-      self._storage.commit(patch)
+  @staticmethod
+  def transactional(
+      fn: Callable[..., Optional[rt.Patch]]) -> Callable[..., rt.JobResult]:
+    """A decorator that commits the result of a data operation."""
 
-    return _job_result(patch)
+    @wraps(fn)
+    def decorated(self, *args, **kwargs):
+      try:
+        with self._storage.transaction() as txn:  # pylint: disable=protected-access
+          txn.commit(fn(self, *args, **kwargs))
+          r = txn.result()
+          logging.info(f"Job result:\n{r}")
+          return r
+      except (errors.SpaceRuntimeError, errors.UserInputError) as e:
+        r = rt.JobResult(state=rt.JobResult.FAILED, error_message=repr(e))
+        logging.warning(f"Job result:\n{r}")
+        return r
+
+    return decorated
 
 
 class BaseReadWriteRunner(StorageCommitMixin, BaseReadOnlyRunner):
@@ -161,14 +177,16 @@ class LocalRunner(BaseReadWriteRunner):
                             version_to_snapshot_id(start_version),
                             version_to_snapshot_id(end_version))
 
-  def append(self, data: InputData) -> rt.JobResult:
+  @StorageCommitMixin.transactional
+  def append(self, data: InputData) -> Optional[rt.Patch]:
     op = LocalAppendOp(self._storage.location, self._storage.metadata)
     op.write(data)
-    return self._try_commit(op.finish())
+    return op.finish()
 
+  @StorageCommitMixin.transactional
   def append_from(
       self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
-  ) -> rt.JobResult:
+  ) -> Optional[rt.Patch]:
     op = LocalAppendOp(self._storage.location, self._storage.metadata)
     if not isinstance(sources, list):
       sources = [sources]
@@ -177,37 +195,29 @@ class LocalRunner(BaseReadWriteRunner):
       for data in source:
         op.write(data)
 
-    return self._try_commit(op.finish())
+    return op.finish()
 
+  @StorageCommitMixin.transactional
   def append_array_record(self, input_dir: str,
-                          index_fn: ArrayRecordIndexFn) -> rt.JobResult:
+                          index_fn: ArrayRecordIndexFn) -> Optional[rt.Patch]:
     op = LocalArrayRecordLoadOp(self._storage.location, self._storage.metadata,
                                 input_dir, index_fn)
-    return self._try_commit(op.write())
+    return op.write()
 
-  def append_parquet(self, input_dir: str) -> rt.JobResult:
+  @StorageCommitMixin.transactional
+  def append_parquet(self, input_dir: str) -> Optional[rt.Patch]:
     op = LocalParquetLoadOp(self._storage.location, self._storage.metadata,
                             input_dir)
-    return self._try_commit(op.write())
+    return op.write()
 
-  def _insert(self, data: InputData, mode: InsertOptions.Mode) -> rt.JobResult:
+  @StorageCommitMixin.transactional
+  def _insert(self, data: InputData,
+              mode: InsertOptions.Mode) -> Optional[rt.Patch]:
     op = LocalInsertOp(self._storage, InsertOptions(mode=mode))
-    return self._try_commit(op.write(data))
+    return op.write(data)
 
-  def delete(self, filter_: pc.Expression) -> rt.JobResult:
+  @StorageCommitMixin.transactional
+  def delete(self, filter_: pc.Expression) -> Optional[rt.Patch]:
     op = FileSetDeleteOp(self._storage.location, self._storage.metadata,
                          self._storage.data_files(filter_), filter_)
-    return self._try_commit(op.delete())
-
-
-def _job_result(patch: Optional[rt.Patch]) -> rt.JobResult:
-  if patch is None:
-    result = rt.JobResult(state=rt.JobResult.State.SKIPPED)
-  else:
-    # TODO: to catch failures and report failed state.
-    result = rt.JobResult(
-        state=rt.JobResult.State.SUCCEEDED,
-        storage_statistics_update=patch.storage_statistics_update)
-
-  logging.info(f"Job result:\n{result}")
-  return result
+    return op.delete()

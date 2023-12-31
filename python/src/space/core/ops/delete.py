@@ -28,6 +28,7 @@ from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import BaseOp
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
+from space.core.utils import errors
 from space.core.utils.paths import StoragePathsMixin
 from space.core.schema import constants
 
@@ -65,7 +66,8 @@ class FileSetDeleteOp(BaseDeleteOp, StoragePathsMixin):
     StoragePathsMixin.__init__(self, location)
 
     if not _validate_files(file_set):
-      raise RuntimeError(f"Invalid input file set for delete op:\n{file_set}")
+      raise errors.SpaceRuntimeError(
+          f"Invalid input file set for delete op:\n{file_set}")
 
     self._file_set = file_set
     # Rows not matching not filter will be reinserted.
@@ -127,7 +129,7 @@ class FileSetDeleteOp(BaseDeleteOp, StoragePathsMixin):
     deleted_manifest_files: List[str] = []
     for manifest_id in deleted_manifest_ids:
       if manifest_id not in self._file_set.index_manifest_files:
-        raise RuntimeError(
+        raise errors.SpaceRuntimeError(
             f"Index manifest ID {manifest_id} not found in file set")
 
       deleted_manifest_files.append(

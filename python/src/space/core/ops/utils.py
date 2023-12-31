@@ -23,6 +23,7 @@ import pyarrow.compute as pc
 from space.core.schema import arrow
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
+from space.core.utils import errors
 
 
 def update_index_storage_stats(
@@ -77,7 +78,8 @@ def primary_key_filter(primary_keys: List[str],
     # more efficient method.
     filter_str = str(row_filter)
     if filter_str in filter_strs:
-      raise RuntimeError(f"Found duplicated primary key: {filter_str}")
+      raise errors.PrimaryKeyExistError(
+          f"Found duplicated primary key: {filter_str}")
 
     filter_strs.add(filter_str)
 

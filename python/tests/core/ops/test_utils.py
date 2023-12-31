@@ -19,6 +19,7 @@ import pytest
 from space.core.ops import utils
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
+from space.core.utils import errors
 
 
 def test_update_index_storage_stats_positive():
@@ -97,7 +98,7 @@ def test_primary_key_filter(all_types_input_data):
 
 
 def test_primary_key_filter_fail_with_duplicated():
-  with pytest.raises(RuntimeError):
+  with pytest.raises(errors.PrimaryKeyExistError):
     utils.primary_key_filter(["int64", "float64"],
                              pa.Table.from_pydict({
                                  "int64": [1, 2, 1],

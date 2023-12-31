@@ -22,6 +22,7 @@ import cloudpickle  # type: ignore[import-untyped]
 import pyarrow as pa
 from space.core.utils.uuids import random_id
 
+from space.core.utils import errors
 from substrait.algebra_pb2 import Rel, RelRoot
 from substrait.extensions.extensions_pb2 import SimpleExtensionDeclaration
 from substrait.extensions.extensions_pb2 import SimpleExtensionURI
@@ -113,7 +114,7 @@ class LogicalPlanBuilder:
       if name not in self._udfs:
         return name
 
-    raise RuntimeError("Failed to generate an unused UDF name")
+    raise errors.SpaceRuntimeError("Failed to generate an unused UDF name")
 
   @property
   def udfs(self) -> Dict[str, UserDefinedFn]:

@@ -26,6 +26,7 @@ from space.core.ops.read import FileSetReadOp
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
+from space.core.utils import errors
 from space.core.utils.paths import StoragePathsMixin
 
 
@@ -45,7 +46,7 @@ def read_change_data(
   start_snapshot_id is excluded; end_snapshot_id is included.
   """
   if start_snapshot_id > end_snapshot_id:
-    raise RuntimeError(
+    raise errors.UserInputError(
         f"End snapshot ID {end_snapshot_id} should not be lower than start "
         f"snapshot ID {start_snapshot_id}")
 
@@ -53,10 +54,12 @@ def read_change_data(
   all_snapshot_ids_set = set(all_snapshot_ids)
 
   if start_snapshot_id not in all_snapshot_ids_set:
-    raise RuntimeError(f"Start snapshot ID not found: {start_snapshot_id}")
+    raise errors.SnapshotNotFoundError(
+        f"Start snapshot ID not found: {start_snapshot_id}")
 
   if end_snapshot_id not in all_snapshot_ids_set:
-    raise RuntimeError(f"Start snapshot ID not found: {end_snapshot_id}")
+    raise errors.SnapshotNotFoundError(
+        f"Start snapshot ID not found: {end_snapshot_id}")
 
   for snapshot_id in all_snapshot_ids:
     if snapshot_id <= start_snapshot_id:
@@ -79,7 +82,7 @@ class _LocalChangeDataReadOp(StoragePathsMixin):
     self._metadata = self._storage.metadata
 
     if snapshot_id not in self._metadata.snapshots:
-      raise RuntimeError(
+      raise errors.SnapshotNotFoundError(
           f"Change data read can't find snapshot ID {snapshot_id}")
 
     snapshot = self._metadata.snapshots[snapshot_id]

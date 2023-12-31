@@ -25,6 +25,7 @@ from space.core.ops.insert import filter_matched
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
+from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray
 
 
@@ -48,7 +49,8 @@ class RayInsertOp(LocalInsertOp):
 
     for duplicated in ray.get(remote_duplicated_values):
       if duplicated:
-        raise RuntimeError("Primary key to insert already exist")
+        raise errors.PrimaryKeyExistError(
+            "Primary key to insert already exist")
 
   def _append(self, data: pa.Table, patches: List[Optional[rt.Patch]]) -> None:
     append_op = RayAppendOp(self._location, self._metadata, self._parallelism)
