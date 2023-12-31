@@ -106,14 +106,15 @@ view = ds.map_batches(
   output_schema=ds.schema,
   output_record_fields=["binary"]
 )
-view.read()  # Read dataset files and apply transform on it.
+view_runner = view.ray()
+view_runner.read()  # Read dataset files and apply transform on it.
 
 mv = view.materialize("/path/to/<mybucket>/example_mv")
 
-view_runner = mv.ray()
+mv_runner = mv.ray()
 # Refresh the MV up to version `2`.
-view_runner.refresh(2)
-view_runner.read()  # Directly read from materialized view files.
+mv_runner.refresh(2)
+mv_runner.read()  # Directly read from materialized view files.
 ```
 
 ### ML frameworks integration

@@ -36,6 +36,8 @@ class ChangeType(Enum):
   ADD = 1
   # For deleted rows.
   DELETE = 2
+  # TODO: to support UPDATE. UPDATE is currently described as an ADD after a
+  # DELETE, on the same primary key in one snapshot change.
 
 
 def read_change_data(
@@ -92,6 +94,10 @@ class _LocalChangeDataReadOp(StoragePathsMixin):
     self._change_log = _read_change_log_proto(fs, change_log_file)
 
   def __iter__(self) -> Iterator[Tuple[ChangeType, pa.Table]]:
+    # TODO: must return deletion first, otherwise when the upstream re-apply
+    # deletions and additions, it may delete newly added data.
+    # TODO: to enforce this check upstream, or merge deletion+addition as a
+    # update.
     for bitmap in self._change_log.deleted_rows:
       yield self._read_bitmap_rows(ChangeType.DELETE, bitmap)
 

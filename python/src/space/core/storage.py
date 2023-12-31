@@ -22,6 +22,7 @@ from absl import logging  # type: ignore[import-untyped]
 import pyarrow as pa
 import pyarrow.compute as pc
 
+from space.core.fs.base import BaseFileSystem
 from space.core.fs.factory import create_fs
 from space.core.manifests.falsifiable_filters import build_manifest_filter
 from space.core.manifests.index import read_index_manifests
@@ -42,12 +43,15 @@ _INIT_SNAPSHOT_ID = 0
 
 
 class Storage(paths.StoragePathsMixin):
-  """Storage manages data files by metadata using the Space format."""
+  """Storage manages data files by metadata using the Space format.
+  
+  Not thread safe.
+  """
 
   def __init__(self, location: str, metadata: meta.StorageMetadata):
     super().__init__(location)
-    self._metadata = metadata
     self._fs = create_fs(location)
+    self._metadata = metadata
 
     record_fields = set(self._metadata.schema.record_fields)
     self._logical_schema = arrow.arrow_schema(self._metadata.schema.fields,
@@ -144,22 +148,35 @@ class Storage(paths.StoragePathsMixin):
 
     new_metadata_path = paths.new_metadata_path(paths.metadata_dir(location))
 
-    snapshot = meta.Snapshot(snapshot_id=_INIT_SNAPSHOT_ID, create_time=now)
+    snapshot = meta.Snapshot(snapshot_id=_INIT_SNAPSHOT_ID,
+                             create_time=now,
+                             metadata_file=path.relpath(
+                                 new_metadata_path, location))
     metadata.snapshots[metadata.current_snapshot_id].CopyFrom(snapshot)
 
     storage = Storage(location, metadata)
-    storage._initialize(new_metadata_path)
+    storage._initialize_files(new_metadata_path)
     return storage
 
   @classmethod
   def load(cls, location: str) -> Storage:
     """Load an existing storage from the given location."""
     fs = create_fs(location)
-    entry_point = fs.read_proto(paths.entry_point_path(location),
-                                meta.EntryPoint())
-    metadata = fs.read_proto(path.join(location, entry_point.metadata_file),
-                             meta.StorageMetadata())
-    return Storage(location, metadata)
+    entry_point = _read_entry_point(fs, location)
+    return Storage(location, _read_metadata(fs, location, entry_point))
+
+  def reload(self) -> bool:
+    """Check whether the storage files has been updated by other writers, if
+    so, reload the files into memory and return True."""
+    entry_point = _read_entry_point(self._fs, self._location)
+    if entry_point.metadata_file == self.snapshot().metadata_file:
+      return False
+
+    metadata = _read_metadata(self._fs, self._location, entry_point)
+    self.__init__(self.location, metadata)  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
+    logging.info(
+        f"Storage reloaded to snapshot: {self._metadata.current_snapshot_id}")
+    return True
 
   def transaction(self) -> Transaction:
     """Start a transaction."""
@@ -187,6 +204,7 @@ class Storage(paths.StoragePathsMixin):
 
     snapshot = meta.Snapshot(
         snapshot_id=new_snapshot_id,
+        metadata_file=self.short_path(new_metadata_path),
         create_time=proto_now(),
         manifest_files=current_snapshot.manifest_files,
         storage_statistics=current_snapshot.storage_statistics)
@@ -262,7 +280,7 @@ class Storage(paths.StoragePathsMixin):
                                     snapshot_id=snapshot_id,
                                     reference_read=reference_read)
 
-  def _initialize(self, metadata_path: str) -> None:
+  def _initialize_files(self, metadata_path: str) -> None:
     """Initialize a new storage by creating folders and files."""
     self._fs.create_dir(self._data_dir)
     self._fs.create_dir(self._metadata_dir)
@@ -317,7 +335,7 @@ class Transaction:
 
     # Check that no other commit has taken place.
     assert self._snapshot_id is not None
-    # TODO: to refresh storage from files.
+    self._storage.reload()
     if self._snapshot_id != self._storage.metadata.current_snapshot_id:
       self._result = rt.JobResult(
           state=rt.JobResult.FAILED,
@@ -342,10 +360,22 @@ class Transaction:
     return self._result
 
   def __enter__(self) -> Transaction:
-    # TODO: to refresh storage from files.
+    # All mutations start with a transaction, so storage is always reloaded for
+    # mutations.
+    self._storage.reload()
     self._snapshot_id = self._storage.metadata.current_snapshot_id
     logging.info(f"Start transaction {self._txn_id}")
     return self
 
   def __exit__(self, exc_type, exc_value, traceback) -> None:
     ...
+
+
+def _read_entry_point(fs: BaseFileSystem, location: str) -> meta.EntryPoint:
+  return fs.read_proto(paths.entry_point_path(location), meta.EntryPoint())
+
+
+def _read_metadata(fs: BaseFileSystem, location: str,
+                   entry_point: meta.EntryPoint) -> meta.StorageMetadata:
+  return fs.read_proto(path.join(location, entry_point.metadata_file),
+                       meta.StorageMetadata())
