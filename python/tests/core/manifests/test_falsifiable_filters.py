@@ -25,6 +25,9 @@ from space.core.manifests import falsifiable_filters as ff
         ((pc.field("a") < 10) | (pc.field("b") > 1),
          (pc.field("_STATS_f0", "_MIN") >= 10) &
          (pc.field("_STATS_f1", "_MAX") <= 1)),
+        ((10 > pc.field("a")) | (1 < pc.field("b")),
+         (pc.field("_STATS_f0", "_MIN") >= 10) &
+         (pc.field("_STATS_f1", "_MAX") <= 1)),
         ((pc.field("a") > 10) & (pc.field("b") == 1),
          (pc.field("_STATS_f0", "_MAX") <= 10) |
          ((pc.field("_STATS_f1", "_MIN") > 1) |
@@ -39,6 +42,7 @@ from space.core.manifests import falsifiable_filters as ff
         ((pc.scalar(False) | (pc.field("a") <= 10)),
          (~pc.scalar(False) & (pc.field("_STATS_f0", "_MIN") > 10))),
         (~(pc.field("a") >= 10), ~(pc.field("_STATS_f0", "_MAX") < 10)),
+        (~(10 <= pc.field("a")), ~(pc.field("_STATS_f0", "_MAX") < 10)),
         (pc.field("a") > pc.field("a"), pc.field("_STATS_f0", "_MAX")
          <= pc.field("_STATS_f0", "_MIN")),
         (pc.scalar(1) < pc.scalar(2), pc.scalar(1) >= pc.scalar(2))

@@ -179,11 +179,14 @@ def _falsifiable_filter_internal(extensions: List[SimpleExtensionDeclaration],
                                f"{expr.scalar_function.arguments}")
 
   # Move literal to rhs.
+  reverse_fn = False
   if _has_selection(rhs):
+    reverse_fn = True
     tmp, lhs = lhs, rhs
     rhs = tmp
 
-  return _falsifiable_condition_field_literal(fn, lhs, rhs, min_max_fn)
+  return _falsifiable_condition_field_literal(fn, lhs, rhs, min_max_fn,
+                                              reverse_fn)
 
 
 def _stats_field_min(field_id: int) -> pc.Expression:
@@ -252,13 +255,23 @@ def _falsifiable_condition_literals(fn: str, lhs: Expression,
 
 
 def _falsifiable_condition_field_literal(
-    fn: str, lhs: Expression, rhs: Expression,
-    min_max_fn: Callable) -> Optional[pc.Expression]:
+    fn: str, lhs: Expression, rhs: Expression, min_max_fn: Callable,
+    reverse_fn: bool) -> Optional[pc.Expression]:
   field_min, field_max, is_pk = min_max_fn(lhs)
   if not is_pk:
     return None
 
   value = _value(rhs)
+
+  if reverse_fn:
+    if fn == "gt":
+      fn = "lt"
+    elif fn == "gte":
+      fn = "lte"
+    elif fn == "lt":
+      fn = "gt"
+    elif fn == "lte":
+      fn = "gte"
 
   if fn == "gt":
     return field_max <= value
