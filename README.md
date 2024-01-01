@@ -134,7 +134,8 @@ ray_dataset = ds.ray_dataset()
 ## More readings
 
 ### Examples
-- [Load TFDS datasets into Space: COCO as an example](notebooks/tfds_coco_tutorial.ipynb)
+- [Load TFDS datasets into Space: COCO as example](notebooks/tfds_coco_tutorial.ipynb)
+- [Load custom data and build transform pipeline: Segment Anything as example](notebooks/segment_anything_tutorial.ipynb)
 
 ## Staus
 Space is a new project under active development.
