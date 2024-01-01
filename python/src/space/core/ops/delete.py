@@ -24,6 +24,7 @@ import pyarrow.compute as pc
 from pyroaring import BitMap  # type: ignore[import-not-found]
 
 from space.core.ops import utils
+from space.core.ops.utils import FileOptions
 from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import BaseOp
 from space.core.proto import metadata_pb2 as meta
@@ -61,8 +62,10 @@ class FileSetDeleteOp(BaseDeleteOp, StoragePathsMixin):
   Not thread safe.
   """
 
+  # pylint: disable=too-many-arguments
   def __init__(self, location: str, metadata: meta.StorageMetadata,
-               file_set: rt.FileSet, filter_: pc.Expression):
+               file_set: rt.FileSet, filter_: pc.Expression,
+               file_options: FileOptions):
     StoragePathsMixin.__init__(self, location)
 
     if not _validate_files(file_set):
@@ -75,6 +78,7 @@ class FileSetDeleteOp(BaseDeleteOp, StoragePathsMixin):
 
     self._append_op = LocalAppendOp(location,
                                     metadata,
+                                    file_options,
                                     record_address_input=True)
 
   def delete(self) -> Optional[rt.Patch]:

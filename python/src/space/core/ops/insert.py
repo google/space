@@ -25,6 +25,7 @@ import pyarrow.compute as pc
 from space.core.ops.append import LocalAppendOp
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.read import FileSetReadOp, ReadOptions
+from space.core.ops.utils import FileOptions
 from space.core.ops import utils
 from space.core.ops.base import BaseOp, InputData
 import space.core.proto.metadata_pb2 as meta
@@ -59,13 +60,15 @@ class BaseInsertOp(BaseOp):
 class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
   """Insert data to a dataset."""
 
-  def __init__(self, storage: Storage, options: InsertOptions):
+  def __init__(self, storage: Storage, options: InsertOptions,
+               file_options: FileOptions):
     StoragePathsMixin.__init__(self, storage.location)
 
     self._storage = storage
     self._metadata = self._storage.metadata
 
     self._options = InsertOptions() if options is None else options
+    self._file_options = file_options
 
   def write(self, data: InputData) -> Optional[rt.Patch]:
     if not isinstance(data, pa.Table):
@@ -103,11 +106,12 @@ class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
   def _delete(self, filter_: pc.Expression, data_files: rt.FileSet,
               patches: List[Optional[rt.Patch]]) -> None:
     delete_op = FileSetDeleteOp(self._location, self._metadata, data_files,
-                                filter_)
+                                filter_, self._file_options)
     patches.append(delete_op.delete())
 
   def _append(self, data: pa.Table, patches: List[Optional[rt.Patch]]) -> None:
-    append_op = LocalAppendOp(self._location, self._metadata)
+    append_op = LocalAppendOp(self._location, self._metadata,
+                              self._file_options)
     append_op.write(data)
     patches.append(append_op.finish())
 

@@ -25,6 +25,7 @@ import pyarrow.parquet as pq
 from space.core.manifests import IndexManifestWriter
 from space.core.manifests import RecordManifestWriter
 from space.core.ops import utils
+from space.core.ops.utils import FileOptions
 from space.core.ops.base import BaseOp, InputData
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
@@ -33,12 +34,6 @@ from space.core.schema import utils as schema_utils
 from space.core.utils import paths
 from space.core.utils.lazy_imports_utils import array_record_module as ar
 from space.core.utils.paths import StoragePathsMixin
-
-# TODO: to obtain the values from user provided options.
-# Thresholds for writing Parquet files. The sizes are uncompressed bytes.
-_MAX_ARRAY_RECORD_BYTES = 100 * 1024 * 1024
-_MAX_PARQUET_BYTES = 1 * 1024 * 1024
-_MAX_ROW_GROUP_BYTES = 100 * 1024
 
 
 class BaseAppendOp(BaseOp):
@@ -83,12 +78,15 @@ class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
   def __init__(self,
                location: str,
                metadata: meta.StorageMetadata,
+               file_options: FileOptions,
                record_address_input: bool = False):
     """
     Args:
       record_address_input: if true, input record fields are addresses.
     """
     StoragePathsMixin.__init__(self, location)
+    self._parquet_options = file_options.parquet_options
+    self._array_record_options = file_options.array_record_options
 
     self._metadata = metadata
     record_fields = set(self._metadata.schema.record_fields)
@@ -206,13 +204,15 @@ class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
           [self._cached_index_data, index_data])
 
     # _cached_index_data is written as a new row group.
-    if self._cached_index_data.nbytes > _MAX_ROW_GROUP_BYTES:
+    if (self._cached_index_data.nbytes
+        > self._parquet_options.max_uncompressed_row_group_bytes):
       assert self._index_writer_info is not None
       self._index_writer_info.writer.write_table(self._cached_index_data)
       self._cached_index_data = None
 
       # Materialize the index file.
-      if self._cached_index_file_bytes > _MAX_PARQUET_BYTES:
+      if (self._cached_index_file_bytes
+          > self._parquet_options.max_uncompressed_file_bytes):
         self._finish_index_writer()
 
   def _maybe_create_index_writer(self) -> None:
@@ -278,7 +278,7 @@ class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
 
     # Materialize the file when size is over threshold.
     if (writer_info.storage_statistics.record_uncompressed_bytes
-        > _MAX_ARRAY_RECORD_BYTES):
+        > self._array_record_options.max_uncompressed_file_bytes):
       self._finish_record_writer(field, writer_info)
 
     return field_name, address_column

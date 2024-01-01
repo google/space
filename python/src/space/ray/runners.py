@@ -26,6 +26,7 @@ from space.core.loaders.array_record import ArrayRecordIndexFn
 from space.core.runners import BaseReadOnlyRunner, BaseReadWriteRunner
 from space.core.runners import StorageMixin
 from space.core.ops import utils
+from space.core.ops.utils import FileOptions
 from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import InputData
 from space.core.ops.change_data import ChangeType, read_change_data
@@ -98,9 +99,12 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
 class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
   """Ray runner for materialized views."""
 
-  def __init__(self, mv: MaterializedView):
+  def __init__(self, mv: MaterializedView,
+               file_options: Optional[FileOptions]):
     RayReadOnlyRunner.__init__(self, mv.view)
     StorageMixin.__init__(self, mv.storage)
+    self._file_options = FileOptions(
+    ) if file_options is None else file_options
 
   @StorageMixin.reload
   def read(self,
@@ -159,11 +163,13 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
       return None
 
     op = FileSetDeleteOp(self._storage.location, self._storage.metadata,
-                         self._storage.data_files(filter_), filter_)
+                         self._storage.data_files(filter_), filter_,
+                         self._file_options)
     return op.delete()
 
   def _process_append(self, data: pa.Table) -> Optional[rt.Patch]:
-    op = LocalAppendOp(self._storage.location, self._storage.metadata)
+    op = LocalAppendOp(self._storage.location, self._storage.metadata,
+                       self._file_options)
     op.write(data)
     return op.finish()
 
@@ -171,16 +177,18 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
 class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
   """Ray read write runner."""
 
-  def __init__(self, dataset: Dataset, options: Optional[RayOptions] = None):
+  def __init__(self,
+               dataset: Dataset,
+               file_options: Optional[FileOptions] = None,
+               ray_options: Optional[RayOptions] = None):
     RayReadOnlyRunner.__init__(self, dataset)
-    BaseReadWriteRunner.__init__(self, dataset.storage)
-
-    self._options = RayOptions() if options is None else options
+    BaseReadWriteRunner.__init__(self, dataset.storage, file_options)
+    self._ray_options = RayOptions() if ray_options is None else ray_options
 
   @StorageMixin.transactional
   def append(self, data: InputData) -> Optional[rt.Patch]:
     op = RayAppendOp(self._storage.location, self._storage.metadata,
-                     self._options.parallelism)
+                     self._ray_options.parallelism, self._file_options)
     op.write(data)
     return op.finish()
 
@@ -192,7 +200,7 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
       sources = [sources]
 
     op = RayAppendOp(self._storage.location, self._storage.metadata,
-                     self._options.parallelism)
+                     self._ray_options.parallelism, self._file_options)
     op.write_from(sources)
 
     return op.finish()
@@ -211,10 +219,10 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
   def _insert(self, data: InputData,
               mode: InsertOptions.Mode) -> Optional[rt.Patch]:
     op = RayInsertOp(self._storage, InsertOptions(mode=mode),
-                     self._options.parallelism)
+                     self._ray_options.parallelism, self._file_options)
     return op.write(data)
 
   @StorageMixin.transactional
   def delete(self, filter_: pc.Expression) -> Optional[rt.Patch]:
-    op = RayDeleteOp(self._storage, filter_)
+    op = RayDeleteOp(self._storage, filter_, self._file_options)
     return op.delete()

@@ -16,8 +16,11 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from space.core.ops.append import LocalAppendOp
+from space.core.ops.utils import FileOptions
 from space.core.ops.read import FileSetReadOp, ReadOptions
 from space.core.storage import Storage
+
+_default_file_options = FileOptions()
 
 
 class TestFileSetReadOp:
@@ -31,7 +34,8 @@ class TestFileSetReadOp:
                              primary_keys=["int64"],
                              record_fields=[])
 
-    append_op = LocalAppendOp(str(location), storage.metadata)
+    append_op = LocalAppendOp(str(location), storage.metadata,
+                              _default_file_options)
     # TODO: the test should cover all types supported by column stats.
     input_data = [pa.Table.from_pydict(d) for d in all_types_input_data]
     for batch in input_data:
@@ -69,7 +73,8 @@ class TestFileSetReadOp:
                              primary_keys=["int64"],
                              record_fields=["images", "objects"])
 
-    append_op = LocalAppendOp(str(location), storage.metadata)
+    append_op = LocalAppendOp(str(location), storage.metadata,
+                              _default_file_options)
     input_data = [pa.Table.from_pydict(d) for d in record_fields_input_data]
     for batch in input_data:
       append_op.write(batch)

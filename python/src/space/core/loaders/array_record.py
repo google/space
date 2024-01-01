@@ -24,6 +24,7 @@ from space.core.loaders.utils import list_files
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
 from space.core.ops import utils
+from space.core.ops.utils import FileOptions
 from space.core.ops.append import LocalAppendOp
 from space.core.schema import arrow
 from space.core.serializers import DictSerializer
@@ -35,9 +36,12 @@ ArrayRecordIndexFn: TypeAlias = Callable[[Dict[str, Any]], Dict[str, Any]]
 class LocalArrayRecordLoadOp(StoragePathsMixin):
   """Load ArrayRecord files into Space without copying data."""
 
+  # pylint: disable=too-many-arguments
   def __init__(self, location: str, metadata: meta.StorageMetadata,
-               input_dir: str, index_fn: ArrayRecordIndexFn):
+               input_dir: str, index_fn: ArrayRecordIndexFn,
+               file_options: FileOptions):
     StoragePathsMixin.__init__(self, location)
+    self._file_options = file_options
 
     self._metadata = metadata
     self._input_dir = input_dir
@@ -64,6 +68,7 @@ class LocalArrayRecordLoadOp(StoragePathsMixin):
     """Write index files to load ArrayRecord files to Space dataset."""
     append_op = LocalAppendOp(self._location,
                               self._metadata,
+                              self._file_options,
                               record_address_input=True)
 
     total_record_bytes = 0

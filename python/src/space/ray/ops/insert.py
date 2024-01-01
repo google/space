@@ -22,6 +22,7 @@ import pyarrow.compute as pc
 from space.ray.ops.append import RayAppendOp
 from space.core.ops.insert import InsertOptions, LocalInsertOp
 from space.core.ops.insert import filter_matched
+from space.core.ops.utils import FileOptions
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
@@ -33,8 +34,8 @@ class RayInsertOp(LocalInsertOp):
   """Insert data to a dataset with distributed duplication check."""
 
   def __init__(self, storage: Storage, options: InsertOptions,
-               parallelism: int):
-    LocalInsertOp.__init__(self, storage, options)
+               parallelism: int, file_options: FileOptions):
+    LocalInsertOp.__init__(self, storage, options, file_options)
     self._parallelism = parallelism
 
   def _check_duplication(self, data_files: rt.FileSet, filter_: pc.Expression):
@@ -53,7 +54,8 @@ class RayInsertOp(LocalInsertOp):
             "Primary key to insert already exist")
 
   def _append(self, data: pa.Table, patches: List[Optional[rt.Patch]]) -> None:
-    append_op = RayAppendOp(self._location, self._metadata, self._parallelism)
+    append_op = RayAppendOp(self._location, self._metadata, self._parallelism,
+                            self._file_options)
     append_op.write(data)
     patches.append(append_op.finish())
 

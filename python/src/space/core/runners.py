@@ -32,6 +32,7 @@ from space.core.ops.base import InputData
 from space.core.ops.change_data import ChangeType, read_change_data
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions, LocalInsertOp
+from space.core.ops.append import FileOptions
 from space.core.ops.read import FileSetReadOp, ReadOptions
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
@@ -109,8 +110,12 @@ class StorageMixin:
 class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
   """Abstract base read and write runner class."""
 
-  def __init__(self, storage: Storage):
+  def __init__(self,
+               storage: Storage,
+               file_options: Optional[FileOptions] = None):
     StorageMixin.__init__(self, storage)
+    self._file_options = FileOptions(
+    ) if file_options is None else file_options
 
   @abstractmethod
   def append(self, data: InputData) -> JobResult:
@@ -193,7 +198,8 @@ class LocalRunner(BaseReadWriteRunner):
 
   @StorageMixin.transactional
   def append(self, data: InputData) -> Optional[rt.Patch]:
-    op = LocalAppendOp(self._storage.location, self._storage.metadata)
+    op = LocalAppendOp(self._storage.location, self._storage.metadata,
+                       self._file_options)
     op.write(data)
     return op.finish()
 
@@ -201,7 +207,8 @@ class LocalRunner(BaseReadWriteRunner):
   def append_from(
       self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
   ) -> Optional[rt.Patch]:
-    op = LocalAppendOp(self._storage.location, self._storage.metadata)
+    op = LocalAppendOp(self._storage.location, self._storage.metadata,
+                       self._file_options)
     if not isinstance(sources, list):
       sources = [sources]
 
@@ -215,7 +222,7 @@ class LocalRunner(BaseReadWriteRunner):
   def append_array_record(self, input_dir: str,
                           index_fn: ArrayRecordIndexFn) -> Optional[rt.Patch]:
     op = LocalArrayRecordLoadOp(self._storage.location, self._storage.metadata,
-                                input_dir, index_fn)
+                                input_dir, index_fn, self._file_options)
     return op.write()
 
   @StorageMixin.transactional
@@ -227,11 +234,13 @@ class LocalRunner(BaseReadWriteRunner):
   @StorageMixin.transactional
   def _insert(self, data: InputData,
               mode: InsertOptions.Mode) -> Optional[rt.Patch]:
-    op = LocalInsertOp(self._storage, InsertOptions(mode=mode))
+    op = LocalInsertOp(self._storage, InsertOptions(mode=mode),
+                       self._file_options)
     return op.write(data)
 
   @StorageMixin.transactional
   def delete(self, filter_: pc.Expression) -> Optional[rt.Patch]:
     op = FileSetDeleteOp(self._storage.location, self._storage.metadata,
-                         self._storage.data_files(filter_), filter_)
+                         self._storage.data_files(filter_), filter_,
+                         self._file_options)
     return op.delete()
