@@ -131,50 +131,59 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
     for column_id, field in record_columns:
       result_data = result_data.append_column(
           field,
-          self._read_record_column(
+          read_record_column(
+              self,
               index_data.select([column_id]),  # type: ignore[list-item]
               field.name))
 
     # TODO: to keep field order the same as schema.
     return result_data
 
-  def _read_record_column(self, record_address: pa.Table,
-                          field: str) -> pa.BinaryArray:
-    """Read selective rows in multiple ArrayRecord files."""
-    num_rows = record_address.num_rows
-    # _RECORD_KEY_FIELD is the row index of record_address_table used for
-    # retrieving rows after group by. It is not in the read result.
-    record_address = record_address.flatten().append_column(
-        _RECORD_KEY_FIELD, [np.arange(num_rows)])  # type: ignore[arg-type]
 
-    # TODO: should detect whether data file use file path or ID.
-    file_path_field = f"{field}.{FILE_PATH_FIELD}"
-    row_id_field = f"{field}.{ROW_ID_FIELD}"
+def read_record_column(paths_mixin: StoragePathsMixin,
+                       record_address: pa.Table, field: str) -> pa.BinaryArray:
+  """Read rows in multiple ArrayRecord files specified in a record address
+  table.
+  
+  Args:
+    paths_mixin: provide full_path method.
+    record_address: specify record rows to read.
+    field: the field name to read.
+  """
+  num_rows = record_address.num_rows
+  # _RECORD_KEY_FIELD is the row index of record_address_table used for
+  # retrieving rows after group by. It is not in the read result.
+  record_address = record_address.flatten().append_column(
+      _RECORD_KEY_FIELD, [np.arange(num_rows)])  # type: ignore[arg-type]
 
-    # Record row IDs and records key co-grouped by file path, for processing
-    # one file at a time to minimize file reads.
-    grouped_records = record_address.group_by(
-        file_path_field).aggregate(  # type: ignore[arg-type]
-            [(row_id_field, "list"), (_RECORD_KEY_FIELD, "list")])
+  file_path_field = f"{field}.{FILE_PATH_FIELD}"
+  row_id_field = f"{field}.{ROW_ID_FIELD}"
 
-    file_path_column = grouped_records.column(file_path_field).combine_chunks()
-    row_ids_column = grouped_records.column(
-        f"{row_id_field}_list").combine_chunks()
-    record_keys_column = grouped_records.column(
-        f"{_RECORD_KEY_FIELD}_list").combine_chunks()
+  # Record row IDs and records key co-grouped by file path, for processing
+  # one file at a time to minimize file reads.
+  grouped_records = record_address.group_by(
+      file_path_field).aggregate(  # type: ignore[arg-type]
+          [(row_id_field, "list"), (_RECORD_KEY_FIELD, "list")])
 
-    # TODO: to parallelize ArrayRecord file reads.
-    record_values: List[List[bytes]] = []
-    for file_path, row_ids in zip(
-        file_path_column, row_ids_column):  # type: ignore[call-overload]
-      record_values.append(
-          read_record_file(self.full_path(file_path.as_py()), row_ids.as_py()))
+  file_path_column = grouped_records.column(file_path_field).combine_chunks()
+  row_ids_column = grouped_records.column(
+      f"{row_id_field}_list").combine_chunks()
+  record_keys_column = grouped_records.column(
+      f"{_RECORD_KEY_FIELD}_list").combine_chunks()
 
-    # Sort records by record_keys so the records can match indexes.
-    sorted_values: List[bytes] = [None] * num_rows  # type: ignore[list-item]
-    for values, keys in zip(record_values,
-                            record_keys_column):  # type: ignore[call-overload]
-      for value, key in zip(values, keys):
-        sorted_values[key.as_py()] = value
+  # TODO: to parallelize ArrayRecord file reads.
+  record_values: List[List[bytes]] = []
+  for file_path, row_ids in zip(file_path_column,
+                                row_ids_column):  # type: ignore[call-overload]
+    record_values.append(
+        read_record_file(paths_mixin.full_path(file_path.as_py()),
+                         row_ids.as_py()))
 
-    return pa.array(sorted_values, pa.binary())  # type: ignore[return-value]
+  # Sort records by record_keys so the records can match indexes.
+  sorted_values: List[bytes] = [None] * num_rows  # type: ignore[list-item]
+  for values, keys in zip(record_values,
+                          record_keys_column):  # type: ignore[call-overload]
+    for value, key in zip(values, keys):
+      sorted_values[key.as_py()] = value
+
+  return pa.array(sorted_values, pa.binary())  # type: ignore[return-value]
