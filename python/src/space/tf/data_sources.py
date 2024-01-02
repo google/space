@@ -96,8 +96,10 @@ class SpaceDataSource(AbcSequence):
     
     TODO: to read index for filters.
     """
-    return self._ds.local().read_all(fields=[self._feature_field],
-                                     reference_read=True)
+    result = self._ds.local().read_all(fields=[self._feature_field],
+                                       reference_read=True)
+    assert result is not None, "Input is empty"
+    return result
 
   def _file_instructions(
       self, record_addresses: pa.Table) -> List[shard_utils.FileInstruction]:

@@ -16,10 +16,11 @@
 
 from __future__ import annotations
 from os import path
-from typing import Collection, Dict, List, Optional
+from typing import Collection, Dict, Iterator, List, Optional
 
 from absl import logging  # type: ignore[import-untyped]
 import pyarrow as pa
+import pyarrow.parquet as pq
 import pyarrow.compute as pc
 
 from space.core.fs.base import BaseFileSystem
@@ -276,6 +277,29 @@ class Storage(paths.StoragePathsMixin):
                                     fields=fields,
                                     snapshot_id=snapshot_id,
                                     reference_read=reference_read)
+
+  def index_manifest(self,
+                     filter_: Optional[pc.Expression] = None,
+                     snapshot_id: Optional[int] = None) -> Iterator[pa.Table]:
+    """Read index manifest."""
+    return self._manifest(filter_, snapshot_id, record=False)
+
+  def record_manifest(self,
+                      filter_: Optional[pc.Expression] = None,
+                      snapshot_id: Optional[int] = None) -> Iterator[pa.Table]:
+    """Read record manifest."""
+    return self._manifest(filter_, snapshot_id, record=True)
+
+  def _manifest(self,
+                filter_: Optional[pc.Expression] = None,
+                snapshot_id: Optional[int] = None,
+                record: bool = False) -> Iterator[pa.Table]:
+    manifest_files = self.snapshot(snapshot_id).manifest_files
+    manifest_files_list = (manifest_files.record_manifest_files
+                           if record else manifest_files.index_manifest_files)
+    for manifest_file in manifest_files_list:
+      yield pq.read_table(self.full_path(manifest_file),
+                          filters=filter_)  # type: ignore[arg-type]
 
   def _initialize_files(self, metadata_path: str) -> None:
     """Initialize a new storage by creating folders and files."""

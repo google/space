@@ -55,10 +55,13 @@ class BaseReadOnlyRunner(ABC):
                filter_: Optional[pc.Expression] = None,
                fields: Optional[List[str]] = None,
                snapshot_id: Optional[int] = None,
-               reference_read: bool = False) -> pa.Table:
+               reference_read: bool = False) -> Optional[pa.Table]:
     """Read data from the dataset as an Arrow table."""
-    return pa.concat_tables(
-        list(self.read(filter_, fields, snapshot_id, reference_read)))
+    data = list(self.read(filter_, fields, snapshot_id, reference_read))
+    if not data:
+      return None
+
+    return pa.concat_tables(data)
 
   @abstractmethod
   def diff(self, start_version: Union[int],
