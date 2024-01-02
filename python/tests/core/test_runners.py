@@ -89,7 +89,7 @@ class TestLocalRunner:
     job_result = [None]
 
     def append_data():
-      job_result[0] = local_runner.append_from(make_iter())
+      job_result[0] = local_runner.append_from(make_iter)
 
     t = threading.Thread(target=append_data)
     t.start()

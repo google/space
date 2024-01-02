@@ -16,13 +16,16 @@
 
 from __future__ import annotations
 from abc import ABC
-from typing import Any, Dict, Union
+from typing import Any, Callable, Dict, Iterator, Union
 from typing_extensions import TypeAlias
 
 import pyarrow as pa
 
 # Input data can be either nested Py dict or Arrow table.
 InputData: TypeAlias = Union[Dict[str, Any], pa.Table]
+
+# A no args function that returns an iterator.
+InputIteratorFn: TypeAlias = Callable[[], Iterator[InputData]]
 
 
 class BaseOp(ABC):

@@ -67,9 +67,8 @@ class TestRayReadWriteRunner:
     input_data4 = generate_data([9, 10, 11])
 
     runner.append_from([
-        iter([input_data1, input_data2]),
-        iter([input_data3]),
-        iter([input_data4])
+        lambda: iter([input_data1, input_data2]), lambda: iter([input_data3]),
+        lambda: iter([input_data4])
     ])
 
     assert_equal(

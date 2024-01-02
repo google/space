@@ -28,7 +28,7 @@ def test_read_change_data(tmp_path, all_types_schema, all_types_input_data):
 
   # Validate ADD changes.
   runner = ds.local()
-  runner.append_from(iter(all_types_input_data))
+  runner.append_from(lambda: iter(all_types_input_data))
 
   changes = list(runner.diff(0, 1))
   assert len(changes) == 1

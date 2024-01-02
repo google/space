@@ -28,7 +28,7 @@ from space.core.runners import StorageMixin
 from space.core.ops import utils
 from space.core.ops.utils import FileOptions
 from space.core.ops.append import LocalAppendOp
-from space.core.ops.base import InputData
+from space.core.ops.base import InputData, InputIteratorFn
 from space.core.ops.change_data import ChangeType, read_change_data
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions
@@ -194,14 +194,14 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
 
   @StorageMixin.transactional
   def append_from(
-      self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
+      self, source_fns: Union[InputIteratorFn, List[InputIteratorFn]]
   ) -> Optional[rt.Patch]:
-    if not isinstance(sources, list):
-      sources = [sources]
+    if not isinstance(source_fns, list):
+      source_fns = [source_fns]
 
     op = RayAppendOp(self._storage.location, self._storage.metadata,
                      self._ray_options.parallelism, self._file_options)
-    op.write_from(sources)
+    op.write_from(source_fns)
 
     return op.finish()
 
