@@ -31,7 +31,7 @@ class TestLocalInsertOp:
                         record_fields=[])
 
     runner = ds.local()
-    runner.append_from(iter(all_types_input_data))
+    runner.append_from(lambda: iter(all_types_input_data))
 
     # Test insert.
     result = runner.insert({

@@ -28,7 +28,7 @@ from space.core.loaders.array_record import ArrayRecordIndexFn
 from space.core.loaders.array_record import LocalArrayRecordLoadOp
 from space.core.loaders.parquet import LocalParquetLoadOp
 from space.core.ops.append import LocalAppendOp
-from space.core.ops.base import InputData
+from space.core.ops.base import InputData, InputIteratorFn
 from space.core.ops.change_data import ChangeType, read_change_data
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions, LocalInsertOp
@@ -123,9 +123,14 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
 
   @abstractmethod
   def append_from(
-      self, sources: Union[Iterator[InputData],
-                           List[Iterator[InputData]]]) -> JobResult:
-    """Append data into the dataset from an iterator source."""
+      self, source_fns: Union[InputIteratorFn,
+                              List[InputIteratorFn]]) -> JobResult:
+    """Append data into the dataset from an iterator source.
+    
+    source_fns contains a list of no args functions that return iterators. It
+    accepts functions because iterators can not be pickled to run remotely. For
+    example, `lambda: make_iter()` where `make_iter` returns an iterator.
+    """
 
   @abstractmethod
   def append_array_record(self, input_dir: str,
@@ -205,15 +210,15 @@ class LocalRunner(BaseReadWriteRunner):
 
   @StorageMixin.transactional
   def append_from(
-      self, sources: Union[Iterator[InputData], List[Iterator[InputData]]]
+      self, source_fns: Union[InputIteratorFn, List[InputIteratorFn]]
   ) -> Optional[rt.Patch]:
     op = LocalAppendOp(self._storage.location, self._storage.metadata,
                        self._file_options)
-    if not isinstance(sources, list):
-      sources = [sources]
+    if not isinstance(source_fns, list):
+      source_fns = [source_fns]
 
-    for source in sources:
-      for data in source:
+    for source_fn in source_fns:
+      for data in source_fn():
         op.write(data)
 
     return op.finish()

@@ -15,14 +15,14 @@
 """Distributed append operation using Ray."""
 
 from __future__ import annotations
-from typing import Iterator, List, Optional
+from typing import List, Optional
 
 import pyarrow as pa
 
 from space.core.ops import utils
 from space.core.ops.utils import FileOptions
 from space.core.ops.append import BaseAppendOp, LocalAppendOp
-from space.core.ops.base import InputData
+from space.core.ops.base import InputData, InputIteratorFn
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
 from space.core.utils.lazy_imports_utils import ray
@@ -73,14 +73,15 @@ class RayAppendOp(BaseAppendOp):
 
     ray.get(responses)
 
-  def write_from(self, sources: List[Iterator[InputData]]) -> None:
+  def write_from(self, source_fns: List[InputIteratorFn]) -> None:
     """Append data into the dataset from multiple iterator sources in
     parallel.
     """
     num_actors = len(self._actors)
     responses = []
-    for i, source in enumerate(sources):
-      responses.append(self._actors[i % num_actors].write_from.remote(source))
+    for i, source_fn in enumerate(source_fns):
+      responses.append(self._actors[i %
+                                    num_actors].write_from.remote(source_fn))
 
     ray.get(responses)
 
@@ -101,9 +102,9 @@ class _AppendActor:
     self._op = LocalAppendOp(location, metadata, file_options,
                              record_address_input)
 
-  def write_from(self, source: Iterator[InputData]) -> None:
+  def write_from(self, source_fn: InputIteratorFn) -> None:
     """Append data into the dataset from an iterator source."""
-    for data in source:
+    for data in source_fn():
       self._op.write(data)
 
   def write(self, data: InputData) -> bool:
