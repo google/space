@@ -242,6 +242,19 @@ class TestStorage:
     assert storage.data_files() == rt.FileSet(
         index_files=[index_file0, index_file1],
         index_manifest_files=manifests_dict2)
+    assert pa.concat_tables(storage.index_manifest()).to_pydict() == {
+        "_FILE": ["data/file0", "data/file1"],
+        "_NUM_ROWS": [3, 2],
+        "_INDEX_COMPRESSED_BYTES": [110, 104],
+        "_INDEX_UNCOMPRESSED_BYTES": [109, 100],
+        "_STATS_f0": [{
+            "_MAX": 3,
+            "_MIN": 1
+        }, {
+            "_MAX": 1000000,
+            "_MIN": 1000
+        }]
+    }
 
     # Test time travel data_files().
     assert storage.data_files(snapshot_id=0) == rt.FileSet()

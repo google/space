@@ -80,8 +80,7 @@ class TestLocalArrayRecordLoadOp:
         index_uncompressed_bytes=100,
         record_uncompressed_bytes=135)
 
-    index_data = pa.concat_tables(
-        (list(runner.read()))).select(["id", "num_objects"])
+    index_data = runner.read_all().select(["id", "num_objects"])
     assert index_data == pa.Table.from_pydict({
         "id": [123, 456],
         "num_objects": [1, 2]

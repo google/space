@@ -59,6 +59,14 @@ class TestLocalRunner:
     local_runner.delete(pc.field("id") >= 10)
     assert _read_pyarrow(local_runner) == _generate_data(range(10))
 
+    storage = sample_dataset.storage
+    index_manifest = pa.concat_tables(storage.index_manifest()).to_pydict()
+    assert index_manifest["_NUM_ROWS"] == [10]
+
+    # Deletion does not change rows in record files.
+    record_manifest = pa.concat_tables(storage.record_manifest()).to_pydict()
+    assert record_manifest["_NUM_ROWS"] == [50, 50, 40, 40]
+
   def test_append_empty_data_should_skip_commit(self, sample_dataset):
     local_runner = sample_dataset.local()
 
