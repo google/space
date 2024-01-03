@@ -28,7 +28,7 @@ from space.core.schema import constants
 from space.core.storage import Storage
 from space.core.utils import errors
 from space.core.utils.paths import StoragePathsMixin
-from space.core.serializers import FieldSerializer
+from space.core.serializers import DictSerializer, FieldSerializer
 from space.core.ops.read import read_record_column
 from space.core.fs.array_record import read_record_file
 
@@ -78,18 +78,12 @@ class ArrowDataSource(AbcSequence):
   """Data source using addresses stored in Arrow table."""
 
   def __init__(self,
-               storage: Storage,
                addresses: pa.Table,
-               feature_fields: List[str],
-               deserialize: bool = False):
-    self._storage = storage
+               feature_fields: Dict[str, Storage],
+               serializer: Optional[DictSerializer] = None):
     self._addresses = addresses
-
     self._feature_fields = feature_fields
-
-    self._serializer = None
-    if deserialize:
-      self._serializer = self._storage.serializer()
+    self._serializer = serializer
 
   def __len__(self) -> int:
     return self._addresses.num_rows
@@ -103,13 +97,13 @@ class ArrowDataSource(AbcSequence):
       return self.__getitems__(index)
 
     results: Dict[str, bytes] = {}
-    for field_name in self._feature_fields:
-      file_path = self._addresses[_file_path(field_name)][index].as_py()
-      row_ids = [self._addresses[_row_id(field_name)][index].as_py()]
-      records: List[bytes] = read_record_file(
-          self._storage.full_path(file_path), row_ids)
+    for field, storage in self._feature_fields.items():
+      file_path = self._addresses[_file_path(field)][index].as_py()
+      row_ids = [self._addresses[_row_id(field)][index].as_py()]
+      records: List[bytes] = read_record_file(storage.full_path(file_path),
+                                              row_ids)
       assert len(records) == 1
-      results[field_name] = records[0]
+      results[field] = records[0]
 
     if self._serializer is None:
       return self._maybe_remove_dict(results)
@@ -123,18 +117,18 @@ class ArrowDataSource(AbcSequence):
 
   def __getitems__(self, indexes: Sequence[int]) -> Sequence[Any]:
     results: Dict[str, List[bytes]] = {}
-    for field_name in self._feature_fields:
-      file_paths = self._addresses[_file_path(field_name)].take(
+    for field, storage in self._feature_fields.items():
+      file_paths = self._addresses[_file_path(field)].take(
           indexes)  # type: ignore[arg-type]
-      row_ids = self._addresses[_row_id(field_name)].take(
+      row_ids = self._addresses[_row_id(field)].take(
           indexes)  # type: ignore[arg-type]
       addresses = pa.Table.from_arrays(
           [file_paths, row_ids],  # type: ignore[arg-type]
           [constants.FILE_PATH_FIELD, constants.ROW_ID_FIELD])
 
-      records = read_record_column(self._storage, addresses).to_pylist()
+      records = read_record_column(storage, addresses).to_pylist()
       assert len(records) == addresses.num_rows
-      results[field_name] = records
+      results[field] = records
 
     return self._maybe_remove_dict(results if self._serializer is None else
                                    self._serializer.deserialize(results))
@@ -151,8 +145,7 @@ class RandomAccessDataSource(AbcSequence):
 
   # pylint: disable=too-many-arguments
   def __init__(self,
-               storage_or_location: Union[str, Storage],
-               feature_fields: List[str],
+               feature_fields: Dict[str, Union[str, Storage]],
                addresses: Optional[pa.Table] = None,
                deserialize: bool = False,
                use_array_record_data_source=True):
@@ -160,43 +153,64 @@ class RandomAccessDataSource(AbcSequence):
     TODO: to support a filter on index fields.
 
     Args:
-      storage: the Space dataset or materialized view storage.
-      feature_fields: the record field containing data to read.
+      feature_fields: the record field containing data to read, in form of
+        {<field>: <storage>}, where <storage> is the storage containing the
+        field.
       addresses: a table of feature field addresses
       deserialize: deserialize output data if true, otherwise return bytes.
+      use_array_record_data_source: use ArrayRecordDataSource if true, it only
+        supports one feature field.
     """
-    if isinstance(storage_or_location, str):
-      storage = Storage.load(storage_or_location)
-    else:
-      storage = storage_or_location
+    storages: Dict[str, Storage] = {}
+    for field, storage_or_location in feature_fields.items():
+      if isinstance(storage_or_location, str):
+        s = Storage.load(storage_or_location)
+        feature_fields[field] = s
+        storages[storage_or_location] = s
+      else:
+        storages[storage_or_location.location] = storage_or_location
 
     serializers: Dict[str, FieldSerializer] = {}
     if deserialize:
-      for field_name in feature_fields:
-        serializer = storage.serializer().field_serializer(field_name)
+      for field, s in feature_fields.items():  # type: ignore[assignment]
+        serializer = s.serializer().field_serializer(field)
         if serializer is None:
           raise errors.UserInputError(
-              f"Feature field {field_name} must be a record field")
+              f"Feature field {field} in {s.location} must be a record field")
 
-        serializers[field_name] = serializer  # type: ignore[assignment]
+        serializers[field] = serializer  # type: ignore[assignment]
 
+    storage: Optional[Storage] = None
+    if len(storages) == 1:
+      storage = list(storages.values())[0]
+
+    # Today the support of multiple storages is for external addresses
+    # scenarios only, for example, addresses as the output of a JOIN.
     if addresses is None:
-      addresses = self._read_addresses(storage, feature_fields)
+      if storage is None:
+        raise errors.UserInputError(
+            f"Expect exactly one storage, found {len(storages)}")
+
+      addresses = self._read_addresses(storage, list(feature_fields.keys()))
 
     addresses = addresses.flatten()
 
+    # Today ArrayRecordDataSource only support a single feature field.
     if use_array_record_data_source and len(feature_fields) == 1:
-      field_name = feature_fields[0]
-      file_paths = addresses.column(_file_path(field_name))
-      row_ids = addresses.column(_row_id(field_name))
+      assert storage is not None
+      field = list(feature_fields.keys())[0]
+      file_paths = addresses.column(_file_path(field))
+      row_ids = addresses.column(_row_id(field))
       file_instructions = build_file_instructions(
           storage, file_paths, row_ids)  # type: ignore[arg-type]
       self._data_source = ArrayRecordDataSource(
-          file_instructions, serializers[field_name] if deserialize else None)
+          file_instructions, serializers[field] if deserialize else None)
     else:
       self._data_source = ArrowDataSource(
-          storage, addresses, feature_fields,
-          deserialize)  # type: ignore[assignment]
+          addresses,
+          feature_fields,  # type: ignore[arg-type]
+          DictSerializer(serializers)
+          if deserialize else None)  # type: ignore[assignment]
 
     self._length = len(self._data_source)
 
@@ -212,13 +226,12 @@ class RandomAccessDataSource(AbcSequence):
   def __getitems__(self, record_keys: Sequence[int]) -> Sequence[Any]:
     return self._data_source.__getitems__(record_keys)
 
-  def _read_addresses(self, storage: Storage,
-                      feature_fields: List[str]) -> pa.Table:
+  def _read_addresses(self, storage: Storage, fields: List[str]) -> pa.Table:
     """Read index and references (record address) columns.
     
     TODO: to read index fields for supporting filters.
     """
-    addresses = Dataset(storage).local().read_all(fields=feature_fields,
+    addresses = Dataset(storage).local().read_all(fields=fields,
                                                   reference_read=True)
 
     if addresses is None:

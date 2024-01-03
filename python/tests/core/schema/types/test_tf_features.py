@@ -77,7 +77,7 @@ class TestTfFeatures:
 
   def test_dict_serialize_deserialize(self, tf_features):
     schema = pa.schema([("int64", pa.int64()), ("features", tf_features)])
-    serializer = DictSerializer(schema)
+    serializer = DictSerializer.create(schema)
 
     features_data = [{
         "objects": {
