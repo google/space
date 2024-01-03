@@ -31,6 +31,7 @@ from space.core.manifests.index import read_index_manifests
 from space.core.ops import utils as ops_utils
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
+from space.core.serializers.base import DictSerializer
 from space.core.schema import FieldIdManager
 from space.core.schema import arrow
 from space.core.schema import substrait as substrait_schema
@@ -92,6 +93,10 @@ class Storage(paths.StoragePathsMixin):
   def physical_schema(self) -> pa.Schema:
     """Return the physcal schema that uses reference for record fields."""
     return self._physical_schema
+
+  def serializer(self) -> DictSerializer:
+    """Return a serializer (deserializer) for the dataset."""
+    return DictSerializer(self.logical_schema)
 
   def snapshot(self, snapshot_id: Optional[int] = None) -> meta.Snapshot:
     """Return the snapshot specified by a snapshot ID, or current snapshot ID
