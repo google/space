@@ -140,28 +140,33 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
     return result_data
 
 
-def read_record_column(paths_mixin: StoragePathsMixin,
-                       record_address: pa.Table, field: str) -> pa.BinaryArray:
+def read_record_column(paths: StoragePathsMixin,
+                       addresses: pa.Table,
+                       field: Optional[str] = None) -> pa.BinaryArray:
   """Read rows in multiple ArrayRecord files specified in a record address
   table.
   
   Args:
-    paths_mixin: provide full_path method.
-    record_address: specify record rows to read.
-    field: the field name to read.
+    paths: provide `full_path` method.
+    addresses: addresses of record rows to read.
+    field: the field name to read, if `addresses` has field name prefix.
   """
-  num_rows = record_address.num_rows
-  # _RECORD_KEY_FIELD is the row index of record_address_table used for
-  # retrieving rows after group by. It is not in the read result.
-  record_address = record_address.flatten().append_column(
+  num_rows = addresses.num_rows
+  # _RECORD_KEY_FIELD is the row index of addresses used for retrieving rows
+  # after group by. It is not in the read result.
+  addresses = addresses.flatten().append_column(
       _RECORD_KEY_FIELD, [np.arange(num_rows)])  # type: ignore[arg-type]
 
-  file_path_field = f"{field}.{FILE_PATH_FIELD}"
-  row_id_field = f"{field}.{ROW_ID_FIELD}"
+  if field is None:
+    file_path_field = f"{FILE_PATH_FIELD}"
+    row_id_field = f"{ROW_ID_FIELD}"
+  else:
+    file_path_field = f"{field}.{FILE_PATH_FIELD}"
+    row_id_field = f"{field}.{ROW_ID_FIELD}"
 
   # Record row IDs and records key co-grouped by file path, for processing
   # one file at a time to minimize file reads.
-  grouped_records = record_address.group_by(
+  grouped_records = addresses.group_by(
       file_path_field).aggregate(  # type: ignore[arg-type]
           [(row_id_field, "list"), (_RECORD_KEY_FIELD, "list")])
 
@@ -176,8 +181,7 @@ def read_record_column(paths_mixin: StoragePathsMixin,
   for file_path, row_ids in zip(file_path_column,
                                 row_ids_column):  # type: ignore[call-overload]
     record_values.append(
-        read_record_file(paths_mixin.full_path(file_path.as_py()),
-                         row_ids.as_py()))
+        read_record_file(paths.full_path(file_path.as_py()), row_ids.as_py()))
 
   # Sort records by record_keys so the records can match indexes.
   sorted_values: List[bytes] = [None] * num_rows  # type: ignore[list-item]

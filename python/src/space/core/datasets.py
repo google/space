@@ -23,7 +23,6 @@ from substrait.algebra_pb2 import ReadRel, Rel
 
 from space.core.ops.utils import FileOptions
 from space.core.runners import LocalRunner
-from space.core.serializers.base import DictSerializer
 from space.core.storage import Storage
 from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.plans import LogicalPlanBuilder
@@ -73,10 +72,6 @@ class Dataset(View):
   @property
   def record_fields(self) -> List[str]:
     return self._storage.record_fields
-
-  def serializer(self) -> DictSerializer:
-    """Return a serializer (deserializer) for the dataset."""
-    return DictSerializer(self.schema)
 
   def local(self, file_options: Optional[FileOptions] = None) -> LocalRunner:
     """Get a runner that runs operations locally."""
