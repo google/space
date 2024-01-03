@@ -92,6 +92,10 @@ class Dataset(View):
     return {self._storage.location: self}
 
   def to_relation(self, builder: LogicalPlanBuilder) -> Rel:
+    # TODO: using location as table name is a limitation, because the location
+    # could be mapped from Cloud Storage. The solution is external catalog
+    # service integration, and using a unique identifier registered in the
+    # catalog instead.
     location = self._storage.location
     return Rel(read=ReadRel(named_table=ReadRel.NamedTable(names=[location]),
                             base_schema=self._storage.metadata.schema.fields))
