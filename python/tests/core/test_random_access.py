@@ -39,7 +39,7 @@ class TestRandomAccessDataSource:
     return TfFeatures(features_dict)
 
   @pytest.mark.parametrize(
-      "feature_fields, test_serializer,test_array_record_data_source,"
+      "feature_fields,test_serializer,test_array_record_data_source,"
       "test_external_addresses,test_single_index",
       [
           # Test single feature field, read muliple indexes.
@@ -59,10 +59,9 @@ class TestRandomAccessDataSource:
           (["f0", "f1"], False, False, False, True),
           (["f0", "f1"], False, False, True, True)
       ])
-  def test_read_space_data_source(self, tmp_path, tf_features, feature_fields,
-                                  test_serializer,
-                                  test_array_record_data_source,
-                                  test_external_addresses, test_single_index):
+  def test_data_source(self, tmp_path, tf_features, feature_fields,
+                       test_serializer, test_array_record_data_source,
+                       test_external_addresses, test_single_index):
     fields = [("id", pa.int64())]
     for f in feature_fields:
       fields.append((f, tf_features))
@@ -79,9 +78,7 @@ class TestRandomAccessDataSource:
     input_data = _generate_data(batch_sizes, feature_fields, test_serializer)
 
     runner = ds.local()
-    serializer = ds.storage.serializer()
-    for data in input_data:
-      runner.append(serializer.serialize(data) if test_serializer else data)
+    _write_data(ds, runner, input_data, test_serializer)
 
     addresses = None
     if test_external_addresses:
@@ -92,8 +89,8 @@ class TestRandomAccessDataSource:
       addresses = addresses.flatten()
 
     data_source = RandomAccessDataSource(
-        location,
-        feature_fields,
+        {f: location
+         for f in feature_fields},
         addresses,
         deserialize=test_serializer,
         use_array_record_data_source=test_array_record_data_source)
@@ -121,21 +118,88 @@ class TestRandomAccessDataSource:
       f = feature_fields[0]
       expected = [input_data_rows[i][f] for i in indexes]
 
-    def _sort(results, expected):
+    def _sort(data):
       if test_serializer:
-        key_fn = lambda v: v["image_id"]  # pylint: disable=unnecessary-lambda-assignment
-        results.sort(key=key_fn)
-        expected.sort(key=key_fn)
+        data.sort(key=lambda v: v["image_id"])
       else:
-        results.sort()
-        expected.sort()
+        data.sort()
+
+    def _multi_field_sort(data):
+      key_fn = None
+      if test_serializer:
+        key_fn = lambda v: v[0]["image_id"]  # pylint: disable=unnecessary-lambda-assignment
+
+      data["f0"], data["f1"] = zip(
+          *sorted(zip(data["f0"], data["f1"]), key=key_fn))
 
     if len(feature_fields) > 1:
-      for f in feature_fields:
-        _sort(results[f], expected[f])
+      _multi_field_sort(results)
+      _multi_field_sort(expected)
     else:
-      _sort(results, expected)
+      _sort(results)
+      _sort(expected)
 
+    assert_equal(results, expected)
+
+  @pytest.mark.parametrize(
+      "test_serializer,test_single_index,test_storage_input",
+      [(False, False, False), (True, False, False), (False, True, False),
+       (False, True, True)])
+  def test_multiple_storages(self, tmp_path, tf_features, test_serializer,
+                             test_single_index, test_storage_input):
+    # Create the 1st dataset.
+    batch_sizes0 = [1, 2, 3]
+    location0 = str(tmp_path / "ds0")
+    ds0, addresses0, input_data0 = _create_and_write_dataset(
+        location0, "feature0", batch_sizes0, tf_features, test_serializer)
+
+    # Create the 2nd dataset.
+    batch_sizes1 = [3, 2, 1]
+    location1 = str(tmp_path / "ds1")
+    ds1, addresses1, input_data1 = _create_and_write_dataset(
+        location1, "feature1", batch_sizes1, tf_features, test_serializer)
+
+    assert sum(batch_sizes0) == sum(batch_sizes1)
+
+    # Join two dataset's addresses.
+    joined_addresses = addresses0.join(addresses1, keys="id")
+
+    data_source = RandomAccessDataSource(
+        {
+            "feature0": ds0.storage if test_storage_input else location0,
+            "feature1": ds1.storage if test_storage_input else location1,
+        },
+        joined_addresses,
+        deserialize=test_serializer,
+        use_array_record_data_source=False)
+    assert len(data_source) == addresses0.num_rows
+
+    indexes = list(range(len(data_source)))
+    random.shuffle(indexes)
+
+    if test_single_index:
+      results = [data_source[i] for i in indexes]
+      results = pa.Table.from_pylist(results).to_pydict()
+    else:
+      results = data_source[indexes]
+
+    input_data_rows0 = _read_batches(input_data0, ["feature0"], False)
+    input_data_rows1 = _read_batches(input_data1, ["feature1"], False)
+    expected = {
+        "feature0": [input_data_rows0[i]["feature0"] for i in indexes],
+        "feature1": [input_data_rows1[i]["feature1"] for i in indexes]
+    }
+
+    def _sort(data):
+      key_fn = None
+      if test_serializer:
+        key_fn = lambda v: v[0]["image_id"]  # pylint: disable=unnecessary-lambda-assignment
+
+      data["feature0"], data["feature1"] = zip(
+          *sorted(zip(data["feature0"], data["feature1"]), key=key_fn))
+
+    _sort(results)
+    _sort(expected)
     assert_equal(results, expected)
 
 
@@ -155,11 +219,11 @@ def _generate_data(batch_sizes, feature_fields, test_serializer):
   return result
 
 
-def _read_batches(data, feature_fields, test_external_addresses):
+def _read_batches(data, feature_fields, apply_filter):
   result = []
   for batch in data:
     for i in range(len(batch["id"])):
-      if test_external_addresses and batch["id"][i] <= 50:
+      if apply_filter and batch["id"][i] <= 50:
         continue
 
       row = {"id": batch["id"][i]}
@@ -181,3 +245,29 @@ def _generate_features(ids, test_serializer):
     } for id_ in ids]
 
   return [f"bytes_{id_}".encode(UTF_8) for id_ in ids]
+
+
+def _write_data(ds, runner, input_data, test_serializer):
+  serializer = ds.storage.serializer()
+  for data in input_data:
+    runner.append(serializer.serialize(data) if test_serializer else data)
+
+
+def _create_and_write_dataset(location, feature_field, batch_sizes,
+                              tf_features, test_serializer):
+  feature_fields = [feature_field]
+  schema = pa.schema([("id", pa.int64()), (feature_field, tf_features)])
+  ds = Dataset.create(location,
+                      schema,
+                      primary_keys=["id"],
+                      record_fields=feature_fields)
+
+  input_data = _generate_data(batch_sizes, feature_fields, test_serializer)
+
+  runner = ds.local()
+  _write_data(ds, runner, input_data, test_serializer)
+
+  addresses = runner.read_all(fields=["id"] + feature_fields,
+                              reference_read=True)
+  assert addresses is not None
+  return ds, addresses.flatten(), input_data

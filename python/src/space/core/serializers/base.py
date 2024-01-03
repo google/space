@@ -14,6 +14,7 @@
 #
 """Serializers (and deserializers) for unstructured record fields."""
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 from typing_extensions import TypeAlias
@@ -56,12 +57,18 @@ class DictSerializer:
   converted from an Arrow table, e.g., {"field": [values, ...], ...}
   """
 
-  def __init__(self, logical_schema: pa.Schema):
-    self._serializers: Dict[str, FieldSerializer] = {}
+  def __init__(self, serializers: Dict[str, FieldSerializer]):
+    self._serializers = serializers
 
+  @classmethod
+  def create(cls, logical_schema: pa.Schema) -> DictSerializer:
+    """Create a new dictionary serializer."""
+    serializers: Dict[str, FieldSerializer] = {}
     for field in logical_schema:
       if isinstance(field.type, FieldSerializer):
-        self._serializers[field.name] = field.type
+        serializers[field.name] = field.type
+
+    return DictSerializer(serializers)
 
   def field_serializer(self, field: str) -> Optional[FieldSerializer]:
     """Return the FieldSerializer of a given field, or None if not found."""

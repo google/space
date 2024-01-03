@@ -96,7 +96,7 @@ class Storage(paths.StoragePathsMixin):
 
   def serializer(self) -> DictSerializer:
     """Return a serializer (deserializer) for the dataset."""
-    return DictSerializer(self.logical_schema)
+    return DictSerializer.create(self.logical_schema)
 
   def snapshot(self, snapshot_id: Optional[int] = None) -> meta.Snapshot:
     """Return the snapshot specified by a snapshot ID, or current snapshot ID

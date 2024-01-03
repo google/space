@@ -61,7 +61,7 @@ class LocalArrayRecordLoadOp(StoragePathsMixin):
     assert len(self._record_fields) == 1, "Support only one record field"
     self._record_field = self._record_fields[0]
 
-    self._serializer = DictSerializer(logical_schema)
+    self._serializer = DictSerializer.create(logical_schema)
     self._input_files = list_files(input_dir, substr=".array_record")
 
   def write(self) -> Optional[rt.Patch]:
