@@ -4,18 +4,30 @@
 
 <hr/>
 
-Space is a hybrid column/row oriented storage framework for Machine Learning datasets. It brings data warehouse/lake features, e.g., data mutation, version management, OLAP queries, materialized views, to ML datasets, while being able to keep data in original row-oriented files. It is perfect for incrementally building and publishing high quality training datasets.
+Space is a hybrid column/row oriented storage framework for Machine Learning datasets. It brings data warehouse/lake features, e.g., data mutation, version management, OLAP queries, materialized views, to ML datasets, for simplifying DataOps and MLOps.
 
-Space uses [Arrow](https://arrow.apache.org/docs/python/index.html) for its APIs (e.g., schema, filter) and in-memory columnar data processing. It supports the file formats:
+For each row of data, Space stores bulky unstructured fields in random access row oriented format (record fields), and stores the addresses (pairs of file and row ID) together with the other fields in columnar files (index fields). By decoupling unstructured data and processing only addresses, it can efficiently support all OLAP/columnar style data operations, e.g., sorting, JOIN. It automatically read data from addresses in its APIs when needed, e.g., feed data into training frameworks.
 
-- [Parqeut](https://parquet.apache.org/) for storing columnar data.
-- [ArrayRecord](https://github.com/google/array_record), a high-performance random access row format for storing bulk ML data. [ArrayRecord](https://www.tensorflow.org/datasets/tfless_tfds) is the successor format in [Tensorflow Datasets](https://www.tensorflow.org/datasets) after [TFRecord](https://www.tensorflow.org/tutorials/load_data/tfrecord).
+<img src="docs/pics/space_overview.png" width="600" />
 
-Data can be moved between Space and other ML datasets (e.g, [TFDS](https://www.tensorflow.org/datasets), [HuggingFace](https://huggingface.co/docs/datasets/index)), with zero or minimized file rewrite, if the file formats and schema are compatible.
+## Ecosystem Integration
 
-Data warehouse/lake features are empowered by a simple [Iceberg](https://iceberg.apache.org/) style, copy-on-write open table format. Data operations can run locally, or distributedly in [Ray](https://docs.ray.io/en/latest/index.html) clusters.
+Space uses [Arrow](https://arrow.apache.org/docs/python/index.html) in the API surface, e.g., schema, filter, data IO. It supports the following file formats:
 
-We expect to support more file formats and compute frameworks in future.
+- [Parquet](https://parquet.apache.org/) for storing columnar data.
+- [ArrayRecord](https://github.com/google/array_record), a high-performance random access row format for ML training. [ArrayRecord](https://www.tensorflow.org/datasets/tfless_tfds) is the successor format in [Tensorflow Datasets](https://www.tensorflow.org/datasets) after [TFRecord](https://www.tensorflow.org/tutorials/load_data/tfrecord).
+
+Because these file formats are native for the most popular OLAP engines and ML frameworks, ecosystem integration is easy: data can be moved between Space and other frameworks, with zero or minimized file rewrite. In addition, Space can be easily integrated with frameworks using Arrow, e.g., [Ray](https://docs.ray.io/en/latest/index.html). Data operations in Space can run locally, or distributedly in Ray clusters.
+
+We expect to support more file formats (e.g., [TFRecord](https://www.tensorflow.org/tutorials/load_data/tfrecord), [Lance](https://github.com/lancedb/lancedb)) and compute frameworks (e.g., [Dask](https://www.dask.org/)) in future.
+
+## Table Format Design
+
+Data warehouse/lake features are empowered by a simple, copy-on-write open table format. Its metadata files use [Protobuf](https://protobuf.dev/) and Parquet files. The metadata Parquet files (aka, manifest files) store the information of data files, i.e., file path, storage statistics, and column statistics (min, max). One row represents one data file. There are two types of manifest files, for index/record fields respectively.
+
+Users can query the manifest files as Arrow tables to get insights of the storage (method `index_manifest`). See more details in the [Segment Anything example](/notebooks/segment_anything_tutorial.ipynb).
+
+Space uses **relative file paths** everywhere in metadata that gives us superior portability. A Space dataset stored in Cloud Storage can be mapped to local files using [FUSE](https://en.wikipedia.org/wiki/Filesystem_in_Userspace). And it is immediately usable after being downloaded or moved.
 
 ## Quick Start
 
@@ -33,9 +45,13 @@ Optionally, setup [GCS FUSE](https://cloud.google.com/storage/docs/gcs-fuse) to 
 gcsfuse <mybucket> "/path/to/<mybucket>"
 ```
 
-### Read and write data
+Space has not yet implemented Cloud Storage file systems. FUSE is the current suggested approach.
 
-Create a Space dataset with two index fields (`id`, `image_name`) (store in Parquet) and a record field (`feature`) (store in ArrayRecord). We don't define a concrete type for the record field, so the type is plain `binary`:
+### Create empty dataset
+
+Create a Space dataset with two index fields (`id`, `image_name`) (store in Parquet) and a record field (`feature`) (store in ArrayRecord).
+
+This example uses the plain `binary` type for the record field. Space supports a type `space.TfFeatures` that integrates with the [TFDS feature serializer](https://www.tensorflow.org/datasets/api_docs/python/tfds/features/FeaturesDict). See more details in a [TFDS example](/notebooks/tfds_coco_tutorial.ipynb).
 
 ```py
 import pyarrow as pa
@@ -56,10 +72,13 @@ ds = Dataset.create(
 # ds = Dataset.load("/path/to/<mybucket>/example_ds")
 ```
 
-Append, delete some data, then read:
+### Read and write data
+
+Append, delete some data. Each mutation generates a new version of data, represented by an increasing integer ID. We expect to support the [Iceberg](https://iceberg.apache.org/docs/latest/branching/) style tags and branches for better version management.
 ```py
 import pyarrow.compute as pc
 
+# Create a local or Ray runner.
 runner = ds.local()  # or ds.ray()
 
 # Appending data generates a new dataset version `1`.
@@ -67,10 +86,11 @@ runner = ds.local()  # or ds.ray()
 # - append(...): no primary key check.
 # - insert(...): fail if primary key exists.
 # - upsert(...): override if primary key exists.
+ids = range(100)
 runner.append({
-  "id": [1, 2, 3],
-  "image_name": ["1.jpg", "2.jpg", "3.jpg"],
-  "binary": [b"somedata1", b"somedata2", b"somedata3"]
+  "id": ids,
+  "image_name": [f"{i}.jpg" for i in ids],
+  "feature": [f"somedata{i}".encode("utf-8") for i in ids]
 })
 
 # Deletion generates a new version `2`.
@@ -80,55 +100,81 @@ runner.delete(pc.field("id") == 1)
 # - filter_: optional, apply a filter (push down to reader).
 # - fields: optional, field selection.
 # - snapshot_id: optional, time travel back to an old version.
-runner.read(
+runner.read_all(
   filter_=pc.field("image_name")=="2.jpg",
-  fields=["binary"],
+  fields=["feature"],
   snapshot_id=1
 )
 
 # Read the changes between version 0 and 2.
-runner.diff(0, 2)
+for change_type, data in runner.diff(0, 2):
+  print(change_type)
+  print(data)
+  print("===============")
 ```
 
 ### Transform and materialized views
 
-Space supports transforming a dataset to a view, and materializing the view to files. When the source dataset is updated, refreshing the materialized view incrementally synchronizes changes, which saves processing cost.
+Space supports transforming a dataset to a view, and materializing the view to files. When the source dataset is modified, refreshing the materialized view incrementally synchronizes changes, which saves compute and IO cost. See more details in a [Segment Anything example](/notebooks/segment_anything_tutorial.ipynb).
+
+Reading or refreshing views must be the `Ray` runner, because they are implemented based on [Ray transform](https://docs.ray.io/en/latest/data/transforming-data.html).
 
 ```py
-# A sample UDF that resizes images.
-def resize_image_udf(batch):
-  batch["binary"] = resize_image(batch["binary"])
+# A sample transform UDF.
+# Input is {"field_name": [values, ...], ...}
+def modify_feature_udf(batch):
+  batch["feature"] = [d + b"123" for d in batch["feature"]]
   return batch
 
 # Create a view and materialize it.
 view = ds.map_batches(
-  fn=resize_image_udf,
+  fn=modify_feature_udf,
   output_schema=ds.schema,
-  output_record_fields=["binary"]
+  output_record_fields=["feature"]
 )
 view_runner = view.ray()
-view_runner.read()  # Read dataset files and apply transform on it.
+# Read dataset files and apply transform on it.
+for d in view_runner.read():
+  print(d)
 
 mv = view.materialize("/path/to/<mybucket>/example_mv")
 
 mv_runner = mv.ray()
-# Refresh the MV up to version `2`.
-mv_runner.refresh(2)
-mv_runner.read()  # Directly read from materialized view files.
+# Refresh the MV up to version `1`.
+mv_runner.refresh(1)
+mv_runner.read_all()  # Directly read from materialized view files.
 ```
 
 ### ML frameworks integration
 
-Space datasets/views support popular ML dataset interfaces to integrate with inference/training frameworks:
+There are several ways to integrate Space storage with ML frameworks. Space provides a random access data source for reading data in ArrayRecord files:
 
 ```py
-from space.tf.data_sources import SpaceDataSource
+from space import RandomAccessDataSource
 
-# To a TFDS random access data source.
-tf_datasource = SpaceDataSource(ds, feature_fields=["feature"])
+datasource = RandomAccessDataSource(
+  # <field-name>: <storage-location>, for reading data from ArrayRecord files.
+  {
+    "feature": "/path/to/<mybucket>/example_mv",
+  },
+  # Don't auto deserialize data, because we store them as plain bytes.
+  deserialize=False)
 
-# To a Ray dataset.
-ray_dataset = ds.ray_dataset()
+len(datasource)
+```
+
+A dataset or view can also be read as a Ray dataset:
+```py
+ray_ds = ds.ray_dataset()
+ray_ds.take(2)
+```
+
+Data in Parquet files can be read as a HuggingFace dataset:
+```py
+from datasets import load_dataset
+
+huggingface_ds = load_dataset("parquet", data_files={"train": ds.index_files()})
+
 ```
 
 ## More readings

@@ -27,6 +27,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "pandas",
   "pyarrow-stubs",
   "ray",
   "tensorflow",
