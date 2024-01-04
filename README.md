@@ -8,7 +8,7 @@ Space is a hybrid column/row oriented storage framework for Machine Learning dat
 
 For each row of data, Space stores bulky unstructured fields in random access row oriented format (record fields), and stores the addresses (pairs of file and row ID) together with the other fields in columnar files (index fields). By decoupling unstructured data and processing only addresses, it can efficiently support all OLAP/columnar style data operations, e.g., sorting, JOIN. It automatically read data from addresses in its APIs when needed, e.g., feed data into training frameworks.
 
-<img src="docs/pics/space_overview.png" width="600" />
+<img src="docs/pics/space_overview.png" width="800" />
 
 ## Ecosystem Integration
 
@@ -132,8 +132,10 @@ view = ds.map_batches(
   output_schema=ds.schema,
   output_record_fields=["feature"]
 )
+
 view_runner = view.ray()
-# Read dataset files and apply transform on it.
+# Reading a view will read the source dataset and apply transforms on it.
+# It processes all data using `modify_feature_udf` on the fly.
 for d in view_runner.read():
   print(d)
 
@@ -141,8 +143,11 @@ mv = view.materialize("/path/to/<mybucket>/example_mv")
 
 mv_runner = mv.ray()
 # Refresh the MV up to version `1`.
-mv_runner.refresh(1)
-mv_runner.read_all()  # Directly read from materialized view files.
+mv_runner.refresh(1)  # mv_runner.refresh() refresh to the latest version
+
+# Use the MV runner instead of view runner to directly read from materialized
+# view files, no data processing any more.
+mv_runner.read_all()
 ```
 
 ### ML frameworks integration
