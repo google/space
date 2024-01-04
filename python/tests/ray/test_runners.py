@@ -24,6 +24,7 @@ import ray
 from space import Dataset
 from space.core.jobs import JobResult
 from space.core.ops.change_data import ChangeType
+from space.core.utils import errors
 from space.core.utils.uuids import random_id
 
 
@@ -177,10 +178,11 @@ class TestRayReadWriteRunner:
         "float64": [1.1, 1.3],
     })
 
-    result = ray_runner.refresh(3)
-    assert result.state == JobResult.State.FAILED
-    assert ("Target snapshot ID 3 higher than source dataset version"
-            in result.error_message)
+    with pytest.raises(
+        errors.SnapshotNotFoundError,
+        match=r".*Target snapshot ID 3 higher than source dataset version 2.*"
+    ):
+      ray_runner.refresh(3)
 
   def test_diff_filter(self, sample_dataset):
     # A sample UDF for testing.
