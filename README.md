@@ -6,7 +6,7 @@
 
 Space is a hybrid column/row oriented storage framework for Machine Learning datasets. It brings data warehouse/lake features, e.g., data mutation, version management, OLAP queries, materialized views, to ML datasets, for simplifying DataOps and MLOps.
 
-For each row of data, Space stores bulky unstructured fields in random access row oriented format (record fields), and stores the addresses (pairs of file and row ID) together with the other fields in columnar files (index fields). By decoupling unstructured data and processing only addresses, it can efficiently support all OLAP/columnar style data operations, e.g., sort, join. It automatically read data from addresses in its APIs when needed, e.g., feed data into training frameworks.
+For each row of data, Space stores bulky unstructured fields in random access row oriented format (record fields), and stores the addresses (pairs of file and row ID) together with the other fields in columnar files (index fields). By decoupling unstructured data and processing only addresses, it can efficiently support all OLAP/columnar style data operations, e.g., sort, join. It automatically reads data from addresses in its APIs when needed, e.g., feed data into training frameworks.
 
 <img src="docs/pics/space_overview.png" width="800" />
 
@@ -47,7 +47,7 @@ gcsfuse <mybucket> "/path/to/<mybucket>"
 
 Space has not yet implemented Cloud Storage file systems. FUSE is the current suggested approach.
 
-### Create empty dataset
+### Create Empty Datasets
 
 Create a Space dataset with two index fields (`id`, `image_name`) (store in Parquet) and a record field (`feature`) (store in ArrayRecord).
 
@@ -72,7 +72,7 @@ ds = Dataset.create(
 # ds = Dataset.load("/path/to/<mybucket>/example_ds")
 ```
 
-### Read and write data
+### Write and Read
 
 Append, delete some data. Each mutation generates a new version of data, represented by an increasing integer ID. We expect to support the [Iceberg](https://iceberg.apache.org/docs/latest/branching/) style tags and branches for better version management.
 ```py
@@ -113,7 +113,7 @@ for change_type, data in runner.diff(0, 2):
   print("===============")
 ```
 
-### Transform and materialized views
+### Transform and Materialized Views
 
 Space supports transforming a dataset to a view, and materializing the view to files. When the source dataset is modified, refreshing the materialized view incrementally synchronizes changes, which saves compute and IO cost. See more details in a [Segment Anything example](/notebooks/segment_anything_tutorial.ipynb).
 
@@ -150,7 +150,7 @@ mv_runner.refresh(1)  # mv_runner.refresh() refresh to the latest version
 mv_runner.read_all()
 ```
 
-### ML frameworks integration
+### ML Frameworks Integration
 
 There are several ways to integrate Space storage with ML frameworks. Space provides a random access data source for reading data in ArrayRecord files:
 
@@ -182,7 +182,7 @@ huggingface_ds = load_dataset("parquet", data_files={"train": ds.index_files()})
 
 ```
 
-## More readings
+## More Readings
 
 ### Examples
 - [Load TFDS datasets into Space: COCO as example](notebooks/tfds_coco_tutorial.ipynb)
