@@ -54,7 +54,7 @@ message StorageMetadata {
   // The storage schema.
   Schema schema = 4;
 
-  // The current snapshot ID.
+  // The current snapshot ID for the main branch.
   int64 current_snapshot_id = 5;
 
   // All alive snapshots with snapshot ID as key.
@@ -62,6 +62,12 @@ message StorageMetadata {
 
   // Store the logical plan for materialized views.
   LogicalPlan logical_plan = 7;
+
+  // All alive tags, with reference name as key
+  map<string, SnapshotReference> tags = 8;
+  
+  // All alive branches, with reference name as key
+  map<string, SnapshotReference> branches = 9;
 }
 
 // The storage logical schema where user provided types are persisted instead
@@ -104,6 +110,12 @@ message Snapshot {
   // The metadata file path (StorageMetadata) that uses this snapshot as the
   // current snapshot.
   string metadata_file = 6;
+}
+
+message SnapshotReference {
+  string reference_name = 1;
+  // The snapshot ID.
+  int64 snapshot_id = 2;
 }
 
 // Stores information of manifest files.
