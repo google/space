@@ -156,9 +156,6 @@ class TestLocalRunner:
     with pytest.raises(errors.TagNotFoundError) as excinfo:
       local_runner.read_all(tag="insert1")
     assert "Tag insert1 is not found" in str(excinfo.value)
-    
-
-
 
 def _read_pyarrow(runner: LocalRunner,
                   filter_: Optional[pc.Expression] = None) -> pa.Table:
