@@ -25,6 +25,7 @@ from tensorflow_datasets import features as f
 from space import Dataset, LocalRunner, TfFeatures
 from space.core.jobs import JobResult
 from space.core.ops.change_data import ChangeType
+from space.core.utils import errors
 
 
 class TestLocalRunner:
@@ -133,6 +134,30 @@ class TestLocalRunner:
 
     assert local_runner1.read_all() == pa.concat_tables(
         [sample_data1, sample_data2, sample_data3, sample_data4])
+
+  def test_add_read_remove_tag(self, sample_dataset):
+    ds = sample_dataset
+    local_runner = ds.local()
+
+    sample_data1 = _generate_data([1, 2])
+    local_runner.append(sample_data1)
+
+    local_runner.add_tag(tag="insert1")
+    assert local_runner.read_all() == sample_data1
+
+    sample_data2 = _generate_data([3, 4])
+    local_runner.append(sample_data2)
+
+    assert local_runner.read_all() == pa.concat_tables(
+        [sample_data1, sample_data2])
+    assert local_runner.read_all(tag="insert1") == pa.concat_tables(
+        [sample_data1])
+    local_runner.remove_tag(tag="insert1")
+    with pytest.raises(errors.TagNotFoundError) as excinfo:
+      local_runner.read_all(tag="insert1")
+    assert "Tag insert1 is not found" in str(excinfo.value)
+    
+
 
 
 def _read_pyarrow(runner: LocalRunner,

@@ -104,7 +104,7 @@ global___FileSet = FileSet
 
 @typing_extensions.final
 class Patch(google.protobuf.message.Message):
-    """A patch describing metadata changes to the storage.
+    """A patch describing metadata changes to the storage for a data operation.
     NEXT_ID: 5
     """
 

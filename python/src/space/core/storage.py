@@ -187,6 +187,40 @@ class Storage(paths.StoragePathsMixin):
     """Start a transaction."""
     return Transaction(self)
 
+  def lookup_tag(self,tag:str) -> meta.SnapshotReference:
+    if tag in self._metadata.tags:
+      return self._metadata.tags[tag]
+    raise errors.TagNotFoundError(f"Tag {tag} is not found")
+
+  def add_tag(self, tag:str, snapshot_id: Optional[int] = None) -> None:
+    """Add tag to a snapshot"""
+    if snapshot_id is None:
+      snapshot_id = self._metadata.current_snapshot_id
+    if snapshot_id not in self._metadata.snapshots:
+        raise errors.SnapshotNotFoundError(f"Snapshot {snapshot_id} is not found")
+    if tag in self._metadata.tags:
+        raise errors.TagExistError(f"Tag {tag} already exist")
+    new_metadata_path = self.new_metadata_path()
+    new_metadata = meta.StorageMetadata()
+    new_metadata.CopyFrom(self._metadata)
+    tag_reference = meta.SnapshotReference()
+    tag_reference.reference_name = tag
+    tag_reference.snapshot_id = snapshot_id
+    new_metadata.tags[tag].CopyFrom(tag_reference)
+    self._write_metadata(new_metadata_path, new_metadata)
+    self._metadata = new_metadata
+  
+  def remove_tag(self, tag:str) -> None:
+    """Remove tag from metadata"""
+    if tag not in self._metadata.tags:
+      raise errors.SnapshotNotFoundError(f"Tag {tag} is not found")
+    new_metadata_path = self.new_metadata_path()
+    new_metadata = meta.StorageMetadata()
+    new_metadata.CopyFrom(self._metadata)
+    del new_metadata.tags[tag]
+    self._write_metadata(new_metadata_path, new_metadata)
+    self._metadata = new_metadata
+
   def commit(self, patch: rt.Patch) -> None:
     """Commit changes to the storage.
 
@@ -239,6 +273,7 @@ class Storage(paths.StoragePathsMixin):
       snapshot_id: read a specified snapshot instead of the current.
     """
     manifest_files = self.snapshot(snapshot_id).manifest_files
+    print(manifest_files)
     result = rt.FileSet()
 
     # A temporily assigned identifier for tracking manifest files.

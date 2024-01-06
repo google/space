@@ -47,6 +47,7 @@ class BaseReadOnlyRunner(ABC):
   def read(self,
            filter_: Optional[pc.Expression] = None,
            fields: Optional[List[str]] = None,
+           tag: Optional[str] = None,
            snapshot_id: Optional[int] = None,
            reference_read: bool = False) -> Iterator[pa.Table]:
     """Read data from the dataset as an iterator."""
@@ -54,10 +55,11 @@ class BaseReadOnlyRunner(ABC):
   def read_all(self,
                filter_: Optional[pc.Expression] = None,
                fields: Optional[List[str]] = None,
+               tag: Optional[str] = None,
                snapshot_id: Optional[int] = None,
                reference_read: bool = False) -> Optional[pa.Table]:
     """Read data from the dataset as an Arrow table."""
-    data = list(self.read(filter_, fields, snapshot_id, reference_read))
+    data = list(self.read(filter_, fields, tag, snapshot_id, reference_read))
     if not data:
       return None
 
@@ -109,8 +111,17 @@ class StorageMixin:
 
     return decorated
 
+class BaseVersionUpdateRunner(ABC):
+  @abstractmethod
+  def add_tag(self, snapshot_id:int, tag:str) -> JobResult:
+    """Append data into the dataset."""
 
-class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
+  @abstractmethod
+  def remove_tag(self, snapshot_id:int, tag:str) -> JobResult:
+    """Append data into the dataset."""
+
+
+class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner, BaseVersionUpdateRunner):
   """Abstract base read and write runner class."""
 
   def __init__(self,
@@ -187,8 +198,17 @@ class LocalRunner(BaseReadWriteRunner):
   def read(self,
            filter_: Optional[pc.Expression] = None,
            fields: Optional[List[str]] = None,
+           tag: Optional[str] = None,
            snapshot_id: Optional[int] = None,
            reference_read: bool = False) -> Iterator[pa.Table]:
+    if tag and snapshot_id:
+      raise errors.UserInputError(
+          f"Cannot set tag and snapshot id in the same read operation")
+    
+    if tag:
+      tag_ref = self._storage.lookup_tag(tag)
+      snapshot_id = tag_ref.snapshot_id
+
     return iter(
         FileSetReadOp(
             self._storage.location, self._storage.metadata,
@@ -252,3 +272,29 @@ class LocalRunner(BaseReadWriteRunner):
                          self._storage.data_files(filter_), filter_,
                          self._file_options)
     return op.delete()
+
+  @StorageMixin.reload
+  def add_tag(self, tag:str, snapshot_id: Optional[int] = None) -> JobResult:
+    """Add Tag to a snapshot."""
+    try:
+      self._storage.add_tag(tag, snapshot_id)
+      r = JobResult(JobResult.State.SUCCEEDED)
+      logging.info(f"Job result:\n{r}")
+      return r
+    except (errors.SpaceRuntimeError, errors.UserInputError) as e:
+      r = JobResult(JobResult.State.FAILED, None, repr(e))
+      logging.warning(f"Job result:\n{r}")
+      return r
+
+  @StorageMixin.reload
+  def remove_tag(self, tag:str) -> JobResult:
+    """Append data into the dataset."""
+    try:
+      self._storage.remove_tag(tag)
+      r = JobResult(JobResult.State.SUCCEEDED)
+      logging.info(f"Job result:\n{r}")
+      return r
+    except (errors.SpaceRuntimeError, errors.UserInputError) as e:
+      r = JobResult(JobResult.State.FAILED, None, repr(e))
+      logging.warning(f"Job result:\n{r}")
+      return r
