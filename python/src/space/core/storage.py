@@ -273,7 +273,6 @@ class Storage(paths.StoragePathsMixin):
       snapshot_id: read a specified snapshot instead of the current.
     """
     manifest_files = self.snapshot(snapshot_id).manifest_files
-    print(manifest_files)
     result = rt.FileSet()
 
     # A temporily assigned identifier for tracking manifest files.
