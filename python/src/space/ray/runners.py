@@ -22,6 +22,7 @@ from typing import Iterator, List, Optional, Tuple, Union
 import pyarrow as pa
 import pyarrow.compute as pc
 
+from space.core.jobs import JobResult
 from space.core.loaders.array_record import ArrayRecordIndexFn
 from space.core.runners import BaseReadOnlyRunner, BaseReadWriteRunner
 from space.core.runners import StorageMixin
@@ -127,10 +128,8 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
                                          reference_read).to_arrow_refs():
       yield ray.get(ref)
 
-  @StorageMixin.transactional
   def refresh(self,
-              target_version: Optional[Union[int]] = None
-              ) -> Optional[rt.Patch]:
+              target_version: Optional[Union[int]] = None) -> List[JobResult]:
     """Refresh the materialized view by synchronizing from source dataset."""
     source_snapshot_id = self._source_storage.metadata.current_snapshot_id
     if target_version is None:
@@ -140,23 +139,24 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
       if end_snapshot_id > source_snapshot_id:
         raise errors.SnapshotNotFoundError(
             f"Target snapshot ID {end_snapshot_id} higher than source dataset "
-            "version {source_snapshot_id}")
+            f"version {source_snapshot_id}")
 
     start_snapshot_id = self._storage.metadata.current_snapshot_id
 
-    patches: List[Optional[rt.Patch]] = []
+    job_results: List[JobResult] = []
     for change_type, data in self.diff(start_snapshot_id, end_snapshot_id):
       # In the scope of changes from the same snapshot, must process DELETE
       # before ADD.
       if change_type == ChangeType.DELETE:
-        patches.append(self._process_delete(data))
+        job_results.append(self._process_delete(data))
       elif change_type == ChangeType.ADD:
-        patches.append(self._process_append(data))
+        job_results.append(self._process_append(data))
       else:
         raise NotImplementedError(f"Change type {change_type} not supported")
 
-    return utils.merge_patches(patches)
+    return job_results
 
+  @StorageMixin.transactional
   def _process_delete(self, data: pa.Table) -> Optional[rt.Patch]:
     filter_ = utils.primary_key_filter(self._storage.primary_keys, data)
     if filter_ is None:
@@ -167,6 +167,7 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
                          self._file_options)
     return op.delete()
 
+  @StorageMixin.transactional
   def _process_append(self, data: pa.Table) -> Optional[rt.Patch]:
     op = LocalAppendOp(self._storage.location, self._storage.metadata,
                        self._file_options)
