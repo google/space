@@ -80,6 +80,7 @@ class _SpaceDataSourceReader(Reader):
   # executed in parallel.
   # Note: The `parallelism` which is supposed to indicate how many `ReadTask` to
   # return will have no effect here, since we map each query into a `ReadTask`.
+  # TODO: to properly handle the error that returned list is empty.
   def get_read_tasks(self, parallelism: int) -> List[ReadTask]:
     read_tasks: List[ReadTask] = []
     file_set = self._storage.data_files(self._filter, self._snapshot_id)
