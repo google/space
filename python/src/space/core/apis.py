@@ -12,11 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Space is a storage framework for ML datasets."""
+"""APIs of Space core lib."""
 
-from space.core.apis import Range
-from space.core.datasets import Dataset
-from space.core.runners import LocalRunner
-from space.core.random_access import RandomAccessDataSource
-from space.core.schema.types import TfFeatures
-from space.core.views import MaterializedView
+from dataclasses import dataclass
+from typing import Any, Callable, List, Optional
+
+
+@dataclass
+class Range:
+  """A range of a field."""
+  # Always inclusive.
+  min_: Any
+  # Default exclusive.
+  max_: Any
+  # Max is inclusive when true.
+  include_max: bool = False
+
+
+@dataclass
+class JoinOptions:
+  """Options of joining data."""
+  # Partition the join key range into multiple ranges for parallel processing.
+  partition_fn: Optional[Callable[[Range], List[Range]]] = None

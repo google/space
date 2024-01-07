@@ -24,8 +24,8 @@ from substrait.algebra_pb2 import ReadRel, Rel
 from space.core.ops.utils import FileOptions
 from space.core.runners import LocalRunner
 from space.core.storage import Storage
+from space.core.transform.plans import LogicalPlanBuilder
 from space.core.utils.lazy_imports_utils import ray
-from space.core.utils.plans import LogicalPlanBuilder
 from space.core.views import View
 from space.ray.runners import RayOptions, RayReadWriterRunner
 
