@@ -28,12 +28,13 @@ from space.core.loaders.array_record import ArrayRecordIndexFn
 from space.core.loaders.array_record import LocalArrayRecordLoadOp
 from space.core.loaders.parquet import LocalParquetLoadOp
 from space.core.ops.append import LocalAppendOp
+from space.core.ops.append import FileOptions
 from space.core.ops.base import InputData, InputIteratorFn
 from space.core.ops.change_data import ChangeType, read_change_data
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions, LocalInsertOp
-from space.core.ops.append import FileOptions
-from space.core.ops.read import FileSetReadOp, ReadOptions
+from space.core.ops.read import FileSetReadOp
+from space.core.options import JoinOptions, ReadOptions
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
 from space.core.utils import errors
@@ -43,22 +44,31 @@ from space.core.versions.utils import version_to_snapshot_id
 class BaseReadOnlyRunner(ABC):
   """Abstract base read-only runner class."""
 
+  # pylint: disable=too-many-arguments
   @abstractmethod
-  def read(self,
-           filter_: Optional[pc.Expression] = None,
-           fields: Optional[List[str]] = None,
-           snapshot_id: Optional[int] = None,
-           reference_read: bool = False) -> Iterator[pa.Table]:
+  def read(
+      self,
+      filter_: Optional[pc.Expression] = None,
+      fields: Optional[List[str]] = None,
+      snapshot_id: Optional[int] = None,
+      reference_read: bool = False,
+      join_options: JoinOptions = JoinOptions()
+  ) -> Iterator[pa.Table]:
     """Read data from the dataset as an iterator."""
 
-  def read_all(self,
-               filter_: Optional[pc.Expression] = None,
-               fields: Optional[List[str]] = None,
-               snapshot_id: Optional[int] = None,
-               reference_read: bool = False) -> Optional[pa.Table]:
+  # pylint: disable=too-many-arguments
+  def read_all(
+      self,
+      filter_: Optional[pc.Expression] = None,
+      fields: Optional[List[str]] = None,
+      snapshot_id: Optional[int] = None,
+      reference_read: bool = False,
+      join_options: JoinOptions = JoinOptions()
+  ) -> Optional[pa.Table]:
     """Read data from the dataset as an Arrow table."""
     all_data = []
-    for data in self.read(filter_, fields, snapshot_id, reference_read):
+    for data in self.read(filter_, fields, snapshot_id, reference_read,
+                          join_options):
       if data.num_rows > 0:
         all_data.append(data)
 
@@ -187,19 +197,21 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
 class LocalRunner(BaseReadWriteRunner):
   """A runner that runs operations locally."""
 
+  # pylint: disable=too-many-arguments
   @StorageMixin.reload
-  def read(self,
-           filter_: Optional[pc.Expression] = None,
-           fields: Optional[List[str]] = None,
-           snapshot_id: Optional[int] = None,
-           reference_read: bool = False) -> Iterator[pa.Table]:
+  def read(
+      self,
+      filter_: Optional[pc.Expression] = None,
+      fields: Optional[List[str]] = None,
+      snapshot_id: Optional[int] = None,
+      reference_read: bool = False,
+      join_options: JoinOptions = JoinOptions()
+  ) -> Iterator[pa.Table]:
     return iter(
         FileSetReadOp(
             self._storage.location, self._storage.metadata,
             self._storage.data_files(filter_, snapshot_id=snapshot_id),
-            ReadOptions(filter_=filter_,
-                        fields=fields,
-                        reference_read=reference_read)))
+            ReadOptions(filter_, fields, reference_read=reference_read)))
 
   @StorageMixin.reload
   def diff(self, start_version: Union[int],

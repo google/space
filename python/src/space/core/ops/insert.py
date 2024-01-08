@@ -22,12 +22,13 @@ from typing import List, Optional
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from space.core.ops.append import LocalAppendOp
-from space.core.ops.delete import FileSetDeleteOp
-from space.core.ops.read import FileSetReadOp, ReadOptions
-from space.core.ops.utils import FileOptions
 from space.core.ops import utils
+from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import BaseOp, InputData
+from space.core.ops.delete import FileSetDeleteOp
+from space.core.ops.read import FileSetReadOp
+from space.core.ops.utils import FileOptions
+from space.core.options import ReadOptions
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage

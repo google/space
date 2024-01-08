@@ -16,18 +16,18 @@
 
 from __future__ import annotations
 from dataclasses import dataclass, field as dataclass_field
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, TYPE_CHECKING
 
 import pyarrow as pa
-import pyarrow.compute as pc
 from substrait.algebra_pb2 import Rel
 
-from space.core.apis import JoinOptions
+from space.core.options import JoinOptions, ReadOptions
+from space.core.schema.arrow import record_address_types
 from space.core.transform.plans import LogicalPlanBuilder
 from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray
 from space.core.views import View
-from space.ray.ops.join import RayJoinOp
+from space.ray.ops.join import JoinInput, RayJoinOp
 
 if TYPE_CHECKING:
   from space.core.datasets import Dataset
@@ -37,15 +37,12 @@ if TYPE_CHECKING:
 class JoinTransform(View):
   """Transform that joins two views/datasets."""
 
-  # The input views/datasets of the join.
-  left: View
-  right: View
-  # The fields to read from the input view or dataset.
-  left_fields: Optional[List[str]]
-  right_fields: Optional[List[str]]
   # Join keys must be parts of primary keys.
   join_keys: List[str]
-  join_options: JoinOptions
+  # The input views/datasets of the join.
+  left: JoinInput
+  right: JoinInput
+
   output_schema: pa.Schema = dataclass_field(init=False)
 
   def __post_init__(self):
@@ -57,7 +54,7 @@ class JoinTransform(View):
 
   @property
   def sources(self) -> Dict[str, Dataset]:
-    return {**self.left.sources, **self.right.sources}
+    return {**self.left.view.sources, **self.right.view.sources}
 
   @property
   def schema(self) -> pa.Schema:
@@ -66,60 +63,65 @@ class JoinTransform(View):
   def _output_schema(self) -> pa.Schema:
     assert len(self.join_keys) == 1
     join_key = self.join_keys[0]
+    record_fields = set(self.record_fields)
 
-    def _fields(view: View,
-                field_names: Optional[List[str]]) -> List[pa.Field]:
-      nonlocal join_key
-      return [
-          view.schema.field(f).remove_metadata()  # type: ignore[arg-type]
-          for f in (field_names or view.schema.names) if f != join_key
-      ]
+    def _fields(input_: JoinInput) -> List[pa.Field]:
+      nonlocal join_key, record_fields
+      results = []
+      for f in (input_.fields or input_.view.schema.names):
+        if f == join_key:
+          continue
+
+        if input_.reference_read and f in record_fields:
+          results.append(pa.field(f, pa.struct(
+              record_address_types())))  # type: ignore[arg-type]
+        else:
+          results.append(input_.view.schema.field(
+              f).remove_metadata())  # type: ignore[arg-type]
+
+      return results
 
     # TODO: to handle reference read. If true, use the address field schema.
     try:
-      left_fields_ = _fields(self.left, self.left_fields)
-      right_fields_ = _fields(self.right, self.right_fields)
+      left_fields = _fields(self.left)
+      right_fields = _fields(self.right)
 
       # TODO: to check field names that are the same in left and right; add a
       # validation first, and then support field rename.
       return pa.schema([
-          self.left.schema.field(
+          self.left.view.schema.field(
               join_key).remove_metadata()  # type: ignore[arg-type]
-      ] + left_fields_ + right_fields_)
+      ] + left_fields + right_fields)
     except KeyError as e:
       raise errors.UserInputError(repr(e))
 
   @property
   def record_fields(self) -> List[str]:
     # TODO: For now just inherit record fields from input, to allow updating.
-    left_record_fields = set(self.left.record_fields).intersection(
-        set(self.left_fields or self.left.schema.names))
-    right_record_fields = set(self.right.record_fields).intersection(
-        set(self.right_fields or self.right.schema.names))
+    left_record_fields = set(self.left.view.record_fields).intersection(
+        set(self.left.fields or self.left.view.schema.names))
+    right_record_fields = set(self.right.view.record_fields).intersection(
+        set(self.right.fields or self.right.view.schema.names))
     return list(left_record_fields) + list(right_record_fields)
 
   def process_source(self, data: pa.Table) -> ray.Dataset:
     raise NotImplementedError(
         "Processing change data in join is not supported")
 
-  def ray_dataset(self,
-                  filter_: Optional[pc.Expression] = None,
-                  fields: Optional[List[str]] = None,
-                  snapshot_id: Optional[int] = None,
-                  reference_read: bool = False) -> ray.Dataset:
-    if fields is not None:
+  def ray_dataset(self, read_options: ReadOptions,
+                  join_options: JoinOptions) -> ray.Dataset:
+    if read_options.fields is not None:
       raise errors.UserInputError(
           "`fields` is not supported for join, use `left_fields` and"
           " `right_fields` of join instead")
 
-    if reference_read:
+    if read_options.reference_read:
       # TODO: need such options for both left and right, will be supported
       # after refactoring the arguments.
       raise errors.UserInputError("`reference_read` is not supported for join")
 
-    return RayJoinOp(self.left, self.left_fields, self.right,
-                     self.right_fields, self.join_keys, self.schema,
-                     self.join_options).ray_dataset()
+    return RayJoinOp(self.left, self.right, self.join_keys, self.schema,
+                     join_options).ray_dataset()
 
   def to_relation(self, builder: LogicalPlanBuilder) -> Rel:
     raise NotImplementedError("Materialized view of join is not supported")

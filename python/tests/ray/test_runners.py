@@ -22,7 +22,7 @@ import pyarrow.compute as pc
 import pytest
 import ray
 
-from space import Dataset, Range
+from space import Dataset, JoinOptions, Range
 from space.core.jobs import JobResult
 from space.core.ops.change_data import ChangeType
 from space.core.utils import errors
@@ -233,13 +233,14 @@ class TestRayReadWriteRunner:
     # Test several changes.
     assert list(view_runner.diff(0, 2)) == [expected_change0, expected_change1]
 
-  @pytest.mark.parametrize("left_fields,right_fields,partition_fn",
-                           [(None, None, None),
-                            (None, None, _sample_partition_fn),
-                            (["float64", "binary"], ["string"], None),
-                            (["float64"], ["string"], None)])
+  @pytest.mark.parametrize(
+      "left_fields,right_fields,partition_fn,left_reference_read",
+      [(None, None, None, False), (None, None, _sample_partition_fn, False),
+       (None, None, None, True),
+       (["float64", "binary"], ["string"], None, False),
+       (["float64"], ["string"], None, False)])
   def test_join(self, tmp_path, sample_dataset, left_fields, right_fields,
-                partition_fn):
+                partition_fn, left_reference_read):
     ds1 = sample_dataset
     ds1.local().append(generate_data(range(50)))
     ds1.local().append(generate_data(range(50, 100)))
@@ -266,17 +267,24 @@ class TestRayReadWriteRunner:
                     keys=["int64"],
                     left_fields=left_fields,
                     right_fields=right_fields,
-                    partition_fn=partition_fn)
+                    left_reference_read=left_reference_read)
 
-    assert view.schema == pa.schema([
+    if left_reference_read:
+      ds1_schema = ds1.storage.physical_schema
+    else:
+      ds1_schema = ds1.schema
+
+    expected_schema = pa.schema([
         pa.field("int64", pa.int64()), *[
-            ds1.schema.field(f).remove_metadata()
+            ds1_schema.field(f).remove_metadata()
             for f in left_fields or ds1.schema.names if f != "int64"
         ], *[
             ds2.schema.field(f).remove_metadata()
             for f in right_fields or ds2.schema.names if f != "int64"
         ]
     ])
+
+    assert view.schema == expected_schema
     assert view.record_fields == (["binary"]
                                   if "binary" in view.schema.names else [])
 
@@ -289,9 +297,14 @@ class TestRayReadWriteRunner:
           "string": [f"s{v}" for v in values]
       })
 
-    expected = generate_expected(
-        list(range(0, 5)) + list(range(40, 60)) + list(range(90, 100)))
-    assert view.ray().read_all() == expected.select(view.schema.names)
+    join_values = view.ray().read_all(JoinOptions(partition_fn=partition_fn))
+    expected_values = generate_expected(
+        list(range(0, 5)) + list(range(40, 60)) + list(range(90, 100))).select(
+            view.schema.names)
+
+    # TODO: reference_read support is not completed yet.
+    if not left_reference_read:
+      assert join_values == expected_values
 
   @pytest.mark.parametrize("left_fields,right_fields",
                            [(["float64"], []), (["int64"], ["string"])])

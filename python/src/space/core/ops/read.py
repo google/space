@@ -18,12 +18,11 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Iterator, Dict, List, Tuple, Optional
 
-from dataclasses import dataclass
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
-import pyarrow.compute as pc
 
+from space.core.options import ReadOptions
 from space.core.fs.array_record import read_record_file
 from space.core.ops.base import BaseOp
 from space.core.proto import metadata_pb2 as meta
@@ -34,18 +33,6 @@ from space.core.schema import utils as schema_utils
 from space.core.utils.paths import StoragePathsMixin
 
 _RECORD_KEY_FIELD = "__RECORD_KEY"
-
-
-@dataclass
-class ReadOptions:
-  """Options of reading data."""
-  # Filters on index fields.
-  filter_: Optional[pc.Expression] = None
-  # When specified, only read the given fields instead of all fields.
-  fields: Optional[List[str]] = None
-  # If true, read the references (e.g., address) of read record fields instead
-  #  of values.
-  reference_read: bool = False
 
 
 class BaseReadOp(BaseOp):
