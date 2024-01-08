@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Classes for transforming datasets and """
+"""Classes for transforming datasets using user defined functions."""
 
 from __future__ import annotations
 from abc import abstractmethod
@@ -35,10 +35,11 @@ from substrait.type_pb2 import Type
 from space.core.datasets import Dataset
 import space.core.proto.metadata_pb2 as meta
 from space.core.schema import arrow
+from space.core.transform.plans import LogicalPlanBuilder, UserDefinedFn
+from space.core.transform.plans import SIMPLE_UDF_URI
+import space.core.transform.utils as transform_utils
 from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray
-from space.core.utils.plans import SIMPLE_UDF_URI
-from space.core.utils.plans import LogicalPlanBuilder, UserDefinedFn
 from space.core.views import View
 
 
@@ -111,16 +112,9 @@ class BaseUdfTransform(View):
           "`fields` is not supported for views, use `input_fields` of "
           "transforms (map_batches, filter) instead")
 
-    if isinstance(self.input_, Dataset):
-      # Push input_fields down to the dataset to read less data.
-      ray_ds = self.input_.ray_dataset(filter_, self.input_fields, snapshot_id,
-                                       reference_read)
-    else:
-      ray_ds = self.input_.ray_dataset(filter_, fields, snapshot_id,
-                                       reference_read).select_columns(
-                                           self.input_fields)
-
-    return self._transform(ray_ds)
+    return self._transform(
+        transform_utils.ray_dataset(self.input_, filter_, self.input_fields,
+                                    snapshot_id, reference_read))
 
   @abstractmethod
   def _transform(self, ds: ray.Dataset) -> ray.Dataset:
@@ -243,7 +237,7 @@ def _load_udf(location: str, metadata: meta.StorageMetadata,
   udf = UserDefinedFn.load(path.join(location, pickle_path))
 
   # Build the input view and input argument field names.
-  input_ = load_view_(location, metadata, input_rel, plan)
+  input_ = _load_view(location, metadata, input_rel, plan)
   field_name_dict = arrow.field_id_to_name_dict(input_.schema)
   input_fields = [
       field_name_dict[arg.value.selection.direct_reference.struct_field.field]
@@ -257,10 +251,10 @@ def load_view(location: str, metadata: meta.StorageMetadata,
               plan: Plan) -> View:
   """Build a view from logical plan relation."""
   rel = plan.relations[0].root.input
-  return load_view_(location, metadata, rel, _CompactPlan.from_plan(plan))
+  return _load_view(location, metadata, rel, _CompactPlan.from_plan(plan))
 
 
-def load_view_(location: str, metadata: meta.StorageMetadata, rel: Rel,
+def _load_view(location: str, metadata: meta.StorageMetadata, rel: Rel,
                plan: _CompactPlan) -> View:
   """Build a view from logical plan relation."""
   if rel.HasField("read"):

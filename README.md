@@ -187,6 +187,7 @@ huggingface_ds = load_dataset("parquet", data_files={"train": ds.index_files()})
 ### Examples
 - [Load TFDS datasets into Space: COCO as example](notebooks/tfds_coco_tutorial.ipynb)
 - [Load custom data and build transform pipeline: Segment Anything as example](notebooks/segment_anything_tutorial.ipynb)
+- [Incrementally build embedding indexes using materialized views](notebooks/incremental_embedding_index.ipynb)
 
 ## Staus
 Space is a new project under active development.

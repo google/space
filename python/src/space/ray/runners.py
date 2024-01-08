@@ -40,6 +40,7 @@ from space.core.versions.utils import version_to_snapshot_id
 from space.ray.ops.append import RayAppendOp
 from space.ray.ops.delete import RayDeleteOp
 from space.ray.ops.insert import RayInsertOp
+from space.ray.ops.utils import singleton_storage
 
 if TYPE_CHECKING:
   from space.core.datasets import Dataset
@@ -71,13 +72,16 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
 
     Dataset itself is a special view without any transforms.
     """
+    # Reload all sources because there are two sources for join.
+    for ds in self._view.sources.values():
+      ds.storage.reload()
+    
     snapshot_id = None
     if version:
       if isinstance(version, str):
         snapshot_id = self._source_storage.lookup_reference(version).snapshot_id
       else:
         snapshot_id = version
-    self._source_storage.reload()
     for ref in self._view.ray_dataset(filter_, fields, snapshot_id,
                                       reference_read).to_arrow_refs():
       yield ray.get(ref)
@@ -97,10 +101,8 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
 
   @property
   def _source_storage(self) -> Storage:
-    """Obtain storage of the source dataset, never write to it."""
-    sources = self._view.sources
-    assert len(sources) == 1, "Views only support a single source dataset"
-    return list(sources.values())[0].storage
+    """Obtain the single storage of the source dataset, never write to it."""
+    return singleton_storage(self._view)
 
 
 class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):

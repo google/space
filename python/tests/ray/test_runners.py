@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Iterable
+from __future__ import annotations
+from typing import Any, Dict, List, Iterable
 
 import numpy as np
 from numpy.testing import assert_equal
@@ -21,7 +22,7 @@ import pyarrow.compute as pc
 import pytest
 import ray
 
-from space import Dataset
+from space import Dataset, Range
 from space.core.jobs import JobResult
 from space.core.ops.change_data import ChangeType
 from space.core.utils import errors
@@ -48,6 +49,17 @@ def sample_dataset(tmp_path, sample_schema):
                       primary_keys=["int64"],
                       record_fields=["binary"])
   return ds
+
+
+def _sample_partition_fn(range_: Range) -> List[Range]:
+  assert range_ == Range(0, 99, True)
+
+  return [
+      Range(0, 10, False),
+      Range(10, 50, False),
+      Range(50, 99, False),
+      Range(99, 99, True)
+  ]
 
 
 class TestRayReadWriteRunner:
@@ -113,7 +125,7 @@ class TestRayReadWriteRunner:
             pa.Table.from_pydict({
                 "int64": [10, 11, 12],
                 "float64": [v / 10 + 1 for v in [10, 11, 12]],
-                "binary": [b"b{v}" for v in [10, 11, 12]]
+                "binary": [f"b{v}".encode("utf-8") for v in [10, 11, 12]]
             })
         ]).sort_by("int64"))
 
@@ -221,10 +233,116 @@ class TestRayReadWriteRunner:
     # Test several changes.
     assert list(view_runner.diff(0, 2)) == [expected_change0, expected_change1]
 
+  @pytest.mark.parametrize("left_fields,right_fields,partition_fn",
+                           [(None, None, None),
+                            (None, None, _sample_partition_fn),
+                            (["float64", "binary"], ["string"], None),
+                            (["float64"], ["string"], None)])
+  def test_join(self, tmp_path, sample_dataset, left_fields, right_fields,
+                partition_fn):
+    ds1 = sample_dataset
+    ds1.local().append(generate_data(range(50)))
+    ds1.local().append(generate_data(range(50, 100)))
+
+    ds2 = Dataset.create(str(tmp_path / f"dataset_{random_id()}"),
+                         pa.schema([
+                             pa.field("int64", pa.int64()),
+                             pa.field("string", pa.string())
+                         ]),
+                         primary_keys=["int64"],
+                         record_fields=[])
+
+    def generate_data2(values: Iterable[int]) -> pa.Table:
+      return pa.Table.from_pydict({
+          "int64": values,
+          "string": [f"s{v}" for v in values]
+      })
+
+    ds2.local().append(generate_data2(range(-10, 5)))
+    ds2.local().append(generate_data2(range(40, 60)))
+    ds2.local().append(generate_data2(range(90, 105)))
+
+    view = ds1.join(ds2,
+                    keys=["int64"],
+                    left_fields=left_fields,
+                    right_fields=right_fields,
+                    partition_fn=partition_fn)
+
+    assert view.schema == pa.schema([
+        pa.field("int64", pa.int64()), *[
+            ds1.schema.field(f).remove_metadata()
+            for f in left_fields or ds1.schema.names if f != "int64"
+        ], *[
+            ds2.schema.field(f).remove_metadata()
+            for f in right_fields or ds2.schema.names if f != "int64"
+        ]
+    ])
+    assert view.record_fields == (["binary"]
+                                  if "binary" in view.schema.names else [])
+
+    def generate_expected(values: Iterable[int]) -> pa.Table:
+      return pa.Table.from_pydict({
+          "int64":
+          values,
+          "float64": [v / 10 for v in values],
+          "binary": [f"b{v}".encode("utf-8") for v in values],
+          "string": [f"s{v}" for v in values]
+      })
+
+    expected = generate_expected(
+        list(range(0, 5)) + list(range(40, 60)) + list(range(90, 100)))
+    assert view.ray().read_all() == expected.select(view.schema.names)
+
+  @pytest.mark.parametrize("left_fields,right_fields",
+                           [(["float64"], []), (["int64"], ["string"])])
+  def test_join_input_validation_non_join_key(self, tmp_path, sample_dataset,
+                                              left_fields, right_fields):
+    ds1 = sample_dataset
+    ds2 = Dataset.create(str(tmp_path / f"dataset_{random_id()}"),
+                         pa.schema([
+                             pa.field("int64", pa.int64()),
+                             pa.field("string", pa.string())
+                         ]),
+                         primary_keys=["int64"],
+                         record_fields=[])
+    with pytest.raises(
+        errors.UserInputError,
+        match=r".*Join requires reading at least one non-join key.*"):
+      ds1.join(ds2,
+               keys=["int64"],
+               left_fields=left_fields,
+               right_fields=right_fields)
+
+  def test_join_input_validation(self, tmp_path, sample_dataset):
+    ds1 = sample_dataset
+    ds2 = Dataset.create(str(tmp_path / f"dataset_{random_id()}"),
+                         pa.schema([
+                             pa.field("int64", pa.int64()),
+                             pa.field("string", pa.string())
+                         ]),
+                         primary_keys=["int64"],
+                         record_fields=[])
+
+    with pytest.raises(errors.UserInputError,
+                       match=r".*Support exactly one join key.*"):
+      ds1.join(ds2,
+               keys=["int64", "another_key"],
+               left_fields=["float64"],
+               right_fields=["string"])
+
+    with pytest.raises(
+        errors.UserInputError,
+        match=r".*Join key must be primary key on both sides.*"):
+      ds1.join(ds2,
+               keys=["string"],
+               left_fields=["float64"],
+               right_fields=["string"])
+
 
 def generate_data(values: Iterable[int]) -> pa.Table:
   return pa.Table.from_pydict({
-      "int64": values,
+      "int64":
+      values,
       "float64": [v / 10 for v in values],
-      "binary": [b"b{v}" for v in values]
+      "binary": [f"b{v}".encode("utf-8") for v in values]
   })

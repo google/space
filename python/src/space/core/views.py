@@ -23,15 +23,16 @@ import pyarrow as pa
 import pyarrow.compute as pc
 from substrait.algebra_pb2 import Rel
 
+from space.core.apis import JoinOptions, Range
 from space.core.fs.factory import create_fs
 from space.core.ops.utils import FileOptions
 import space.core.proto.metadata_pb2 as meta
 from space.core.schema import FieldIdManager
 from space.core.storage import Storage
+from space.core.transform.plans import LogicalPlanBuilder, UserDefinedFn
 from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray  # pylint: disable=unused-import
 from space.core.utils.paths import UDF_DIR, metadata_dir
-from space.core.utils.plans import LogicalPlanBuilder, UserDefinedFn
 from space.core.runners import LocalRunner
 from space.core.schema.utils import validate_logical_schema
 from space.ray.runners import RayMaterializedViewRunner, RayReadOnlyRunner
@@ -46,6 +47,8 @@ class View(ABC):
 
   Non-dataset views must use Ray runner instead of local runner, because the
   transforms are implemented with Ray dataset transforms.
+
+  TODO: auto assign a view name for representing transforms.
   """
 
   @property
@@ -143,7 +146,7 @@ class View(ABC):
                             output_record_fields)
 
     # pylint: disable=cyclic-import,import-outside-toplevel
-    from space.core.transform import MapTransform
+    from space.core.transform.udfs import MapTransform
     return MapTransform(
         UserDefinedFn(fn, output_schema, output_record_fields, batch_size),
         self, input_fields)
@@ -162,9 +165,53 @@ class View(ABC):
         self.schema, input_fields)
 
     # pylint: disable=cyclic-import,import-outside-toplevel
-    from space.core.transform import FilterTransform
+    from space.core.transform.udfs import FilterTransform
     return FilterTransform(UserDefinedFn(fn, self.schema, self.record_fields),
                            self, input_fields)
+
+  def join(
+      self,
+      right: View,
+      keys: List[str],
+      left_fields: Optional[List[str]] = None,
+      right_fields: Optional[List[str]] = None,
+      partition_fn: Optional[Callable[[Range], List[Range]]] = None) -> View:
+    """Join two views.
+    
+    Args:
+      keys: join keys, must be primary keys of both left and right.
+    """
+    left = self
+    if len(keys) != 1:
+      raise errors.UserInputError("Support exactly one join key")
+
+    join_key = keys[0]
+    if not (join_key in left.primary_keys and join_key in right.primary_keys):
+      raise errors.UserInputError("Join key must be primary key on both sides")
+
+    def _sanitize_fields(field_names: List[str]) -> None:
+      nonlocal join_key
+      if not field_names or field_names == [join_key]:
+        raise errors.UserInputError(
+            "Join requires reading at least one non-join key")
+
+      if join_key not in field_names:
+        field_names.append(join_key)
+
+    if left_fields is not None:
+      _sanitize_fields(left_fields)
+
+    if right_fields is not None:
+      _sanitize_fields(right_fields)
+
+    # pylint: disable=cyclic-import,import-outside-toplevel
+    from space.core.transform.join import JoinTransform
+    return JoinTransform(left=left,
+                         right=right,
+                         left_fields=left_fields,
+                         right_fields=right_fields,
+                         join_keys=keys,
+                         join_options=JoinOptions(partition_fn))
 
   def _default_or_validate_input_fields(
       self, input_schema: pa.Schema,
@@ -247,6 +294,6 @@ class MaterializedView:
     plan = metadata.logical_plan.logical_plan
 
     # pylint: disable=cyclic-import,import-outside-toplevel
-    from space.core.transform import load_view
+    from space.core.transform.udfs import load_view
     view = load_view(storage.location, metadata, plan)
     return MaterializedView(storage, view)
