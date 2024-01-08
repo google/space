@@ -33,6 +33,7 @@ from space.core.ops.base import InputData, InputIteratorFn
 from space.core.ops.change_data import ChangeType, read_change_data
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions
+from space.core.options import JoinOptions, ReadOptions
 import space.core.proto.runtime_pb2 as rt
 from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray
@@ -60,11 +61,15 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
   def __init__(self, view: View):
     self._view = view
 
-  def read(self,
-           filter_: Optional[pc.Expression] = None,
-           fields: Optional[List[str]] = None,
-           snapshot_id: Optional[int] = None,
-           reference_read: bool = False) -> Iterator[pa.Table]:
+  # pylint: disable=too-many-arguments
+  def read(
+      self,
+      filter_: Optional[pc.Expression] = None,
+      fields: Optional[List[str]] = None,
+      snapshot_id: Optional[int] = None,
+      reference_read: bool = False,
+      join_options: JoinOptions = JoinOptions()
+  ) -> Iterator[pa.Table]:
     """Read data from the dataset as an iterator.
     
     The view runner applies transforms on top of source dataset. It always
@@ -76,8 +81,9 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
     for ds in self._view.sources.values():
       ds.storage.reload()
 
-    for ref in self._view.ray_dataset(filter_, fields, snapshot_id,
-                                      reference_read).to_arrow_refs():
+    for ref in self._view.ray_dataset(
+        ReadOptions(filter_, fields, snapshot_id, reference_read),
+        join_options).to_arrow_refs():
       yield ray.get(ref)
 
   def diff(self, start_version: Union[int],
@@ -109,12 +115,16 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
     self._file_options = FileOptions(
     ) if file_options is None else file_options
 
+  # pylint: disable=too-many-arguments
   @StorageMixin.reload
-  def read(self,
-           filter_: Optional[pc.Expression] = None,
-           fields: Optional[List[str]] = None,
-           snapshot_id: Optional[int] = None,
-           reference_read: bool = False) -> Iterator[pa.Table]:
+  def read(
+      self,
+      filter_: Optional[pc.Expression] = None,
+      fields: Optional[List[str]] = None,
+      snapshot_id: Optional[int] = None,
+      reference_read: bool = False,
+      join_options: JoinOptions = JoinOptions()
+  ) -> Iterator[pa.Table]:
     """Read data from the dataset as an iterator.
     
     Different from view's default runner (RayReadOnlyRunner), a runner of
@@ -126,8 +136,9 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
     To use RayReadOnlyRunner, use `runner = mv.view.ray()` instead of
     `mv.ray()`.
     """
-    for ref in self._storage.ray_dataset(filter_, fields, snapshot_id,
-                                         reference_read).to_arrow_refs():
+    for ref in self._storage.ray_dataset(
+        ReadOptions(filter_, fields, snapshot_id,
+                    reference_read)).to_arrow_refs():
       yield ray.get(ref)
 
   def refresh(self,

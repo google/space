@@ -18,10 +18,10 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 import pyarrow as pa
-import pyarrow.compute as pc
 from substrait.algebra_pb2 import ReadRel, Rel
 
 from space.core.ops.utils import FileOptions
+from space.core.options import JoinOptions, ReadOptions
 from space.core.runners import LocalRunner
 from space.core.storage import Storage
 from space.core.transform.plans import LogicalPlanBuilder
@@ -104,14 +104,13 @@ class Dataset(View):
     # Dataset is the source, there is no transform, so simply return the data.
     return ray.data.from_arrow(data)
 
-  def ray_dataset(self,
-                  filter_: Optional[pc.Expression] = None,
-                  fields: Optional[List[str]] = None,
-                  snapshot_id: Optional[int] = None,
-                  reference_read: bool = False) -> ray.Dataset:
+  def ray_dataset(
+      self,
+      read_options: ReadOptions = ReadOptions(),
+      join_options: JoinOptions = JoinOptions()
+  ) -> ray.Dataset:
     """Return a Ray dataset for a Space dataset."""
-    return self._storage.ray_dataset(filter_, fields, snapshot_id,
-                                     reference_read)
+    return self._storage.ray_dataset(read_options)
 
   def ray(self,
           file_options: Optional[FileOptions] = None,

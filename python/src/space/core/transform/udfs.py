@@ -18,10 +18,9 @@ from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass
 from os import path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 
 import pyarrow as pa
-import pyarrow.compute as pc
 from substrait.algebra_pb2 import Expression
 from substrait.algebra_pb2 import FilterRel
 from substrait.algebra_pb2 import FunctionArgument
@@ -33,6 +32,7 @@ from substrait.plan_pb2 import Plan
 from substrait.type_pb2 import Type
 
 from space.core.datasets import Dataset
+from space.core.options import JoinOptions, ReadOptions
 import space.core.proto.metadata_pb2 as meta
 from space.core.schema import arrow
 from space.core.transform.plans import LogicalPlanBuilder, UserDefinedFn
@@ -102,19 +102,15 @@ class BaseUdfTransform(View):
     return self._transform(
         self.input_.process_source(data).select_columns(self.input_fields))
 
-  def ray_dataset(self,
-                  filter_: Optional[pc.Expression] = None,
-                  fields: Optional[List[str]] = None,
-                  snapshot_id: Optional[int] = None,
-                  reference_read: bool = False) -> ray.Dataset:
-    if fields is not None:
+  def ray_dataset(self, read_options: ReadOptions,
+                  join_options: JoinOptions) -> ray.Dataset:
+    if read_options.fields is not None:
       raise errors.UserInputError(
           "`fields` is not supported for views, use `input_fields` of "
           "transforms (map_batches, filter) instead")
 
     return self._transform(
-        transform_utils.ray_dataset(self.input_, filter_, self.input_fields,
-                                    snapshot_id, reference_read))
+        transform_utils.ray_dataset(self.input_, read_options))
 
   @abstractmethod
   def _transform(self, ds: ray.Dataset) -> ray.Dataset:

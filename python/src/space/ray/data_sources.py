@@ -17,15 +17,15 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-import pyarrow.compute as pc
 from ray.data.block import Block, BlockMetadata
 from ray.data.datasource.datasource import Datasource, Reader, ReadTask
 from ray.data.datasource.datasource import WriteResult
 from ray.types import ObjectRef
 
+from space.core.ops.read import FileSetReadOp
+from space.core.options import ReadOptions
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
-from space.core.ops.read import FileSetReadOp, ReadOptions
 
 if TYPE_CHECKING:
   from space.core.storage import Storage
@@ -36,14 +36,8 @@ class SpaceDataSource(Datasource):
 
   # pylint: disable=arguments-differ,too-many-arguments
   def create_reader(  # type: ignore[override]
-      self,
-      storage: Storage,
-      filter_: Optional[pc.Expression],
-      fields: Optional[List[str]],
-      snapshot_id: Optional[int],
-      reference_read: bool = False) -> Reader:
-    return _SpaceDataSourceReader(storage, filter_, fields, snapshot_id,
-                                  reference_read)
+      self, storage: Storage, read_options: ReadOptions) -> Reader:
+    return _SpaceDataSourceReader(storage, read_options)
 
   def do_write(self, blocks: List[ObjectRef[Block]],
                metadata: List[BlockMetadata],
@@ -59,18 +53,9 @@ class SpaceDataSource(Datasource):
 
 class _SpaceDataSourceReader(Reader):
 
-  # pylint: disable=too-many-arguments
-  def __init__(self,
-               storage: Storage,
-               filter_: Optional[pc.Expression],
-               fields: Optional[List[str]],
-               snapshot_id: Optional[int],
-               reference_read: bool = False):
+  def __init__(self, storage: Storage, read_options: ReadOptions):
     self._storage = storage
-    self._filter = filter_
-    self._fields = fields
-    self._snapshot_id = snapshot_id
-    self._reference_read = reference_read
+    self._read_options = read_options
 
   def estimate_inmemory_data_size(self) -> Optional[int]:
     # TODO: to implement this method.
@@ -83,7 +68,8 @@ class _SpaceDataSourceReader(Reader):
   # TODO: to properly handle the error that returned list is empty.
   def get_read_tasks(self, parallelism: int) -> List[ReadTask]:
     read_tasks: List[ReadTask] = []
-    file_set = self._storage.data_files(self._filter, self._snapshot_id)
+    file_set = self._storage.data_files(self._read_options.filter_,
+                                        self._read_options.snapshot_id)
 
     for index_file in file_set.index_files:
       task_file_set = rt.FileSet(index_files=[index_file])
@@ -102,9 +88,7 @@ class _SpaceDataSourceReader(Reader):
       def _read_fn(location=self._storage.location,
                    metadata=self._storage.metadata,
                    file_set=task_file_set):
-        return _read_file_set(
-            location, metadata, file_set,
-            ReadOptions(self._filter, self._fields, self._reference_read))
+        return _read_file_set(location, metadata, file_set, self._read_options)
 
       read_tasks.append(ReadTask(_read_fn, block_metadata))
 
