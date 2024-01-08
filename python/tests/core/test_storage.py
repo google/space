@@ -329,7 +329,7 @@ class TestStorage:
         storage.add_tag("tag1")
     storage.add_tag("tag2")
     metadata = storage.metadata
-        
+
     tag_ref1 = storage.lookup_reference("tag1")
     tag_ref2 = storage.lookup_reference("tag2")
 
