@@ -67,7 +67,7 @@ class BaseReadOnlyRunner(ABC):
   ) -> Optional[pa.Table]:
     """Read data from the dataset as an Arrow table."""
     all_data = []
-    for data in self.read(filter_, fields, snapshot_id, reference_read,
+    for data in self.read(filter_, fields, version, reference_read,
                           join_options):
       if data.num_rows > 0:
         all_data.append(data)
@@ -121,6 +121,25 @@ class StorageMixin:
       self._storage.reload()  # pylint: disable=protected-access
       return fn(self, *args, **kwargs)
 
+    return decorated
+
+class JobExecutionUtils:
+  """Untils class for utils methods for job execution."""
+  @staticmethod
+  def wrap_error(fn: Callable) -> Callable[..., JobResult]:
+    """A decorator that wrap error."""
+
+    @wraps(fn)
+    def decorated(self, *args, **kwargs):
+      try:
+        fn(self, *args, **kwargs)
+        r = JobResult(JobResult.State.SUCCEEDED)
+        logging.info(f"Job result:\n{r}")
+        return r
+      except (errors.SpaceRuntimeError, errors.UserInputError) as e:
+        r = JobResult(JobResult.State.FAILED, None, repr(e))
+        logging.warning(f"Job result:\n{r}")
+        return r
     return decorated
 
 class BaseVersionUpdateRunner(ABC):
@@ -288,27 +307,13 @@ class LocalRunner(BaseReadWriteRunner, BaseVersionUpdateRunner):
     return op.delete()
 
   @StorageMixin.reload
+  @JobExecutionUtils.wrap_error
   def add_tag(self, tag:str, snapshot_id: Optional[int] = None) -> JobResult:
     """Add Tag to a snapshot."""
-    try:
-      self._storage.add_tag(tag, snapshot_id)
-      r = JobResult(JobResult.State.SUCCEEDED)
-      logging.info(f"Job result:\n{r}")
-      return r
-    except (errors.SpaceRuntimeError, errors.UserInputError) as e:
-      r = JobResult(JobResult.State.FAILED, None, repr(e))
-      logging.warning(f"Job result:\n{r}")
-      return r
+    self._storage.add_tag(tag, snapshot_id)
 
   @StorageMixin.reload
+  @JobExecutionUtils.wrap_error
   def remove_tag(self, tag:str) -> JobResult:
     """Remove Tag from a snapshot."""
-    try:
-      self._storage.remove_tag(tag)
-      r = JobResult(JobResult.State.SUCCEEDED)
-      logging.info(f"Job result:\n{r}")
-      return r
-    except (errors.SpaceRuntimeError, errors.UserInputError) as e:
-      r = JobResult(JobResult.State.FAILED, None, repr(e))
-      logging.warning(f"Job result:\n{r}")
-      return r
+    self._storage.remove_tag(tag)

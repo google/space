@@ -80,7 +80,7 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
     # Reload all sources because there are two sources for join.
     for ds in self._view.sources.values():
       ds.storage.reload()
-  
+
     snapshot_id = None
     if version:
       if isinstance(version, str):

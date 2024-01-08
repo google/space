@@ -192,23 +192,28 @@ class Storage(paths.StoragePathsMixin):
     """Lookup a reference in the snapshot"""
     if ref_name in self._metadata.refs:
       return self._metadata.refs[ref_name]
-    raise errors.SnapshotReferenceNotFoundError(f"Version {ref_name} is not found")
+    raise errors.SnapshotReferenceNotFoundError(
+              f"Version {ref_name} is not found")
 
   def add_tag(self, tag:str, snapshot_id: Optional[int] = None) -> None:
     """Add tag to a snapshot"""
     if snapshot_id is None:
       snapshot_id = self._metadata.current_snapshot_id
+
     if snapshot_id not in self._metadata.snapshots:
       raise errors.SnapshotNotFoundError(f"Snapshot {snapshot_id} is not found")
+
     if tag in self._metadata.refs:
-      raise errors.SnapshotReferenceAlreadyExistError(f"Tag {tag} already exist")
+      raise errors.SnapshotReferenceAlreadyExistError(
+                f"Reference {tag} already exist")
+
     new_metadata_path = self.new_metadata_path()
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
-    tag_reference = meta.SnapshotReference()
-    tag_reference.reference_name = tag
-    tag_reference.snapshot_id = snapshot_id
-    tag_reference.type = meta.SnapshotReference.ReferenceType.TAG
+    tag_reference = meta.SnapshotReference(
+                        reference_name = tag,
+                        snapshot_id = snapshot_id,
+                        type = meta.SnapshotReference.ReferenceType.TAG)
     new_metadata.refs[tag].CopyFrom(tag_reference)
     self._write_metadata(new_metadata_path, new_metadata)
     self._metadata = new_metadata
@@ -221,6 +226,7 @@ class Storage(paths.StoragePathsMixin):
         != meta.SnapshotReference.ReferenceType.TAG
     ):
       raise errors.SnapshotNotFoundError(f"Tag {tag} is not found")
+
     new_metadata_path = self.new_metadata_path()
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
