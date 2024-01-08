@@ -29,6 +29,7 @@ from space.core.jobs import JobResult
 from space.core.manifests.falsifiable_filters import build_manifest_filter
 from space.core.manifests.index import read_index_manifests
 from space.core.ops import utils as ops_utils
+from space.core.options import ReadOptions
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.serializers.base import DictSerializer
@@ -310,18 +311,11 @@ class Storage(paths.StoragePathsMixin):
     """A list of all alive snapshot IDs in the dataset."""
     return list(self._metadata.snapshots)
 
-  def ray_dataset(self,
-                  filter_: Optional[pc.Expression] = None,
-                  fields: Optional[List[str]] = None,
-                  snapshot_id: Optional[int] = None,
-                  reference_read: bool = False) -> ray.Dataset:
+  def ray_dataset(self, read_options: ReadOptions) -> ray.Dataset:
     """Return a Ray dataset for a Space storage."""
     return ray.data.read_datasource(SpaceDataSource(),
                                     storage=self,
-                                    filter_=filter_,
-                                    fields=fields,
-                                    snapshot_id=snapshot_id,
-                                    reference_read=reference_read)
+                                    read_options=read_options)
 
   def index_manifest(self,
                      filter_: Optional[pc.Expression] = None,

@@ -15,24 +15,25 @@
 """Utilities for transforms."""
 
 from __future__ import annotations
-from typing import List, Optional, TYPE_CHECKING
-
-import pyarrow.compute as pc
+from typing import TYPE_CHECKING
 
 from space.core.datasets import Dataset
+from space.core.options import JoinOptions, ReadOptions
 from space.core.utils.lazy_imports_utils import ray
 
 if TYPE_CHECKING:
   from space.core.views import View
 
 
-def ray_dataset(view: View, filter_: Optional[pc.Expression],
-                fields: Optional[List[str]], snapshot_id: Optional[int],
-                reference_read: bool) -> ray.Dataset:
+def ray_dataset(view: View, read_options: ReadOptions) -> ray.Dataset:
   """A wrapper for creating Ray dataset for datasets and views."""
+  empty_join_options = JoinOptions()
+
   if isinstance(view, Dataset):
     # Push input_fields down to the dataset to read less data.
-    return view.ray_dataset(filter_, fields, snapshot_id, reference_read)
+    return view.ray_dataset(read_options, empty_join_options)
 
-  return view.ray_dataset(filter_, None, snapshot_id,
-                          reference_read).select_columns(fields)
+  # For non-dataset views, fields can't be pushed down to storage.
+  read_options.fields = None
+  return view.ray_dataset(read_options, empty_join_options).select_columns(
+      read_options.fields)

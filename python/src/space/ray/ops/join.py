@@ -15,16 +15,16 @@
 """Distributed join operation using Ray."""
 
 from __future__ import annotations
+from dataclasses import dataclass
 from typing import List, Optional, TYPE_CHECKING
 
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from space.core.apis import JoinOptions, Range
+from space.core.options import JoinOptions, Range, ReadOptions
 from space.core.schema import arrow
 from space.core.schema import constants
 from space.core.schema import utils as schema_utils
-from space.core.storage import Storage
 import space.core.transform.utils as transform_utils
 from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray
@@ -34,28 +34,38 @@ if TYPE_CHECKING:
   from space.core.views import View
 
 
+@dataclass
+class JoinInput:
+  """A helper wraper of join arguments."""
+  view: View
+  # Fields to read from the view.
+  fields: Optional[List[str]]
+  # If true, read references (addresses) for record fields.
+  reference_read: bool
+
+
 class RayJoinOp:
   """Join operation running on Ray."""
 
   # pylint: disable=too-many-arguments
-  def __init__(self, left: View, left_fields: Optional[List[str]], right: View,
-               right_fields: Optional[List[str]], join_keys: List[str],
+  def __init__(self, left: JoinInput, right: JoinInput, join_keys: List[str],
                schema: pa.Schema, options: JoinOptions):
     assert len(join_keys) == 1
 
-    self._left, self._left_fields = left, left_fields
-    self._right, self._right_fields = right, right_fields
-    self._options = options
+    self._left, self._right = left, right
     self._schema = schema
+    self._options = options
 
     self._join_key = join_keys[0]
 
+    # TODO: reference_read is not complete yet.
+    self._reference_read = (self._left.reference_read
+                            or self._right.reference_read)
+
   def ray_dataset(self) -> ray.Dataset:
     """Return join result as a Ray dataset."""
-    left_range = _join_key_range(singleton_storage(self._left), self._join_key,
-                                 self._left.schema)
-    right_range = _join_key_range(singleton_storage(self._right),
-                                  self._join_key, self._right.schema)
+    left_range = _join_key_range(self._left, self._join_key)
+    right_range = _join_key_range(self._right, self._join_key)
 
     ranges: List[Range] = []
     if not (left_range is None or right_range is None):
@@ -68,34 +78,46 @@ class RayJoinOp:
     results = []
     for range_ in ranges:
       filter_ = _range_to_filter(self._join_key, range_)
-      left_ds = transform_utils.ray_dataset(self._left,
-                                            filter_,
-                                            self._left_fields,
-                                            snapshot_id=None,
-                                            reference_read=False)
-      right_ds = transform_utils.ray_dataset(self._right,
-                                             filter_,
-                                             self._right_fields,
-                                             snapshot_id=None,
-                                             reference_read=False)
+      left_ds = transform_utils.ray_dataset(
+          self._left.view,
+          ReadOptions(filter_,
+                      self._left.fields,
+                      reference_read=self._left.reference_read))
+      right_ds = transform_utils.ray_dataset(
+          self._right.view,
+          ReadOptions(filter_,
+                      self._right.fields,
+                      reference_read=self._right.reference_read))
       results.append(
           _join.options(num_returns=1).remote(  # type: ignore[attr-defined]
-              left_ds, right_ds, self._join_key, self._schema.names))
+              left_ds, right_ds, self._join_key, self._schema.names,
+              self._reference_read))
 
     return ray.data.from_arrow_refs(results)
 
 
 @ray.remote
 def _join(left: ray.Dataset, right: ray.Dataset, join_key: str,
-          output_fields: List[str]) -> Optional[pa.Table]:
+          output_fields: List[str],
+          reference_read: bool) -> Optional[pa.Table]:
   left_data, right_data = _read_all(left), _read_all(right)
   if left_data is None or right_data is None:
     return None
 
-  # output_fields is used for re-ordering fields.
+  # TODO: PyArrow does not support joining struct, so tables are flattened.
+  # The result's schema is thus different from expected. To fix it.
+  if reference_read:
+    left_data = left_data.flatten()
+    right_data = right_data.flatten()
+
   # TODO: to make join_type an option.
-  return left_data.join(right_data, keys=join_key,
-                        join_type="inner").select(output_fields)
+  result = left_data.join(right_data, keys=join_key, join_type="inner")
+
+  if reference_read:
+    return result
+
+  # output_fields is used for re-ordering fields.
+  return result.select(output_fields)
 
 
 def _read_all(ds: ray.Dataset) -> Optional[pa.Table]:
@@ -113,8 +135,8 @@ def _read_all(ds: ray.Dataset) -> Optional[pa.Table]:
   return pa.concat_tables(results)
 
 
-def _join_key_range(source_storage: Storage, field_name: str,
-                    schema: pa.Schema) -> Optional[Range]:
+def _join_key_range(input_: JoinInput, field_name: str) -> Optional[Range]:
+  schema = input_.view.schema
   field_name_ids = arrow.field_name_to_id_dict(schema)
   if field_name not in field_name_ids:
     raise errors.UserInputError(
@@ -124,7 +146,7 @@ def _join_key_range(source_storage: Storage, field_name: str,
 
   stats_field = schema_utils.stats_field_name(field_id)
   min_, max_ = None, None
-  for manifest in source_storage.index_manifest():
+  for manifest in singleton_storage(input_.view).index_manifest():
     stats = manifest.column(stats_field).combine_chunks()
 
     batch_min = pc.min(  # type: ignore[attr-defined] # pylint: disable=no-member

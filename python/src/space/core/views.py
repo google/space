@@ -20,12 +20,12 @@ from os import path
 from typing import Callable, Dict, List, Optional, TYPE_CHECKING
 
 import pyarrow as pa
-import pyarrow.compute as pc
 from substrait.algebra_pb2 import Rel
 
-from space.core.apis import JoinOptions, Range
+from space.core.options import JoinOptions
 from space.core.fs.factory import create_fs
 from space.core.ops.utils import FileOptions
+from space.core.options import ReadOptions
 import space.core.proto.metadata_pb2 as meta
 from space.core.schema import FieldIdManager
 from space.core.storage import Storage
@@ -92,11 +92,8 @@ class View(ABC):
     """Process input data using the transform defined by the view."""
 
   @abstractmethod
-  def ray_dataset(self,
-                  filter_: Optional[pc.Expression] = None,
-                  fields: Optional[List[str]] = None,
-                  snapshot_id: Optional[int] = None,
-                  reference_read: bool = False) -> ray.Dataset:
+  def ray_dataset(self, read_options: ReadOptions,
+                  join_options: JoinOptions) -> ray.Dataset:
     """Return a Ray dataset for a Space view."""
 
   def ray(self) -> RayReadOnlyRunner:
@@ -169,13 +166,13 @@ class View(ABC):
     return FilterTransform(UserDefinedFn(fn, self.schema, self.record_fields),
                            self, input_fields)
 
-  def join(
-      self,
-      right: View,
-      keys: List[str],
-      left_fields: Optional[List[str]] = None,
-      right_fields: Optional[List[str]] = None,
-      partition_fn: Optional[Callable[[Range], List[Range]]] = None) -> View:
+  def join(self,
+           right: View,
+           keys: List[str],
+           left_fields: Optional[List[str]] = None,
+           right_fields: Optional[List[str]] = None,
+           left_reference_read: bool = False,
+           right_reference_read: bool = False) -> View:
     """Join two views.
     
     Args:
@@ -206,12 +203,12 @@ class View(ABC):
 
     # pylint: disable=cyclic-import,import-outside-toplevel
     from space.core.transform.join import JoinTransform
-    return JoinTransform(left=left,
-                         right=right,
-                         left_fields=left_fields,
-                         right_fields=right_fields,
-                         join_keys=keys,
-                         join_options=JoinOptions(partition_fn))
+    from space.ray.ops.join import JoinInput
+    return JoinTransform(join_keys=keys,
+                         left=JoinInput(left, left_fields,
+                                        left_reference_read),
+                         right=JoinInput(right, right_fields,
+                                         right_reference_read))
 
   def _default_or_validate_input_fields(
       self, input_schema: pa.Schema,
@@ -251,6 +248,13 @@ class MaterializedView:
   def storage(self) -> Storage:
     """Return storage of the materialized view."""
     return self._storage
+
+  @property
+  def dataset(self) -> Dataset:
+    """Return storage of the materialized view as a dataset."""
+    # pylint: disable=import-outside-toplevel
+    from space.core.datasets import Dataset
+    return Dataset(self._storage)
 
   @property
   def view(self) -> View:

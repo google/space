@@ -4,7 +4,7 @@
 
 <hr/>
 
-Space is a hybrid column/row oriented storage framework for Machine Learning datasets. It brings data warehouse/lake features, e.g., data mutation, version management, OLAP queries, materialized views, to ML datasets, for simplifying DataOps and MLOps.
+Space is a hybrid column/row oriented storage framework for Machine Learning datasets. It brings data warehouse/lake (e.g., Iceberg/DeltaLake/Hudi + Spark) features, e.g., data mutation, version management, OLAP queries, materialized views, to ML datasets, for simplifying DataOps and MLOps.
 
 For each row of data, Space stores bulky unstructured fields in random access row oriented format (record fields), and stores the addresses (pairs of file and row ID) together with the other fields in columnar files (index fields). By decoupling unstructured data and processing only addresses, it can efficiently support all OLAP/columnar style data operations, e.g., sort, join. It automatically reads data from addresses in its APIs when needed, e.g., feed data into training frameworks.
 
@@ -115,9 +115,17 @@ for change_type, data in runner.diff(0, 2):
 
 ### Transform and Materialized Views
 
-Space supports transforming a dataset to a view, and materializing the view to files. When the source dataset is modified, refreshing the materialized view incrementally synchronizes changes, which saves compute and IO cost. See more details in a [Segment Anything example](/notebooks/segment_anything_tutorial.ipynb).
+Space supports transforming a dataset to a view, and materializing the view to files. The transforms include:
 
-Reading or refreshing views must be the `Ray` runner, because they are implemented based on [Ray transform](https://docs.ray.io/en/latest/data/transforming-data.html).
+- Mapping batches using a user defined function (UDF).
+- Filter using a UDF.
+- Joining two views/datasets.
+
+When the source dataset is modified, refreshing the materialized view incrementally synchronizes changes, which saves compute and IO cost. See more details in a [Segment Anything example](/notebooks/segment_anything_tutorial.ipynb). Reading or refreshing views must be the `Ray` runner, because they are implemented based on [Ray transform](https://docs.ray.io/en/latest/data/transforming-data.html).
+
+A materialized view `mv` can be used as a view `mv.view` or a dataset `mv.dataset`. The former always reads data from the source dataset's files and processes all data on-the-fly. The latter directly reads processed data from the MV's files, skips processing data.
+
+#### Example of map_batches
 
 ```py
 # A sample transform UDF.
@@ -148,6 +156,16 @@ mv_runner.refresh(1)  # mv_runner.refresh() refresh to the latest version
 # Use the MV runner instead of view runner to directly read from materialized
 # view files, no data processing any more.
 mv_runner.read_all()
+```
+
+#### Example of join
+
+See a full example in the [Segment Anything example](/notebooks/segment_anything_tutorial.ipynb). Creating a materialized view of join result is not supported yet.
+
+```py
+# If input is a materialized view, using `mv.dataset` instead of `mv.view`
+# Only support 1 join key, it must be primary key of both left and right.
+joined_view = mv_left.dataset.join(mv_right.dataset, keys=["id"])
 ```
 
 ### ML Frameworks Integration
