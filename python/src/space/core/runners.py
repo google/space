@@ -126,14 +126,13 @@ class StorageMixin:
 class JobExecutionUtils:
   """Untils class for utils methods for job execution."""
   @staticmethod
-  def wrap_error(fn: Callable) -> Callable[..., JobResult]:
+  def wrap_error(fn: Callable[...,JobResult]) -> Callable[..., JobResult]:
     """A decorator that wrap error."""
 
     @wraps(fn)
     def decorated(self, *args, **kwargs):
       try:
-        fn(self, *args, **kwargs)
-        r = JobResult(JobResult.State.SUCCEEDED)
+        r = fn(self, *args, **kwargs)
         logging.info(f"Job result:\n{r}")
         return r
       except (errors.SpaceRuntimeError, errors.UserInputError) as e:
@@ -311,9 +310,11 @@ class LocalRunner(BaseReadWriteRunner, BaseVersionUpdateRunner):
   def add_tag(self, tag:str, snapshot_id: Optional[int] = None) -> JobResult:
     """Add Tag to a snapshot."""
     self._storage.add_tag(tag, snapshot_id)
+    return JobResult(JobResult.State.SUCCEEDED)
 
   @StorageMixin.reload
   @JobExecutionUtils.wrap_error
   def remove_tag(self, tag:str) -> JobResult:
     """Remove Tag from a snapshot."""
     self._storage.remove_tag(tag)
+    return JobResult(JobResult.State.SUCCEEDED)
