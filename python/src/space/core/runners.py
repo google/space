@@ -47,20 +47,18 @@ class BaseReadOnlyRunner(ABC):
   def read(self,
            filter_: Optional[pc.Expression] = None,
            fields: Optional[List[str]] = None,
-           tag: Optional[str] = None,
-           snapshot_id: Optional[int] = None,
+           version: Optional[Union[int,str]] = None,
            reference_read: bool = False) -> Iterator[pa.Table]:
     """Read data from the dataset as an iterator."""
 
   def read_all(self,
                filter_: Optional[pc.Expression] = None,
                fields: Optional[List[str]] = None,
-               tag: Optional[str] = None,
-               snapshot_id: Optional[int] = None,
+               version: Optional[Union[int,str]] = None,
                reference_read: bool = False) -> Optional[pa.Table]:
     """Read data from the dataset as an Arrow table."""
     all_data = []
-    for data in self.read(filter_, fields, tag, snapshot_id, reference_read):
+    for data in self.read(filter_, fields, version, reference_read):
       if data.num_rows > 0:
         all_data.append(data)
 
@@ -116,16 +114,18 @@ class StorageMixin:
     return decorated
 
 class BaseVersionUpdateRunner(ABC):
-  @abstractmethod
-  def add_tag(self, snapshot_id:int, tag:str) -> JobResult:
-    """Append data into the dataset."""
+  """Abstract base version management runner class."""
 
   @abstractmethod
-  def remove_tag(self, snapshot_id:int, tag:str) -> JobResult:
-    """Append data into the dataset."""
+  def add_tag(self, tag:str, snapshot_id: Optional[int] = None) -> JobResult:
+    """Adds a tag for a snapshot."""
+
+  @abstractmethod
+  def remove_tag(self, tag:str) -> JobResult:
+    """Removes a tag from snapshot."""
 
 
-class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner, BaseVersionUpdateRunner):
+class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
   """Abstract base read and write runner class."""
 
   def __init__(self,
@@ -195,24 +195,22 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner, BaseVersionUpdateRun
     """Delete data matching the filter from the dataset."""
 
 
-class LocalRunner(BaseReadWriteRunner):
+class LocalRunner(BaseReadWriteRunner, BaseVersionUpdateRunner):
   """A runner that runs operations locally."""
 
   @StorageMixin.reload
   def read(self,
            filter_: Optional[pc.Expression] = None,
            fields: Optional[List[str]] = None,
-           tag: Optional[str] = None,
-           snapshot_id: Optional[int] = None,
+           version: Optional[Union[int,str]] = None,
            reference_read: bool = False) -> Iterator[pa.Table]:
-    if tag and snapshot_id:
-      raise errors.UserInputError(
-          f"Cannot set tag and snapshot id in the same read operation")
-    
-    if tag:
-      tag_ref = self._storage.lookup_tag(tag)
-      snapshot_id = tag_ref.snapshot_id
-
+    snapshot_id = None
+    if version:
+      if isinstance(version, str):
+        version_ref = self._storage.lookup_reference(version)
+        snapshot_id = version_ref.snapshot_id
+      else:
+        snapshot_id = version
     return iter(
         FileSetReadOp(
             self._storage.location, self._storage.metadata,
@@ -292,7 +290,7 @@ class LocalRunner(BaseReadWriteRunner):
 
   @StorageMixin.reload
   def remove_tag(self, tag:str) -> JobResult:
-    """Append data into the dataset."""
+    """Remove Tag from a snapshot."""
     try:
       self._storage.remove_tag(tag)
       r = JobResult(JobResult.State.SUCCEEDED)

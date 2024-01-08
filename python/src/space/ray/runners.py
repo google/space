@@ -62,7 +62,7 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
   def read(self,
            filter_: Optional[pc.Expression] = None,
            fields: Optional[List[str]] = None,
-           snapshot_id: Optional[int] = None,
+           version: Optional[Union[int,str]] = None,
            reference_read: bool = False) -> Iterator[pa.Table]:
     """Read data from the dataset as an iterator.
     
@@ -71,6 +71,12 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
 
     Dataset itself is a special view without any transforms.
     """
+    snapshot_id = None
+    if version:
+      if isinstance(version, str):
+        snapshot_id = self._source_storage.lookup_reference(version).snapshot_id
+      else:
+        snapshot_id = version
     self._source_storage.reload()
     for ref in self._view.ray_dataset(filter_, fields, snapshot_id,
                                       reference_read).to_arrow_refs():
@@ -111,7 +117,7 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
   def read(self,
            filter_: Optional[pc.Expression] = None,
            fields: Optional[List[str]] = None,
-           snapshot_id: Optional[int] = None,
+           version: Optional[Union[int,str]] = None,
            reference_read: bool = False) -> Iterator[pa.Table]:
     """Read data from the dataset as an iterator.
     
@@ -124,6 +130,12 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
     To use RayReadOnlyRunner, use `runner = mv.view.ray()` instead of
     `mv.ray()`.
     """
+    snapshot_id = None
+    if version:
+      if isinstance(version, str):
+        snapshot_id = self._storage.lookup_reference(version).snapshot_id
+      else:
+        snapshot_id = version
     for ref in self._storage.ray_dataset(filter_, fields, snapshot_id,
                                          reference_read).to_arrow_refs():
       yield ray.get(ref)

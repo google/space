@@ -26,10 +26,10 @@ class SnapshotNotFoundError(UserInputError):
 class PrimaryKeyExistError(UserInputError):
   """Errors caused by duplicated primary keys."""
 
-class TagExistError(UserInputError):
+class SnapshotReferenceAlreadyExistError(UserInputError):
   """Errors caused by duplicated tags."""
 
-class TagNotFoundError(UserInputError):
+class SnapshotReferenceNotFoundError(UserInputError):
   """Errors caused by duplicated tags."""
 
 class SpaceRuntimeError(RuntimeError):

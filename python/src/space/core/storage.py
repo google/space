@@ -187,37 +187,43 @@ class Storage(paths.StoragePathsMixin):
     """Start a transaction."""
     return Transaction(self)
 
-  def lookup_tag(self,tag:str) -> meta.SnapshotReference:
-    if tag in self._metadata.tags:
-      return self._metadata.tags[tag]
-    raise errors.TagNotFoundError(f"Tag {tag} is not found")
+  def lookup_reference(self, ref_name:str) -> meta.SnapshotReference:
+    """Lookup a reference in the snapshot"""
+    if ref_name in self._metadata.refs:
+      return self._metadata.refs[ref_name]
+    raise errors.SnapshotReferenceNotFoundError(f"Version {ref_name} is not found")
 
   def add_tag(self, tag:str, snapshot_id: Optional[int] = None) -> None:
     """Add tag to a snapshot"""
     if snapshot_id is None:
       snapshot_id = self._metadata.current_snapshot_id
     if snapshot_id not in self._metadata.snapshots:
-        raise errors.SnapshotNotFoundError(f"Snapshot {snapshot_id} is not found")
-    if tag in self._metadata.tags:
-        raise errors.TagExistError(f"Tag {tag} already exist")
+      raise errors.SnapshotNotFoundError(f"Snapshot {snapshot_id} is not found")
+    if tag in self._metadata.refs:
+      raise errors.SnapshotReferenceAlreadyExistError(f"Tag {tag} already exist")
     new_metadata_path = self.new_metadata_path()
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
     tag_reference = meta.SnapshotReference()
     tag_reference.reference_name = tag
     tag_reference.snapshot_id = snapshot_id
-    new_metadata.tags[tag].CopyFrom(tag_reference)
+    tag_reference.type = meta.SnapshotReference.ReferenceType.TAG
+    new_metadata.refs[tag].CopyFrom(tag_reference)
     self._write_metadata(new_metadata_path, new_metadata)
     self._metadata = new_metadata
-  
+
   def remove_tag(self, tag:str) -> None:
     """Remove tag from metadata"""
-    if tag not in self._metadata.tags:
+    if (
+        tag not in self._metadata.refs
+        or self._metadata.refs[tag].type
+        != meta.SnapshotReference.ReferenceType.TAG
+    ):
       raise errors.SnapshotNotFoundError(f"Tag {tag} is not found")
     new_metadata_path = self.new_metadata_path()
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
-    del new_metadata.tags[tag]
+    del new_metadata.refs[tag]
     self._write_metadata(new_metadata_path, new_metadata)
     self._metadata = new_metadata
 

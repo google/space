@@ -150,12 +150,12 @@ class TestLocalRunner:
 
     assert local_runner.read_all() == pa.concat_tables(
         [sample_data1, sample_data2])
-    assert local_runner.read_all(tag="insert1") == pa.concat_tables(
+    assert local_runner.read_all(version="insert1") == pa.concat_tables(
         [sample_data1])
     local_runner.remove_tag(tag="insert1")
-    with pytest.raises(errors.TagNotFoundError) as excinfo:
-      local_runner.read_all(tag="insert1")
-    assert "Tag insert1 is not found" in str(excinfo.value)
+    with pytest.raises(errors.SnapshotReferenceNotFoundError) as excinfo:
+      local_runner.read_all(version="insert1")
+    assert "Version insert1 is not found" in str(excinfo.value)
 
 def _read_pyarrow(runner: LocalRunner,
                   filter_: Optional[pc.Expression] = None) -> pa.Table:
