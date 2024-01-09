@@ -83,7 +83,7 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
 
     snapshot_id = None
 
-    if version:
+    if version is not None:
       if isinstance(version, str):
         snapshot_id = self._source_storage.lookup_reference(version).snapshot_id
       else:
