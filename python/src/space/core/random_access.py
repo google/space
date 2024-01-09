@@ -25,6 +25,7 @@ from tensorflow_datasets.core.utils.lazy_imports_utils import array_record_data_
 
 from space.core.datasets import Dataset
 from space.core.schema import constants
+from space.core.schema.utils import file_path_field_name, row_id_field_name
 from space.core.storage import Storage
 from space.core.utils import errors
 from space.core.utils.paths import StoragePathsMixin
@@ -98,8 +99,8 @@ class ArrowDataSource(AbcSequence):
 
     results: Dict[str, bytes] = {}
     for field, storage in self._feature_fields.items():
-      file_path = self._addresses[_file_path(field)][index].as_py()
-      row_ids = [self._addresses[_row_id(field)][index].as_py()]
+      file_path = self._addresses[file_path_field_name(field)][index].as_py()
+      row_ids = [self._addresses[row_id_field_name(field)][index].as_py()]
       records: List[bytes] = read_record_file(storage.full_path(file_path),
                                               row_ids)
       assert len(records) == 1
@@ -118,9 +119,9 @@ class ArrowDataSource(AbcSequence):
   def __getitems__(self, indexes: Sequence[int]) -> Sequence[Any]:
     results: Dict[str, List[bytes]] = {}
     for field, storage in self._feature_fields.items():
-      file_paths = self._addresses[_file_path(field)].take(
+      file_paths = self._addresses[file_path_field_name(field)].take(
           indexes)  # type: ignore[arg-type]
-      row_ids = self._addresses[_row_id(field)].take(
+      row_ids = self._addresses[row_id_field_name(field)].take(
           indexes)  # type: ignore[arg-type]
       addresses = pa.Table.from_arrays(
           [file_paths, row_ids],  # type: ignore[arg-type]
@@ -199,8 +200,8 @@ class RandomAccessDataSource(AbcSequence):
     if use_array_record_data_source and len(feature_fields) == 1:
       assert storage is not None
       field = list(feature_fields.keys())[0]
-      file_paths = addresses.column(_file_path(field))
-      row_ids = addresses.column(_row_id(field))
+      file_paths = addresses.column(file_path_field_name(field))
+      row_ids = addresses.column(row_id_field_name(field))
       file_instructions = build_file_instructions(
           storage, file_paths, row_ids)  # type: ignore[arg-type]
       self._data_source = ArrayRecordDataSource(
@@ -280,11 +281,3 @@ def build_file_instructions(
       previous_idx = idx
 
   return file_instructions
-
-
-def _file_path(field: str) -> str:
-  return f"{field}.{constants.FILE_PATH_FIELD}"
-
-
-def _row_id(field: str) -> str:
-  return f"{field}.{constants.ROW_ID_FIELD}"

@@ -52,6 +52,16 @@ def stats_field_name(field_id_: int) -> str:
   return f"{constants.STATS_FIELD}_f{field_id_}"
 
 
+def file_path_field_name(field: str) -> str:
+  """File path field name in flatten addresses."""
+  return f"{field}.{constants.FILE_PATH_FIELD}"
+
+
+def row_id_field_name(field: str) -> str:
+  """Row ID field name in flatten addresses."""
+  return f"{field}.{constants.ROW_ID_FIELD}"
+
+
 def validate_logical_schema(schema: pa.Schema, primary_keys: List[str],
                             record_fields: List[str]) -> None:
   """Validate the logical schema of a Space storage."""
