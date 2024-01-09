@@ -207,7 +207,7 @@ class LocalRunner(BaseReadWriteRunner):
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
     snapshot_id = None
-    if version:
+    if version is not None:
       if isinstance(version, str):
         version_ref = self._storage.lookup_reference(version)
         snapshot_id = version_ref.snapshot_id
