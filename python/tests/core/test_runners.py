@@ -142,7 +142,7 @@ class TestLocalRunner:
     sample_data1 = _generate_data([1, 2])
     local_runner.append(sample_data1)
 
-    local_runner.add_tag(tag="insert1")
+    ds.add_tag(tag="insert1")
     assert local_runner.read_all() == sample_data1
 
     sample_data2 = _generate_data([3, 4])
@@ -152,7 +152,7 @@ class TestLocalRunner:
         [sample_data1, sample_data2])
     assert local_runner.read_all(version="insert1") == pa.concat_tables(
         [sample_data1])
-    local_runner.remove_tag(tag="insert1")
+    ds.remove_tag(tag="insert1")
     with pytest.raises(errors.SnapshotReferenceNotFoundError) as excinfo:
       local_runner.read_all(version="insert1")
     assert "Version insert1 is not found" in str(excinfo.value)

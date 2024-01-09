@@ -192,6 +192,7 @@ class Storage(paths.StoragePathsMixin):
     """Lookup a reference in the snapshot"""
     if ref_name in self._metadata.refs:
       return self._metadata.refs[ref_name]
+
     raise errors.SnapshotReferenceNotFoundError(
               f"Version {ref_name} is not found")
 
@@ -207,7 +208,6 @@ class Storage(paths.StoragePathsMixin):
       raise errors.SnapshotReferenceAlreadyExistError(
                 f"Reference {tag} already exist")
 
-    new_metadata_path = self.new_metadata_path()
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
     tag_reference = meta.SnapshotReference(
@@ -215,7 +215,7 @@ class Storage(paths.StoragePathsMixin):
                         snapshot_id = snapshot_id,
                         type = meta.SnapshotReference.ReferenceType.TAG)
     new_metadata.refs[tag].CopyFrom(tag_reference)
-    self._write_metadata(new_metadata_path, new_metadata)
+    self._write_metadata(self.new_metadata_path(), new_metadata)
     self._metadata = new_metadata
 
   def remove_tag(self, tag:str) -> None:
@@ -227,11 +227,10 @@ class Storage(paths.StoragePathsMixin):
     ):
       raise errors.SnapshotNotFoundError(f"Tag {tag} is not found")
 
-    new_metadata_path = self.new_metadata_path()
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
     del new_metadata.refs[tag]
-    self._write_metadata(new_metadata_path, new_metadata)
+    self._write_metadata(self.new_metadata_path(), new_metadata)
     self._metadata = new_metadata
 
   def commit(self, patch: rt.Patch) -> None:

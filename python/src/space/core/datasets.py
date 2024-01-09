@@ -73,6 +73,14 @@ class Dataset(View):
   def record_fields(self) -> List[str]:
     return self._storage.record_fields
 
+  def add_tag(self, tag:str, snapshot_id: Optional[int] = None):
+    """Add Tag to a snapshot."""
+    self._storage.add_tag(tag, snapshot_id)
+
+  def remove_tag(self, tag:str):
+    """Remove Tag from a snapshot."""
+    self._storage.remove_tag(tag)
+
   def local(self, file_options: Optional[FileOptions] = None) -> LocalRunner:
     """Get a runner that runs operations locally."""
     return LocalRunner(self._storage, file_options)

@@ -33,7 +33,7 @@ message EntryPoint {
 // Metadata persisting the current status of a storage, including logical
 // metadata such as schema, and physical metadata persisted as a history of
 // snapshots
-// NEXT_ID: 8
+// NEXT_ID: 9
 message StorageMetadata {
   // Create time of the storage.
   google.protobuf.Timestamp create_time = 1;
@@ -63,7 +63,8 @@ message StorageMetadata {
   // Store the logical plan for materialized views.
   LogicalPlan logical_plan = 7;
 
-  // All alive refs, with reference name as key
+  // All alive refs, with reference name as key. Reference name can be a tag 
+  // or a branch name.
   map<string, SnapshotReference> refs = 8;
   
 }
@@ -110,13 +111,20 @@ message Snapshot {
   string metadata_file = 6;
 }
 
+// Reference to a snapshot.
+// NEXT_ID: 4
 message SnapshotReference {
+  // Name for the reference.
   string reference_name = 1;
+
   // The snapshot ID.
   int64 snapshot_id = 2;
+
   enum ReferenceType{
     TYPE_UNSPECIFIED = 0;
+    // Reference of a specific commit within the project history,
     TAG = 1;
+    // Reference of the current snapshot of a branch.
     BRANCH = 2;
   }
   ReferenceType type = 3;

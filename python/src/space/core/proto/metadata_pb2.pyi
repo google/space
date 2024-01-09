@@ -62,7 +62,7 @@ class StorageMetadata(google.protobuf.message.Message):
     """Metadata persisting the current status of a storage, including logical
     metadata such as schema, and physical metadata persisted as a history of
     snapshots
-    NEXT_ID: 8
+    NEXT_ID: 9
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -152,7 +152,9 @@ class StorageMetadata(google.protobuf.message.Message):
         """Store the logical plan for materialized views."""
     @property
     def refs(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___SnapshotReference]:
-        """All alive refs, with reference name as key"""
+        """All alive refs, with reference name as key. Reference name can be a tag 
+        or a branch name.
+        """
     def __init__(
         self,
         *,
@@ -255,6 +257,10 @@ global___Snapshot = Snapshot
 
 @typing_extensions.final
 class SnapshotReference(google.protobuf.message.Message):
+    """Reference to a snapshot.
+    NEXT_ID: 4
+    """
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _ReferenceType:
@@ -265,17 +271,22 @@ class SnapshotReference(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         TYPE_UNSPECIFIED: SnapshotReference._ReferenceType.ValueType  # 0
         TAG: SnapshotReference._ReferenceType.ValueType  # 1
+        """Reference of a specific commit within the project history,"""
         BRANCH: SnapshotReference._ReferenceType.ValueType  # 2
+        """Reference of the current snapshot of a branch."""
 
     class ReferenceType(_ReferenceType, metaclass=_ReferenceTypeEnumTypeWrapper): ...
     TYPE_UNSPECIFIED: SnapshotReference.ReferenceType.ValueType  # 0
     TAG: SnapshotReference.ReferenceType.ValueType  # 1
+    """Reference of a specific commit within the project history,"""
     BRANCH: SnapshotReference.ReferenceType.ValueType  # 2
+    """Reference of the current snapshot of a branch."""
 
     REFERENCE_NAME_FIELD_NUMBER: builtins.int
     SNAPSHOT_ID_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
     reference_name: builtins.str
+    """Name for the reference."""
     snapshot_id: builtins.int
     """The snapshot ID."""
     type: global___SnapshotReference.ReferenceType.ValueType
