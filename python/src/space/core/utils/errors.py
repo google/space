@@ -27,10 +27,10 @@ class PrimaryKeyExistError(UserInputError):
   """Errors caused by duplicated primary keys."""
 
 class SnapshotReferenceAlreadyExistError(UserInputError):
-  """Errors caused by duplicated tags."""
+  """Errors caused by duplicated reference."""
 
 class SnapshotReferenceNotFoundError(UserInputError):
-  """Errors caused by duplicated tags."""
+  """Errors caused by reference not found."""
 
 class SpaceRuntimeError(RuntimeError):
   """Basic class of errors thrown from Space runtime."""
