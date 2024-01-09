@@ -24,7 +24,8 @@ import pyarrow.compute as pc
 from space.core.options import JoinOptions, Range, ReadOptions
 from space.core.schema import arrow
 from space.core.schema import constants
-from space.core.schema import utils as schema_utils
+from space.core.schema.utils import (file_path_field_name, stats_field_name,
+                                     row_id_field_name)
 import space.core.transform.utils as transform_utils
 from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray
@@ -51,16 +52,14 @@ class RayJoinOp:
   def __init__(self, left: JoinInput, right: JoinInput, join_keys: List[str],
                schema: pa.Schema, options: JoinOptions):
     assert len(join_keys) == 1
+    self._join_key = join_keys[0]
 
     self._left, self._right = left, right
     self._schema = schema
     self._options = options
 
-    self._join_key = join_keys[0]
-
-    # TODO: reference_read is not complete yet.
-    self._reference_read = (self._left.reference_read
-                            or self._right.reference_read)
+    self._left_record_fields = _selected_record_fields(left)
+    self._right_record_fields = _selected_record_fields(right)
 
   def ray_dataset(self) -> ray.Dataset:
     """Return join result as a Ray dataset."""
@@ -90,31 +89,46 @@ class RayJoinOp:
                       reference_read=self._right.reference_read))
       results.append(
           _join.options(num_returns=1).remote(  # type: ignore[attr-defined]
-              left_ds, right_ds, self._join_key, self._schema.names,
-              self._reference_read))
+              _JoinInputInternal(left_ds, self._left.reference_read,
+                                 self._left_record_fields),
+              _JoinInputInternal(right_ds, self._right.reference_read,
+                                 self._right_record_fields), self._join_key,
+              self._schema.names))
 
     return ray.data.from_arrow_refs(results)
 
 
+@dataclass
+class _JoinInputInternal:
+  ds: ray.Dataset
+  reference_read: bool
+  record_fields: List[str]
+
+
 @ray.remote
-def _join(left: ray.Dataset, right: ray.Dataset, join_key: str,
-          output_fields: List[str],
-          reference_read: bool) -> Optional[pa.Table]:
-  left_data, right_data = _read_all(left), _read_all(right)
+def _join(left: _JoinInputInternal, right: _JoinInputInternal, join_key: str,
+          output_fields: List[str]) -> Optional[pa.Table]:
+  left_data, right_data = _read_all(left.ds), _read_all(right.ds)
   if left_data is None or right_data is None:
     return None
 
-  # TODO: PyArrow does not support joining struct, so tables are flattened.
-  # The result's schema is thus different from expected. To fix it.
-  if reference_read:
+  # PyArrow does not support joining struct, so tables are flattened.
+  # TODO: we only flatten/fold record addresses field. If any other fields are
+  # struct or list, then join won't work. It is a PyArrow limitation.
+  if left.reference_read:
     left_data = left_data.flatten()
+
+  if right.reference_read:
     right_data = right_data.flatten()
 
-  # TODO: to make join_type an option.
+  # TODO: to make join_type an user provided option.
   result = left_data.join(right_data, keys=join_key, join_type="inner")
 
-  if reference_read:
-    return result
+  if left.reference_read:
+    result = _fold_addresses(result, left.record_fields)
+
+  if right.reference_read:
+    result = _fold_addresses(result, right.record_fields)
 
   # output_fields is used for re-ordering fields.
   return result.select(output_fields)
@@ -144,7 +158,7 @@ def _join_key_range(input_: JoinInput, field_name: str) -> Optional[Range]:
 
   field_id = field_name_ids[field_name]
 
-  stats_field = schema_utils.stats_field_name(field_id)
+  stats_field = stats_field_name(field_id)
   min_, max_ = None, None
   for manifest in singleton_storage(input_.view).index_manifest():
     stats = manifest.column(stats_field).combine_chunks()
@@ -172,3 +186,30 @@ def _range_to_filter(field_name: str, range_: Range) -> pc.Expression:
     return (field >= range_.min_) & (field <= range_.max_)
 
   return (field >= range_.min_) & (field < range_.max_)
+
+
+def _selected_record_fields(input_: JoinInput) -> List[str]:
+  if input_.fields is None:
+    return input_.view.record_fields
+
+  return list(set(input_.view.record_fields).intersection(set(input_.fields)))
+
+
+def _fold_addresses(data: pa.Table, record_fields: List[str]) -> pa.Table:
+  for f in record_fields:
+    file_path_field = file_path_field_name(f)
+    row_id_field = row_id_field_name(f)
+
+    file_column = data.column(file_path_field)
+    row_column = data.column(row_id_field)
+
+    data = data.drop(file_path_field)  # type: ignore[attr-defined]
+    data = data.drop(row_id_field)  # type: ignore[attr-defined]
+
+    arrays = [file_column.combine_chunks(), row_column.combine_chunks()]
+    address_column = pa.StructArray.from_arrays(
+        arrays,  # type: ignore[arg-type]
+        names=[constants.FILE_PATH_FIELD, constants.ROW_ID_FIELD])
+    data = data.append_column(f, address_column)
+
+  return data

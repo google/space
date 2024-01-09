@@ -25,6 +25,7 @@ import ray
 from space import Dataset, JoinOptions, Range
 from space.core.jobs import JobResult
 from space.core.ops.change_data import ChangeType
+from space.core.ops.read import read_record_column
 from space.core.utils import errors
 from space.core.utils.uuids import random_id
 
@@ -234,13 +235,14 @@ class TestRayReadWriteRunner:
     assert list(view_runner.diff(0, 2)) == [expected_change0, expected_change1]
 
   @pytest.mark.parametrize(
-      "left_fields,right_fields,partition_fn,left_reference_read",
-      [(None, None, None, False), (None, None, _sample_partition_fn, False),
-       (None, None, None, True),
-       (["float64", "binary"], ["string"], None, False),
-       (["float64"], ["string"], None, False)])
+      "left_fields,right_fields,partition_fn,left_reference_read,swap",
+      [(None, None, None, False, False),
+       (None, None, _sample_partition_fn, False, False),
+       (None, None, None, True, False), (None, None, None, True, True),
+       (["float64", "binary"], ["string"], None, False, False),
+       (["float64"], ["string"], None, False, False)])
   def test_join(self, tmp_path, sample_dataset, left_fields, right_fields,
-                partition_fn, left_reference_read):
+                partition_fn, left_reference_read, swap):
     ds1 = sample_dataset
     ds1.local().append(generate_data(range(50)))
     ds1.local().append(generate_data(range(50, 100)))
@@ -263,26 +265,39 @@ class TestRayReadWriteRunner:
     ds2.local().append(generate_data2(range(40, 60)))
     ds2.local().append(generate_data2(range(90, 105)))
 
-    view = ds1.join(ds2,
-                    keys=["int64"],
-                    left_fields=left_fields,
-                    right_fields=right_fields,
-                    left_reference_read=left_reference_read)
+    if not swap:
+      view = ds1.join(ds2,
+                      keys=["int64"],
+                      left_fields=left_fields,
+                      right_fields=right_fields,
+                      left_reference_read=left_reference_read)
+    else:
+      view = ds2.join(ds1,
+                      keys=["int64"],
+                      left_fields=right_fields,
+                      right_fields=left_fields,
+                      right_reference_read=left_reference_read)
 
     if left_reference_read:
       ds1_schema = ds1.storage.physical_schema
     else:
       ds1_schema = ds1.schema
 
-    expected_schema = pa.schema([
-        pa.field("int64", pa.int64()), *[
-            ds1_schema.field(f).remove_metadata()
-            for f in left_fields or ds1.schema.names if f != "int64"
-        ], *[
-            ds2.schema.field(f).remove_metadata()
-            for f in right_fields or ds2.schema.names if f != "int64"
-        ]
-    ])
+    left_fields_ = [
+        ds1_schema.field(f).remove_metadata()
+        for f in left_fields or ds1.schema.names if f != "int64"
+    ]
+    right_fields_ = [
+        ds2.schema.field(f).remove_metadata()
+        for f in right_fields or ds2.schema.names if f != "int64"
+    ]
+
+    if not swap:
+      expected_schema = pa.schema(
+          [pa.field("int64", pa.int64()), *left_fields_, *right_fields_])
+    else:
+      expected_schema = pa.schema(
+          [pa.field("int64", pa.int64()), *right_fields_, *left_fields_])
 
     assert view.schema == expected_schema
     assert view.record_fields == (["binary"]
@@ -298,13 +313,29 @@ class TestRayReadWriteRunner:
       })
 
     join_values = view.ray().read_all(JoinOptions(partition_fn=partition_fn))
-    expected_values = generate_expected(
-        list(range(0, 5)) + list(range(40, 60)) + list(range(90, 100))).select(
-            view.schema.names)
+    indexes = list(range(0, 5)) + list(range(40, 60)) + list(range(90, 100))
+    expected_values = generate_expected(indexes).select(view.schema.names)
 
     # TODO: reference_read support is not completed yet.
-    if not left_reference_read:
-      assert join_values == expected_values
+    if left_reference_read:
+      assert join_values.schema == expected_schema
+
+      # Sanity checks of addresses.
+      address_column = join_values.column("binary").combine_chunks()
+      assert address_column.field("_FILE")[0].as_py().startswith(
+          "data/binary_")
+      assert len(address_column.field("_ROW_ID")) == len(indexes)
+
+      # Test reading addresses.
+      values = read_record_column(ds1.storage,
+                                  join_values.select(["binary"]),
+                                  field="binary")
+      assert values == expected_values.column("binary").combine_chunks()
+
+      join_values = join_values.drop("binary")
+      expected_values = expected_values.drop("binary")
+
+    assert join_values == expected_values
 
   @pytest.mark.parametrize("left_fields,right_fields",
                            [(["float64"], []), (["int64"], ["string"])])
