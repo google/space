@@ -188,6 +188,54 @@ class Storage(paths.StoragePathsMixin):
     """Start a transaction."""
     return Transaction(self)
 
+  def lookup_reference(self, ref_name: str) -> meta.SnapshotReference:
+    """Lookup a reference in the snapshot"""
+    if ref_name in self._metadata.refs:
+      return self._metadata.refs[ref_name]
+
+    raise errors.SnapshotReferenceNotFoundError(
+              f"Version {ref_name} is not found")
+
+  def add_tag(self, tag: str, snapshot_id: Optional[int] = None) -> None:
+    """Add tag to a snapshot"""
+    if snapshot_id is None:
+      snapshot_id = self._metadata.current_snapshot_id
+
+    if snapshot_id not in self._metadata.snapshots:
+      raise errors.SnapshotNotFoundError(f"Snapshot {snapshot_id} is not found")
+
+    if len(tag) == 0:
+      raise errors.UserInputError("Tag cannot be empty")
+
+    if tag in self._metadata.refs:
+      raise errors.SnapshotReferenceAlreadyExistError(
+                f"Reference {tag} already exist")
+
+    new_metadata = meta.StorageMetadata()
+    new_metadata.CopyFrom(self._metadata)
+    tag_ref = meta.SnapshotReference(
+                        reference_name = tag,
+                        snapshot_id = snapshot_id,
+                        type = meta.SnapshotReference.TAG)
+    new_metadata.refs[tag].CopyFrom(tag_ref)
+    self._write_metadata(self.new_metadata_path(), new_metadata)
+    self._metadata = new_metadata
+
+  def remove_tag(self, tag: str) -> None:
+    """Remove tag from metadata"""
+    if (
+        tag not in self._metadata.refs
+        or self._metadata.refs[tag].type
+        != meta.SnapshotReference.TAG
+    ):
+      raise errors.SnapshotNotFoundError(f"Tag {tag} is not found")
+
+    new_metadata = meta.StorageMetadata()
+    new_metadata.CopyFrom(self._metadata)
+    del new_metadata.refs[tag]
+    self._write_metadata(self.new_metadata_path(), new_metadata)
+    self._metadata = new_metadata
+
   def commit(self, patch: rt.Patch) -> None:
     """Commit changes to the storage.
 

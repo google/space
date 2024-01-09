@@ -66,7 +66,7 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
       self,
       filter_: Optional[pc.Expression] = None,
       fields: Optional[List[str]] = None,
-      snapshot_id: Optional[int] = None,
+      version: Optional[Union[int,str]] = None,
       reference_read: bool = False,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
@@ -80,6 +80,14 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
     # Reload all sources because there are two sources for join.
     for ds in self._view.sources.values():
       ds.storage.reload()
+
+    snapshot_id = None
+
+    if version is not None:
+      if isinstance(version, str):
+        snapshot_id = self._source_storage.lookup_reference(version).snapshot_id
+      else:
+        snapshot_id = version
 
     for ref in self._view.ray_dataset(
         ReadOptions(filter_, fields, snapshot_id, reference_read),
@@ -121,7 +129,7 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
       self,
       filter_: Optional[pc.Expression] = None,
       fields: Optional[List[str]] = None,
-      snapshot_id: Optional[int] = None,
+      version: Optional[Union[int,str]] = None,
       reference_read: bool = False,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
@@ -136,6 +144,12 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
     To use RayReadOnlyRunner, use `runner = mv.view.ray()` instead of
     `mv.ray()`.
     """
+    snapshot_id = None
+    if version:
+      if isinstance(version, str):
+        snapshot_id = self._storage.lookup_reference(version).snapshot_id
+      else:
+        snapshot_id = version
     for ref in self._storage.ray_dataset(
         ReadOptions(filter_, fields, snapshot_id,
                     reference_read)).to_arrow_refs():

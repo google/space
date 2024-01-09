@@ -62,7 +62,7 @@ class StorageMetadata(google.protobuf.message.Message):
     """Metadata persisting the current status of a storage, including logical
     metadata such as schema, and physical metadata persisted as a history of
     snapshots
-    NEXT_ID: 8
+    NEXT_ID: 9
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -106,6 +106,24 @@ class StorageMetadata(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
+    @typing_extensions.final
+    class RefsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___SnapshotReference: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___SnapshotReference | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
     CREATE_TIME_FIELD_NUMBER: builtins.int
     LAST_UPDATE_TIME_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
@@ -113,6 +131,7 @@ class StorageMetadata(google.protobuf.message.Message):
     CURRENT_SNAPSHOT_ID_FIELD_NUMBER: builtins.int
     SNAPSHOTS_FIELD_NUMBER: builtins.int
     LOGICAL_PLAN_FIELD_NUMBER: builtins.int
+    REFS_FIELD_NUMBER: builtins.int
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Create time of the storage."""
@@ -124,13 +143,18 @@ class StorageMetadata(google.protobuf.message.Message):
     def schema(self) -> global___Schema:
         """The storage schema."""
     current_snapshot_id: builtins.int
-    """The current snapshot ID."""
+    """The current snapshot ID for the main branch."""
     @property
     def snapshots(self) -> google.protobuf.internal.containers.MessageMap[builtins.int, global___Snapshot]:
         """All alive snapshots with snapshot ID as key."""
     @property
     def logical_plan(self) -> global___LogicalPlan:
         """Store the logical plan for materialized views."""
+    @property
+    def refs(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___SnapshotReference]:
+        """All alive refs, with reference name as key. Reference name can be a tag 
+        or a branch name.
+        """
     def __init__(
         self,
         *,
@@ -141,9 +165,10 @@ class StorageMetadata(google.protobuf.message.Message):
         current_snapshot_id: builtins.int = ...,
         snapshots: collections.abc.Mapping[builtins.int, global___Snapshot] | None = ...,
         logical_plan: global___LogicalPlan | None = ...,
+        refs: collections.abc.Mapping[builtins.str, global___SnapshotReference] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "last_update_time", b"last_update_time", "logical_plan", b"logical_plan", "schema", b"schema"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "current_snapshot_id", b"current_snapshot_id", "last_update_time", b"last_update_time", "logical_plan", b"logical_plan", "schema", b"schema", "snapshots", b"snapshots", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "current_snapshot_id", b"current_snapshot_id", "last_update_time", b"last_update_time", "logical_plan", b"logical_plan", "refs", b"refs", "schema", b"schema", "snapshots", b"snapshots", "type", b"type"]) -> None: ...
 
 global___StorageMetadata = StorageMetadata
 
@@ -229,6 +254,52 @@ class Snapshot(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing_extensions.Literal["data_info", b"data_info"]) -> typing_extensions.Literal["manifest_files"] | None: ...
 
 global___Snapshot = Snapshot
+
+@typing_extensions.final
+class SnapshotReference(google.protobuf.message.Message):
+    """Reference to a snapshot.
+    NEXT_ID: 4
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _ReferenceType:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _ReferenceTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[SnapshotReference._ReferenceType.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        TYPE_UNSPECIFIED: SnapshotReference._ReferenceType.ValueType  # 0
+        TAG: SnapshotReference._ReferenceType.ValueType  # 1
+        """Reference of a specific snapshot within the storage history."""
+        BRANCH: SnapshotReference._ReferenceType.ValueType  # 2
+        """Reference of the current snapshot of a branch."""
+
+    class ReferenceType(_ReferenceType, metaclass=_ReferenceTypeEnumTypeWrapper): ...
+    TYPE_UNSPECIFIED: SnapshotReference.ReferenceType.ValueType  # 0
+    TAG: SnapshotReference.ReferenceType.ValueType  # 1
+    """Reference of a specific snapshot within the storage history."""
+    BRANCH: SnapshotReference.ReferenceType.ValueType  # 2
+    """Reference of the current snapshot of a branch."""
+
+    REFERENCE_NAME_FIELD_NUMBER: builtins.int
+    SNAPSHOT_ID_FIELD_NUMBER: builtins.int
+    TYPE_FIELD_NUMBER: builtins.int
+    reference_name: builtins.str
+    """Name for the reference."""
+    snapshot_id: builtins.int
+    """The snapshot ID."""
+    type: global___SnapshotReference.ReferenceType.ValueType
+    def __init__(
+        self,
+        *,
+        reference_name: builtins.str = ...,
+        snapshot_id: builtins.int = ...,
+        type: global___SnapshotReference.ReferenceType.ValueType = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["reference_name", b"reference_name", "snapshot_id", b"snapshot_id", "type", b"type"]) -> None: ...
+
+global___SnapshotReference = SnapshotReference
 
 @typing_extensions.final
 class ManifestFiles(google.protobuf.message.Message):

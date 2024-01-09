@@ -50,7 +50,7 @@ class BaseReadOnlyRunner(ABC):
       self,
       filter_: Optional[pc.Expression] = None,
       fields: Optional[List[str]] = None,
-      snapshot_id: Optional[int] = None,
+      version: Optional[Union[int, str]] = None,
       reference_read: bool = False,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
@@ -61,13 +61,13 @@ class BaseReadOnlyRunner(ABC):
       self,
       filter_: Optional[pc.Expression] = None,
       fields: Optional[List[str]] = None,
-      snapshot_id: Optional[int] = None,
+      version: Optional[Union[int, str]] = None,
       reference_read: bool = False,
       join_options: JoinOptions = JoinOptions()
   ) -> Optional[pa.Table]:
     """Read data from the dataset as an Arrow table."""
     all_data = []
-    for data in self.read(filter_, fields, snapshot_id, reference_read,
+    for data in self.read(filter_, fields, version, reference_read,
                           join_options):
       if data.num_rows > 0:
         all_data.append(data)
@@ -122,7 +122,6 @@ class StorageMixin:
       return fn(self, *args, **kwargs)
 
     return decorated
-
 
 class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
   """Abstract base read and write runner class."""
@@ -203,10 +202,17 @@ class LocalRunner(BaseReadWriteRunner):
       self,
       filter_: Optional[pc.Expression] = None,
       fields: Optional[List[str]] = None,
-      snapshot_id: Optional[int] = None,
+      version: Optional[Union[int,str]] = None,
       reference_read: bool = False,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
+    snapshot_id = None
+    if version is not None:
+      if isinstance(version, str):
+        version_ref = self._storage.lookup_reference(version)
+        snapshot_id = version_ref.snapshot_id
+      else:
+        snapshot_id = version
     return iter(
         FileSetReadOp(
             self._storage.location, self._storage.metadata,

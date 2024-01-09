@@ -41,7 +41,7 @@ message FileSet {
   map<int64, string> index_manifest_files = 2;
 }
 
-// A patch describing metadata changes to the storage.
+// A patch describing metadata changes to the storage for a data operation.
 // NEXT_ID: 5
 message Patch {
   // Manifest files to add to the storage.
