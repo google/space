@@ -204,17 +204,20 @@ class Storage(paths.StoragePathsMixin):
     if snapshot_id not in self._metadata.snapshots:
       raise errors.SnapshotNotFoundError(f"Snapshot {snapshot_id} is not found")
 
+    if len(tag) == 0:
+      raise errors.UserInputError("Tag cannot be empty")
+
     if tag in self._metadata.refs:
       raise errors.SnapshotReferenceAlreadyExistError(
                 f"Reference {tag} already exist")
 
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
-    tag_reference = meta.SnapshotReference(
+    tag_ref = meta.SnapshotReference(
                         reference_name = tag,
                         snapshot_id = snapshot_id,
-                        type = meta.SnapshotReference.ReferenceType.TAG)
-    new_metadata.refs[tag].CopyFrom(tag_reference)
+                        type = meta.SnapshotReference.TAG)
+    new_metadata.refs[tag].CopyFrom(tag_ref)
     self._write_metadata(self.new_metadata_path(), new_metadata)
     self._metadata = new_metadata
 
@@ -223,7 +226,7 @@ class Storage(paths.StoragePathsMixin):
     if (
         tag not in self._metadata.refs
         or self._metadata.refs[tag].type
-        != meta.SnapshotReference.ReferenceType.TAG
+        != meta.SnapshotReference.TAG
     ):
       raise errors.SnapshotNotFoundError(f"Tag {tag} is not found")
 
