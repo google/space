@@ -325,8 +325,10 @@ class TestStorage:
                     primary_keys=["int64"],
                     record_fields=[])
     storage.add_tag("tag1")
+
     with pytest.raises(errors.UserInputError, match=r".*already exist.*"):
       storage.add_tag("tag1")
+
     storage.add_tag("tag2")
     metadata = storage.metadata
 
@@ -338,6 +340,7 @@ class TestStorage:
     assert tag_ref2.snapshot_id == metadata.current_snapshot_id
 
     storage.remove_tag("tag1")
+
     with pytest.raises(errors.UserInputError, match=r".*not found.*"):
       storage.remove_tag("tag1")
     assert len(storage.metadata.refs) == 1

@@ -271,14 +271,14 @@ class SnapshotReference(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         TYPE_UNSPECIFIED: SnapshotReference._ReferenceType.ValueType  # 0
         TAG: SnapshotReference._ReferenceType.ValueType  # 1
-        """Reference of a specific commit within the project history,"""
+        """Reference of a specific snapshot within the storage history."""
         BRANCH: SnapshotReference._ReferenceType.ValueType  # 2
         """Reference of the current snapshot of a branch."""
 
     class ReferenceType(_ReferenceType, metaclass=_ReferenceTypeEnumTypeWrapper): ...
     TYPE_UNSPECIFIED: SnapshotReference.ReferenceType.ValueType  # 0
     TAG: SnapshotReference.ReferenceType.ValueType  # 1
-    """Reference of a specific commit within the project history,"""
+    """Reference of a specific snapshot within the storage history."""
     BRANCH: SnapshotReference.ReferenceType.ValueType  # 2
     """Reference of the current snapshot of a branch."""
 

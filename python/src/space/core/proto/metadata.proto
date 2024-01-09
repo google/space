@@ -122,7 +122,7 @@ message SnapshotReference {
 
   enum ReferenceType{
     TYPE_UNSPECIFIED = 0;
-    // Reference of a specific commit within the project history,
+    // Reference of a specific snapshot within the storage history.
     TAG = 1;
     // Reference of the current snapshot of a branch.
     BRANCH = 2;

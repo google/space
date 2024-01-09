@@ -50,7 +50,7 @@ class BaseReadOnlyRunner(ABC):
       self,
       filter_: Optional[pc.Expression] = None,
       fields: Optional[List[str]] = None,
-      version: Optional[Union[int,str]] = None,
+      version: Optional[Union[int, str]] = None,
       reference_read: bool = False,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
@@ -61,7 +61,7 @@ class BaseReadOnlyRunner(ABC):
       self,
       filter_: Optional[pc.Expression] = None,
       fields: Optional[List[str]] = None,
-      version: Optional[Union[int,str]] = None,
+      version: Optional[Union[int, str]] = None,
       reference_read: bool = False,
       join_options: JoinOptions = JoinOptions()
   ) -> Optional[pa.Table]:

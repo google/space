@@ -82,6 +82,7 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
       ds.storage.reload()
 
     snapshot_id = None
+
     if version:
       if isinstance(version, str):
         snapshot_id = self._source_storage.lookup_reference(version).snapshot_id

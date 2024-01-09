@@ -152,6 +152,7 @@ class TestLocalRunner:
         [sample_data1, sample_data2])
     assert local_runner.read_all(version="insert1") == pa.concat_tables(
         [sample_data1])
+
     ds.remove_tag(tag="insert1")
     with pytest.raises(errors.SnapshotReferenceNotFoundError) as excinfo:
       local_runner.read_all(version="insert1")
