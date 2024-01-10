@@ -209,7 +209,7 @@ global___Schema = Schema
 class Snapshot(google.protobuf.message.Message):
     """Storage snapshot persisting physical metadata such as manifest file paths.
     It is used for obtaining all alive data file paths for a given snapshot.
-    NEXT_ID: 7
+    NEXT_ID: 6
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
