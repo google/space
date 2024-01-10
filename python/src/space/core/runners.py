@@ -36,9 +36,8 @@ from space.core.ops.insert import InsertOptions, LocalInsertOp
 from space.core.ops.read import FileSetReadOp
 from space.core.options import JoinOptions, ReadOptions
 import space.core.proto.runtime_pb2 as rt
-from space.core.storage import Storage
+from space.core.storage import Storage, Version
 from space.core.utils import errors
-from space.core.versions.utils import version_to_snapshot_id
 
 
 class BaseReadOnlyRunner(ABC):
@@ -50,7 +49,7 @@ class BaseReadOnlyRunner(ABC):
       self,
       filter_: Optional[pc.Expression] = None,
       fields: Optional[List[str]] = None,
-      version: Optional[Union[int, str]] = None,
+      version: Optional[Version] = None,
       reference_read: bool = False,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
@@ -61,7 +60,7 @@ class BaseReadOnlyRunner(ABC):
       self,
       filter_: Optional[pc.Expression] = None,
       fields: Optional[List[str]] = None,
-      version: Optional[Union[int, str]] = None,
+      version: Optional[Version] = None,
       reference_read: bool = False,
       join_options: JoinOptions = JoinOptions()
   ) -> Optional[pa.Table]:
@@ -123,6 +122,7 @@ class StorageMixin:
 
     return decorated
 
+
 class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
   """Abstract base read and write runner class."""
 
@@ -130,8 +130,7 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
                storage: Storage,
                file_options: Optional[FileOptions] = None):
     StorageMixin.__init__(self, storage)
-    self._file_options = FileOptions(
-    ) if file_options is None else file_options
+    self._file_options = FileOptions() if file_options is None else file_options
 
   @abstractmethod
   def append(self, data: InputData) -> JobResult:
@@ -202,17 +201,13 @@ class LocalRunner(BaseReadWriteRunner):
       self,
       filter_: Optional[pc.Expression] = None,
       fields: Optional[List[str]] = None,
-      version: Optional[Union[int,str]] = None,
+      version: Optional[Version] = None,
       reference_read: bool = False,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
-    snapshot_id = None
-    if version is not None:
-      if isinstance(version, str):
-        version_ref = self._storage.lookup_reference(version)
-        snapshot_id = version_ref.snapshot_id
-      else:
-        snapshot_id = version
+    snapshot_id = (None if version is None else
+                   self._storage.version_to_snapshot_id(version))
+
     return iter(
         FileSetReadOp(
             self._storage.location, self._storage.metadata,
@@ -220,11 +215,11 @@ class LocalRunner(BaseReadWriteRunner):
             ReadOptions(filter_, fields, reference_read=reference_read)))
 
   @StorageMixin.reload
-  def diff(self, start_version: Union[int],
-           end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
+  def diff(self, start_version: Version,
+           end_version: Version) -> Iterator[Tuple[ChangeType, pa.Table]]:
     return read_change_data(self._storage,
-                            version_to_snapshot_id(start_version),
-                            version_to_snapshot_id(end_version))
+                            self._storage.version_to_snapshot_id(start_version),
+                            self._storage.version_to_snapshot_id(end_version))
 
   @StorageMixin.transactional
   def append(self, data: InputData) -> Optional[rt.Patch]:

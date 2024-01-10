@@ -81,11 +81,11 @@ import pyarrow.compute as pc
 # Create a local or Ray runner.
 runner = ds.local()  # or ds.ray()
 
-# Appending data generates a new dataset version `1`.
+# Appending data generates a new dataset version `snapshot_id=1`.
 # Write methods:
 # - append(...): no primary key check.
 # - insert(...): fail if primary key exists.
-# - upsert(...): override if primary key exists.
+# - upsert(...): overwrite if primary key exists.
 ids = range(100)
 runner.append({
   "id": ids,
@@ -93,21 +93,25 @@ runner.append({
   "feature": [f"somedata{i}".encode("utf-8") for i in ids]
 })
 
-# Deletion generates a new version `2`.
+# Deletion generates a new version `snapshot_id=2`.
 runner.delete(pc.field("id") == 1)
 
-# Obtain an iterator; read options:
+# Version management: add tags to snapshots.
+ds.add_tag("after_add", 1)
+ds.add_tag("after_delete", 2)
+
+# Read options:
 # - filter_: optional, apply a filter (push down to reader).
 # - fields: optional, field selection.
-# - snapshot_id: optional, time travel back to an old version.
+# - version: optional, snapshot_id or tag, time travel back to an old version.
 runner.read_all(
   filter_=pc.field("image_name")=="2.jpg",
   fields=["feature"],
-  snapshot_id=1
+  version="after_add"  # or 1
 )
 
 # Read the changes between version 0 and 2.
-for change_type, data in runner.diff(0, 2):
+for change_type, data in runner.diff(0, "after_delete"):
   print(change_type)
   print(data)
   print("===============")

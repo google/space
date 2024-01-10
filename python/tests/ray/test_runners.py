@@ -131,6 +131,8 @@ class TestRayReadWriteRunner:
         ]).sort_by("int64"))
 
   def test_diff_map_batches(self, tmp_path, sample_dataset):
+    ds = sample_dataset
+
     # A sample UDF for testing.
     def _sample_map_udf(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
       batch["float64"] = batch["float64"] + 1
@@ -139,12 +141,12 @@ class TestRayReadWriteRunner:
     view_schema = pa.schema(
         [pa.field("int64", pa.int64()),
          pa.field("float64", pa.float64())])
-    view = sample_dataset.map_batches(fn=_sample_map_udf,
-                                      input_fields=["int64", "float64"],
-                                      output_schema=view_schema)
+    view = ds.map_batches(fn=_sample_map_udf,
+                          input_fields=["int64", "float64"],
+                          output_schema=view_schema)
     mv = view.materialize(str(tmp_path / "mv"))
 
-    ds_runner = sample_dataset.local()
+    ds_runner = ds.local()
     view_runner = view.ray()
 
     # Test append.
@@ -170,6 +172,12 @@ class TestRayReadWriteRunner:
                         }))
     assert list(view_runner.diff(1, 2)) == [expected_change1]
 
+    # Test that diff supports tags.
+    ds.add_tag("tag1", 1)  # or ds.add_tag("tag") to tag the current snapshot
+    ds.add_tag("tag2", 2)
+    assert list(view_runner.diff(1, "tag2")) == [expected_change1]
+    assert list(view_runner.diff("tag1", "tag2")) == [expected_change1]
+
     # Test several changes.
     assert list(view_runner.diff(0, 2)) == [expected_change0, expected_change1]
 
@@ -192,9 +200,8 @@ class TestRayReadWriteRunner:
     })
 
     with pytest.raises(
-        errors.SnapshotNotFoundError,
-        match=r".*Target snapshot ID 3 higher than source dataset version 2.*"
-    ):
+        errors.VersionNotFoundError,
+        match=r".*Target snapshot ID 3 higher than source dataset version 2.*"):
       ray_runner.refresh(3)
 
   def test_diff_filter(self, sample_dataset):
@@ -285,11 +292,13 @@ class TestRayReadWriteRunner:
 
     left_fields_ = [
         ds1_schema.field(f).remove_metadata()
-        for f in left_fields or ds1.schema.names if f != "int64"
+        for f in left_fields or ds1.schema.names
+        if f != "int64"
     ]
     right_fields_ = [
         ds2.schema.field(f).remove_metadata()
-        for f in right_fields or ds2.schema.names if f != "int64"
+        for f in right_fields or ds2.schema.names
+        if f != "int64"
     ]
 
     if not swap:
@@ -305,8 +314,7 @@ class TestRayReadWriteRunner:
 
     def generate_expected(values: Iterable[int]) -> pa.Table:
       return pa.Table.from_pydict({
-          "int64":
-          values,
+          "int64": values,
           "float64": [v / 10 for v in values],
           "binary": [f"b{v}".encode("utf-8") for v in values],
           "string": [f"s{v}" for v in values]
@@ -322,8 +330,7 @@ class TestRayReadWriteRunner:
 
       # Sanity checks of addresses.
       address_column = join_values.column("binary").combine_chunks()
-      assert address_column.field("_FILE")[0].as_py().startswith(
-          "data/binary_")
+      assert address_column.field("_FILE")[0].as_py().startswith("data/binary_")
       assert len(address_column.field("_ROW_ID")) == len(indexes)
 
       # Test reading addresses.
@@ -374,9 +381,8 @@ class TestRayReadWriteRunner:
                left_fields=["float64"],
                right_fields=["string"])
 
-    with pytest.raises(
-        errors.UserInputError,
-        match=r".*Join key must be primary key on both sides.*"):
+    with pytest.raises(errors.UserInputError,
+                       match=r".*Join key must be primary key on both sides.*"):
       ds1.join(ds2,
                keys=["string"],
                left_fields=["float64"],
@@ -385,8 +391,7 @@ class TestRayReadWriteRunner:
 
 def generate_data(values: Iterable[int]) -> pa.Table:
   return pa.Table.from_pydict({
-      "int64":
-      values,
+      "int64": values,
       "float64": [v / 10 for v in values],
       "binary": [f"b{v}".encode("utf-8") for v in values]
   })
