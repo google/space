@@ -87,6 +87,8 @@ message Schema {
 // It is used for obtaining all alive data file paths for a given snapshot.
 // NEXT_ID: 7
 message Snapshot {
+  reserved 6;
+
   // The snapshot ID.
   int64 snapshot_id = 1;
 
@@ -105,10 +107,6 @@ message Snapshot {
 
   // File path of the change log of the snapshot.
   string change_log_file = 5;
-
-  // The metadata file path (StorageMetadata) that uses this snapshot as the
-  // current snapshot.
-  string metadata_file = 6;
 }
 
 // Reference to a snapshot.

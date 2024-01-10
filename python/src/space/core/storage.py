@@ -53,10 +53,12 @@ class Storage(paths.StoragePathsMixin):
   Not thread safe.
   """
 
-  def __init__(self, location: str, metadata: meta.StorageMetadata):
+  def __init__(self, location: str, cur_metadata_file: str,
+                 metadata: meta.StorageMetadata):
     super().__init__(location)
     self._fs = create_fs(location)
     self._metadata = metadata
+    self._cur_metadata_file = cur_metadata_file
 
     record_fields = set(self._metadata.schema.record_fields)
     self._logical_schema = arrow.arrow_schema(self._metadata.schema.fields,
@@ -155,12 +157,10 @@ class Storage(paths.StoragePathsMixin):
     new_metadata_path = paths.new_metadata_path(paths.metadata_dir(location))
 
     snapshot = meta.Snapshot(snapshot_id=_INIT_SNAPSHOT_ID,
-                             create_time=now,
-                             metadata_file=path.relpath(
-                                 new_metadata_path, location))
+                             create_time=now)
     metadata.snapshots[metadata.current_snapshot_id].CopyFrom(snapshot)
 
-    storage = Storage(location, metadata)
+    storage = Storage(location, new_metadata_path, metadata)
     storage._initialize_files(new_metadata_path)
     return storage
 
@@ -169,17 +169,18 @@ class Storage(paths.StoragePathsMixin):
     """Load an existing storage from the given location."""
     fs = create_fs(location)
     entry_point = _read_entry_point(fs, location)
-    return Storage(location, _read_metadata(fs, location, entry_point))
+    return Storage(location, entry_point.metadata_file,
+                       _read_metadata(fs, location, entry_point))
 
   def reload(self) -> bool:
     """Check whether the storage files has been updated by other writers, if
     so, reload the files into memory and return True."""
     entry_point = _read_entry_point(self._fs, self._location)
-    if entry_point.metadata_file == self.snapshot().metadata_file:
+    if entry_point.metadata_file == self._cur_metadata_file:
       return False
 
     metadata = _read_metadata(self._fs, self._location, entry_point)
-    self.__init__(self.location, metadata)  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
+    self.__init__(self.location, entry_point.metadata_file, metadata)  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
     logging.info(
         f"Storage reloaded to snapshot: {self._metadata.current_snapshot_id}")
     return True
@@ -218,8 +219,10 @@ class Storage(paths.StoragePathsMixin):
                         snapshot_id = snapshot_id,
                         type = meta.SnapshotReference.TAG)
     new_metadata.refs[tag].CopyFrom(tag_ref)
-    self._write_metadata(self.new_metadata_path(), new_metadata)
+    new_metadata_path = self.new_metadata_path()
+    self._write_metadata(new_metadata_path, new_metadata)
     self._metadata = new_metadata
+    self._cur_metadata_file = new_metadata_path
 
   def remove_tag(self, tag: str) -> None:
     """Remove tag from metadata"""
@@ -233,8 +236,10 @@ class Storage(paths.StoragePathsMixin):
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
     del new_metadata.refs[tag]
-    self._write_metadata(self.new_metadata_path(), new_metadata)
+    new_metadata_path = self.new_metadata_path()
+    self._write_metadata(new_metadata_path, new_metadata)
     self._metadata = new_metadata
+    self._cur_metadata_file = new_metadata_path
 
   def commit(self, patch: rt.Patch) -> None:
     """Commit changes to the storage.
@@ -256,7 +261,6 @@ class Storage(paths.StoragePathsMixin):
 
     snapshot = meta.Snapshot(
         snapshot_id=new_snapshot_id,
-        metadata_file=self.short_path(new_metadata_path),
         create_time=proto_now(),
         manifest_files=current_snapshot.manifest_files,
         storage_statistics=current_snapshot.storage_statistics)
@@ -277,6 +281,7 @@ class Storage(paths.StoragePathsMixin):
     new_metadata.snapshots[new_snapshot_id].CopyFrom(snapshot)
     self._write_metadata(new_metadata_path, new_metadata)
     self._metadata = new_metadata
+    self._cur_metadata_file = new_metadata_path
 
   def data_files(self,
                  filter_: Optional[pc.Expression] = None,

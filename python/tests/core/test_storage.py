@@ -54,7 +54,7 @@ class TestStorage:
 
   @pytest.fixture
   def storage(self, metadata):
-    return Storage("location", metadata)
+    return Storage("location","location/metadata", metadata)
 
   def test_create_dir(self, storage, metadata):
     assert storage.metadata == metadata
