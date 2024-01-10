@@ -111,8 +111,8 @@ class ArrowDataSource(AbcSequence):
 
     return self._maybe_remove_dict({
         f:
-        self._serializer.field_serializer(f  # type: ignore[union-attr]
-                                          ).deserialize(v)
+            self._serializer.field_serializer(f  # type: ignore[union-attr]
+                                             ).deserialize(v)
         for f, v in results.items()
     })
 
@@ -131,8 +131,8 @@ class ArrowDataSource(AbcSequence):
       assert len(records) == addresses.num_rows
       results[field] = records
 
-    return self._maybe_remove_dict(results if self._serializer is None else
-                                   self._serializer.deserialize(results))
+    return self._maybe_remove_dict(results if self._serializer is None else self
+                                   ._serializer.deserialize(results))
 
   def _maybe_remove_dict(self, values: Dict[str, Any]) -> Any:
     if len(self._feature_fields) == 1:

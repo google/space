@@ -37,7 +37,6 @@ from space.core.options import JoinOptions, ReadOptions
 import space.core.proto.runtime_pb2 as rt
 from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray
-from space.core.versions.utils import version_to_snapshot_id
 from space.ray.ops.append import RayAppendOp
 from space.ray.ops.delete import RayDeleteOp
 from space.ray.ops.insert import RayInsertOp
@@ -45,7 +44,7 @@ from space.ray.ops.utils import singleton_storage
 
 if TYPE_CHECKING:
   from space.core.datasets import Dataset
-  from space.core.storage import Storage
+  from space.core.storage import Storage, Version
   from space.core.views import MaterializedView, View
 
 
@@ -66,7 +65,7 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
       self,
       filter_: Optional[pc.Expression] = None,
       fields: Optional[List[str]] = None,
-      version: Optional[Union[int,str]] = None,
+      version: Optional[Version] = None,
       reference_read: bool = False,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
@@ -81,25 +80,23 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
     for ds in self._view.sources.values():
       ds.storage.reload()
 
-    snapshot_id = None
-
-    if version is not None:
-      if isinstance(version, str):
-        snapshot_id = self._source_storage.lookup_reference(version).snapshot_id
-      else:
-        snapshot_id = version
+    snapshot_id = (None if version is None else
+                   self._source_storage.version_to_snapshot_id(version))
 
     for ref in self._view.ray_dataset(
         ReadOptions(filter_, fields, snapshot_id, reference_read),
         join_options).to_arrow_refs():
       yield ray.get(ref)
 
-  def diff(self, start_version: Union[int],
-           end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
+  def diff(
+      self, start_version: Union[Version],
+      end_version: Union[Version]) -> Iterator[Tuple[ChangeType, pa.Table]]:
     self._source_storage.reload()
-    source_changes = read_change_data(self._source_storage,
-                                      version_to_snapshot_id(start_version),
-                                      version_to_snapshot_id(end_version))
+    source_changes = read_change_data(
+        self._source_storage,
+        self._source_storage.version_to_snapshot_id(start_version),
+        self._source_storage.version_to_snapshot_id(end_version))
+
     for change_type, data in source_changes:
       # TODO: skip processing the data for deletions; the caller is usually
       # only interested at deleted primary keys.
@@ -116,12 +113,10 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
 class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
   """Ray runner for materialized views."""
 
-  def __init__(self, mv: MaterializedView,
-               file_options: Optional[FileOptions]):
+  def __init__(self, mv: MaterializedView, file_options: Optional[FileOptions]):
     RayReadOnlyRunner.__init__(self, mv.view)
     StorageMixin.__init__(self, mv.storage)
-    self._file_options = FileOptions(
-    ) if file_options is None else file_options
+    self._file_options = FileOptions() if file_options is None else file_options
 
   # pylint: disable=too-many-arguments
   @StorageMixin.reload
@@ -129,7 +124,7 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
       self,
       filter_: Optional[pc.Expression] = None,
       fields: Optional[List[str]] = None,
-      version: Optional[Union[int,str]] = None,
+      version: Optional[Version] = None,
       reference_read: bool = False,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
@@ -144,27 +139,25 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
     To use RayReadOnlyRunner, use `runner = mv.view.ray()` instead of
     `mv.ray()`.
     """
-    snapshot_id = None
-    if version:
-      if isinstance(version, str):
-        snapshot_id = self._storage.lookup_reference(version).snapshot_id
-      else:
-        snapshot_id = version
+    snapshot_id = (None if version is None else
+                   self._storage.version_to_snapshot_id(version))
+
     for ref in self._storage.ray_dataset(
         ReadOptions(filter_, fields, snapshot_id,
                     reference_read)).to_arrow_refs():
       yield ray.get(ref)
 
   def refresh(self,
-              target_version: Optional[Union[int]] = None) -> List[JobResult]:
+              target_version: Optional[Version] = None) -> List[JobResult]:
     """Refresh the materialized view by synchronizing from source dataset."""
     source_snapshot_id = self._source_storage.metadata.current_snapshot_id
     if target_version is None:
       end_snapshot_id = source_snapshot_id
     else:
-      end_snapshot_id = version_to_snapshot_id(target_version)
+      end_snapshot_id = self._source_storage.version_to_snapshot_id(
+          target_version)
       if end_snapshot_id > source_snapshot_id:
-        raise errors.SnapshotNotFoundError(
+        raise errors.VersionNotFoundError(
             f"Target snapshot ID {end_snapshot_id} higher than source dataset "
             f"version {source_snapshot_id}")
 

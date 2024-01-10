@@ -56,11 +56,11 @@ def read_change_data(
   all_snapshot_ids_set = set(all_snapshot_ids)
 
   if start_snapshot_id not in all_snapshot_ids_set:
-    raise errors.SnapshotNotFoundError(
+    raise errors.VersionNotFoundError(
         f"Start snapshot ID not found: {start_snapshot_id}")
 
   if end_snapshot_id not in all_snapshot_ids_set:
-    raise errors.SnapshotNotFoundError(
+    raise errors.VersionNotFoundError(
         f"Start snapshot ID not found: {end_snapshot_id}")
 
   for snapshot_id in all_snapshot_ids:
@@ -84,7 +84,7 @@ class _LocalChangeDataReadOp(StoragePathsMixin):
     self._metadata = self._storage.metadata
 
     if snapshot_id not in self._metadata.snapshots:
-      raise errors.SnapshotNotFoundError(
+      raise errors.VersionNotFoundError(
           f"Change data read can't find snapshot ID {snapshot_id}")
 
     snapshot = self._metadata.snapshots[snapshot_id]

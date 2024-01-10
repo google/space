@@ -16,7 +16,8 @@
 
 from __future__ import annotations
 from os import path
-from typing import Collection, Dict, Iterator, List, Optional
+from typing import Collection, Dict, Iterator, List, Optional, Union
+from typing_extensions import TypeAlias
 
 from absl import logging  # type: ignore[import-untyped]
 import pyarrow as pa
@@ -42,6 +43,8 @@ from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.protos import proto_now
 from space.core.utils.uuids import uuid_
 from space.ray.data_sources import SpaceDataSource
+
+Version: TypeAlias = Union[str, int]
 
 # Initial snapshot ID.
 _INIT_SNAPSHOT_ID = 0
@@ -111,7 +114,7 @@ class Storage(paths.StoragePathsMixin):
     if snapshot_id in self._metadata.snapshots:
       return self._metadata.snapshots[snapshot_id]
 
-    raise errors.SnapshotNotFoundError(f"Snapshot {snapshot_id} is not found")
+    raise errors.VersionNotFoundError(f"Snapshot {snapshot_id} is not found")
 
   # pylint: disable=too-many-arguments
   @classmethod
@@ -189,13 +192,19 @@ class Storage(paths.StoragePathsMixin):
     """Start a transaction."""
     return Transaction(self)
 
-  def lookup_reference(self, ref_name: str) -> meta.SnapshotReference:
-    """Lookup a reference in the snapshot"""
-    if ref_name in self._metadata.refs:
-      return self._metadata.refs[ref_name]
+  def version_to_snapshot_id(self, version: Version) -> int:
+    """Convert a version to a snapshot ID."""
+    if isinstance(version, int):
+      return version
 
-    raise errors.SnapshotReferenceNotFoundError(
-              f"Version {ref_name} is not found")
+    return self._lookup_reference(version).snapshot_id
+
+  def _lookup_reference(self, tag_or_branch: str) -> meta.SnapshotReference:
+    """Lookup a snapshot reference."""
+    if tag_or_branch in self._metadata.refs:
+      return self._metadata.refs[tag_or_branch]
+
+    raise errors.VersionNotFoundError(f"Version {tag_or_branch} is not found")
 
   def add_tag(self, tag: str, snapshot_id: Optional[int] = None) -> None:
     """Add tag to a snapshot"""
@@ -203,21 +212,19 @@ class Storage(paths.StoragePathsMixin):
       snapshot_id = self._metadata.current_snapshot_id
 
     if snapshot_id not in self._metadata.snapshots:
-      raise errors.SnapshotNotFoundError(f"Snapshot {snapshot_id} is not found")
+      raise errors.VersionNotFoundError(f"Snapshot {snapshot_id} is not found")
 
     if len(tag) == 0:
       raise errors.UserInputError("Tag cannot be empty")
 
     if tag in self._metadata.refs:
-      raise errors.SnapshotReferenceAlreadyExistError(
-                f"Reference {tag} already exist")
+      raise errors.VersionAlreadyExistError(f"Reference {tag} already exist")
 
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
-    tag_ref = meta.SnapshotReference(
-                        reference_name = tag,
-                        snapshot_id = snapshot_id,
-                        type = meta.SnapshotReference.TAG)
+    tag_ref = meta.SnapshotReference(reference_name=tag,
+                                     snapshot_id=snapshot_id,
+                                     type=meta.SnapshotReference.TAG)
     new_metadata.refs[tag].CopyFrom(tag_ref)
     new_metadata_path = self.new_metadata_path()
     self._write_metadata(new_metadata_path, new_metadata)
@@ -226,12 +233,9 @@ class Storage(paths.StoragePathsMixin):
 
   def remove_tag(self, tag: str) -> None:
     """Remove tag from metadata"""
-    if (
-        tag not in self._metadata.refs
-        or self._metadata.refs[tag].type
-        != meta.SnapshotReference.TAG
-    ):
-      raise errors.SnapshotNotFoundError(f"Tag {tag} is not found")
+    if (tag not in self._metadata.refs or
+        self._metadata.refs[tag].type != meta.SnapshotReference.TAG):
+      raise errors.VersionNotFoundError(f"Tag {tag} is not found")
 
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)

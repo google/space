@@ -19,18 +19,17 @@ class UserInputError(ValueError):
   """Errors caused by invalid user input."""
 
 
-class SnapshotNotFoundError(UserInputError):
-  """The snapshot is not found in metadata."""
+class VersionNotFoundError(UserInputError):
+  """The version is not found in metadata."""
+
+
+class VersionAlreadyExistError(UserInputError):
+  """Errors caused by the version to add already exists."""
 
 
 class PrimaryKeyExistError(UserInputError):
   """Errors caused by duplicated primary keys."""
 
-class SnapshotReferenceAlreadyExistError(UserInputError):
-  """Errors caused by duplicated reference."""
-
-class SnapshotReferenceNotFoundError(UserInputError):
-  """Errors caused by reference not found."""
 
 class SpaceRuntimeError(RuntimeError):
   """Basic class of errors thrown from Space runtime."""
