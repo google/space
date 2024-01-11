@@ -189,3 +189,16 @@ message LogicalPlan {
   // Key is UDF name; value is pickle file path.
   map<string, string> udfs = 2;
 }
+
+// A field type representing a file.
+// NEXT_ID: 3
+message FileType {
+  // The common directory of all files stored as the field.
+  // Used as the path prefix when read or write files.
+  string directory = 1;
+
+  // Managed files' lifecycle is controlled by Space. Inserting or deleting
+  // a file field will creating or delete a file.
+  // Feature not implemented yet.
+  bool managed = 2;
+}

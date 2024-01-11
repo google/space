@@ -25,8 +25,8 @@ def test_field_metadata():
 
 def test_field_id():
   assert arrow.field_id(
-      pa.field("name", pa.int64(), metadata={b"PARQUET:field_id":
-                                             b"123"})) == 123
+      pa.field("name", pa.int64(),
+               metadata={b"PARQUET:field_id": b"123"})) == 123
 
 
 def test_arrow_schema_logical_without_records(sample_substrait_fields,
@@ -45,6 +45,19 @@ def test_arrow_schema_physical_without_records(sample_substrait_fields,
                                                sample_arrow_schema):
   assert arrow.arrow_schema(sample_substrait_fields, [],
                             True) == sample_arrow_schema
+
+
+def test_arrow_schema_logical_with_files(file_substrait_fields,
+                                         file_arrow_schema):
+  assert arrow.arrow_schema(file_substrait_fields, [],
+                            False) == file_arrow_schema
+
+
+def test_arrow_schema_physical_with_files(file_substrait_fields):
+  assert arrow.arrow_schema(file_substrait_fields, [], True) == pa.schema([
+      pa.field("int64", pa.int64(), metadata=field_metadata(0)),
+      pa.field("files", pa.string(), metadata=field_metadata(1))
+  ])
 
 
 def test_arrow_schema_physical_with_records(tf_features_substrait_fields):

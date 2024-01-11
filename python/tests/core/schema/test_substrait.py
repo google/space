@@ -17,3 +17,13 @@ from space.core.schema.substrait import substrait_fields
 
 def test_substrait_fields(sample_arrow_schema, sample_substrait_fields):
   assert substrait_fields(sample_arrow_schema) == sample_substrait_fields
+
+
+def test_substrait_fields_tf_features(tf_features_arrow_schema,
+                                      tf_features_substrait_fields):
+  assert substrait_fields(
+      tf_features_arrow_schema) == tf_features_substrait_fields
+
+
+def test_substrait_fields_file(file_arrow_schema, file_substrait_fields):
+  assert substrait_fields(file_arrow_schema) == file_substrait_fields

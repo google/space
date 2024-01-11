@@ -14,14 +14,17 @@
 
 import json
 
+from google.protobuf import json_format
 import numpy as np
 import pyarrow as pa
 import pytest
 from tensorflow_datasets import features  # type: ignore[import-untyped]
 from substrait.type_pb2 import NamedStruct, Type
 
+import space.core.proto.metadata_pb2 as meta
 from space.core.schema.arrow import field_metadata
-from space.core.schema.types import TfFeatures
+from space.core.schema.types import File, TfFeatures
+from space.core.utils.constants import UTF_8
 
 
 @pytest.fixture
@@ -61,8 +64,7 @@ def sample_arrow_schema():
       pa.field("float32", pa.float32(), metadata=field_metadata(100)),
       pa.field("list",
                pa.list_(
-                   pa.field("int32", pa.int32(),
-                            metadata=field_metadata(110))),
+                   pa.field("int32", pa.int32(), metadata=field_metadata(110))),
                metadata=field_metadata(120)),
       pa.field("struct",
                pa.struct([
@@ -90,9 +92,7 @@ def sample_arrow_schema():
                                          pa.string(),
                                          metadata=field_metadata(230))),
                             metadata=field_metadata(240)),
-                   pa.field("binary",
-                            pa.binary(),
-                            metadata=field_metadata(250))
+                   pa.field("binary", pa.binary(), metadata=field_metadata(250))
                ]),
                metadata=field_metadata(260))
   ])
@@ -111,7 +111,7 @@ def tf_features_substrait_fields(tf_features):  # pylint: disable=redefined-oute
       struct=Type.Struct(types=[
           Type(i64=Type.I64(type_variation_reference=0)),
           Type(user_defined=Type.UserDefined(type_parameters=[
-              Type.Parameter(string="TF_FEATURES"),
+              Type.Parameter(string="space.tf_features"),
               Type.Parameter(string=json.dumps(tf_features.to_json()))
           ],
                                              type_variation_reference=1))
@@ -123,4 +123,30 @@ def tf_features_arrow_schema(tf_features):  # pylint: disable=redefined-outer-na
   return pa.schema([
       pa.field("int64", pa.int64(), metadata=field_metadata(0)),
       pa.field("features", TfFeatures(tf_features), metadata=field_metadata(1))
+  ])
+
+
+@pytest.fixture
+def file_substrait_fields():
+  file_type = meta.FileType(directory="test_folder")
+  serialized = json.dumps(json_format.MessageToJson(file_type)).encode(UTF_8)
+  return NamedStruct(
+      names=["int64", "files"],
+      struct=Type.Struct(types=[
+          Type(i64=Type.I64(type_variation_reference=0)),
+          Type(user_defined=Type.UserDefined(type_parameters=[
+              Type.Parameter(string="space.file"),
+              Type.Parameter(string=serialized)
+          ],
+                                             type_variation_reference=1))
+      ]))
+
+
+@pytest.fixture
+def file_arrow_schema():
+  return pa.schema([
+      pa.field("int64", pa.int64(), metadata=field_metadata(0)),
+      pa.field("files",
+               File(directory="test_folder"),
+               metadata=field_metadata(1))
   ])

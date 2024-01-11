@@ -21,7 +21,7 @@ import pyarrow as pa
 from substrait.type_pb2 import NamedStruct, Type
 
 from space.core.schema import constants
-from space.core.schema.types import TfFeatures
+from space.core.schema.types import File, TfFeatures
 from space.core.schema import utils
 from space.core.utils.constants import UTF_8
 
@@ -88,7 +88,7 @@ def _arrow_fields(names_visitor: _NamesVisitor, types: List[Type],
       arrow_type: pa.DataType = pa.struct(
           record_address_types())  # type: ignore[arg-type]
     else:
-      arrow_type = _arrow_type(type_, names_visitor)
+      arrow_type = _arrow_type(type_, physical, names_visitor)
 
     fields.append(
         pa.field(name,
@@ -105,6 +105,7 @@ def _substrait_field_id(type_: Type) -> int:
 
 # pylint: disable=too-many-return-statements
 def _arrow_type(type_: Type,
+                physical: bool,
                 names_visitor: Optional[_NamesVisitor] = None) -> pa.DataType:
   """Return the Arrow type for a Substrait type."""
   # TODO: to support more types in Substrait, e.g., fixed_size_list, map.
@@ -123,27 +124,37 @@ def _arrow_type(type_: Type,
   if type_.HasField("binary"):
     return pa.binary()
   if type_.HasField("list"):
-    return pa.list_(_arrow_type(type_.list.type, names_visitor))
+    return pa.list_(_arrow_type(type_.list.type, physical, names_visitor))
   if type_.HasField("struct"):
     assert names_visitor is not None
     subfields = []
     for t in type_.struct.types:
       subfields.append(
-          pa.field(names_visitor.next(), _arrow_type(t, names_visitor)))
+          pa.field(names_visitor.next(), _arrow_type(t, physical,
+                                                     names_visitor)))
     return pa.struct(subfields)
   if type_.HasField("user_defined"):
-    return _user_defined_arrow_type(type_)
+    return _user_defined_arrow_type(type_, physical)
 
   raise TypeError(f"Unsupported Substrait type: {type_}")
 
 
-def _user_defined_arrow_type(type_: Type) -> pa.ExtensionType:
+def _user_defined_arrow_type(type_: Type, physical: bool) -> pa.DataType:
   type_name = type_.user_defined.type_parameters[0].string
   serialized = type_.user_defined.type_parameters[1].string
 
-  if type_name == constants.TF_FEATURES_TYPE:
+  if type_name == TfFeatures.EXTENSION_NAME:
+    # Physical type has been handled when checking record fields.
     return TfFeatures.__arrow_ext_deserialize__(
         None, serialized)  # type: ignore[arg-type]
+
+  if type_name == File.EXTENSION_NAME:
+    if physical:
+      return pa.string()
+
+    return File.__arrow_ext_deserialize__(
+        None,  # type: ignore[arg-type]
+        serialized)
 
   raise TypeError(f"Unsupported Substrait user defined type: {type_}")
 

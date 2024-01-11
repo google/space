@@ -25,6 +25,7 @@ from tensorflow_datasets import features as f
 from space import Dataset, LocalRunner, TfFeatures
 from space.core.jobs import JobResult
 from space.core.ops.change_data import ChangeType
+from space.core.schema.types import File
 from space.core.utils import errors
 
 
@@ -156,6 +157,25 @@ class TestLocalRunner:
     with pytest.raises(errors.VersionNotFoundError) as excinfo:
       local_runner.read_all(version="insert1")
     assert "Version insert1 is not found" in str(excinfo.value)
+
+  def test_dataset_with_file_type(self, tmp_path):
+    schema = pa.schema([("id", pa.int64()), ("name", pa.string()),
+                        ("file", File(directory="test_folder"))])
+    ds = Dataset.create(str(tmp_path / "dataset"),
+                        schema,
+                        primary_keys=["id"],
+                        record_fields=[])
+
+    ids = range(10)
+    sample_data = pa.Table.from_pydict({
+        "id": ids,
+        "name": [f"name_{i}" for i in ids],
+        "file": [f"file_{i}" for i in ids]
+    })
+    ds.local().append(sample_data)
+
+    assert ds.local().read_all() == sample_data
+    assert ds.schema.field("file").type.full_path("123") == "test_folder/123"
 
 
 def _read_pyarrow(runner: LocalRunner,

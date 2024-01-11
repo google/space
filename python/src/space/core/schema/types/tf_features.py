@@ -29,6 +29,8 @@ from space.core.utils.constants import UTF_8
 class TfFeatures(pa.ExtensionType, FieldSerializer):
   """A custom Arrow type for Tensorflow Dataset Features."""
 
+  EXTENSION_NAME = "space.tf_features"
+
   def __init__(self, features_dict: f.FeaturesDict):
     """
     Args:
@@ -37,11 +39,10 @@ class TfFeatures(pa.ExtensionType, FieldSerializer):
         https://www.tensorflow.org/datasets/api_docs/python/tfds/features/FeaturesDict
     """
     self._features_dict = features_dict
-    self._serialized = json.dumps(features_dict.to_json())
-    pa.ExtensionType.__init__(self, pa.binary(), self._serialized)
+    pa.ExtensionType.__init__(self, pa.binary(), self.EXTENSION_NAME)
 
   def __arrow_ext_serialize__(self) -> bytes:
-    return self._serialized.encode(UTF_8)
+    return json.dumps(self._features_dict.to_json()).encode(UTF_8)
 
   @classmethod
   def __arrow_ext_deserialize__(
