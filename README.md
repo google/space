@@ -29,6 +29,14 @@ Users can query the manifest files as Arrow tables to get insights of the storag
 
 Space uses **relative file paths** everywhere in metadata that gives us superior portability. A Space dataset stored in Cloud Storage can be mapped to local files using [FUSE](https://en.wikipedia.org/wiki/Filesystem_in_Userspace). And it is immediately usable after downloading or moving. It is perfect for incrementally publishing or sharing datasets.
 
+## More Readings
+
+### Examples
+- [Load TFDS datasets into Space: COCO as example](notebooks/tfds_coco_tutorial.ipynb)
+- [Labeling training data using Space as DB: LabelStudio as example](notebooks/label_studio_tutorial.ipynb)
+- [Load custom data and build transform pipeline: Segment Anything as example](notebooks/segment_anything_tutorial.ipynb)
+- [Incrementally build embedding indexes using materialized views](notebooks/incremental_embedding_index.ipynb)
+
 ## Quick Start
 
 ### Install and Setup
@@ -204,13 +212,6 @@ from datasets import load_dataset
 huggingface_ds = load_dataset("parquet", data_files={"train": ds.index_files()})
 
 ```
-
-## More Readings
-
-### Examples
-- [Load TFDS datasets into Space: COCO as example](notebooks/tfds_coco_tutorial.ipynb)
-- [Load custom data and build transform pipeline: Segment Anything as example](notebooks/segment_anything_tutorial.ipynb)
-- [Incrementally build embedding indexes using materialized views](notebooks/incremental_embedding_index.ipynb)
 
 ## Staus
 Space is a new project under active development.
