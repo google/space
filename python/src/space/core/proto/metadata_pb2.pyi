@@ -457,28 +457,21 @@ global___LogicalPlan = LogicalPlan
 @typing_extensions.final
 class FileType(google.protobuf.message.Message):
     """A field type representing a file.
-    NEXT_ID: 3
+    NEXT_ID: 2
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     DIRECTORY_FIELD_NUMBER: builtins.int
-    MANAGED_FIELD_NUMBER: builtins.int
     directory: builtins.str
     """The common directory of all files stored as the field.
     Used as the path prefix when read or write files.
-    """
-    managed: builtins.bool
-    """Managed files' lifecycle is controlled by Space. Inserting or deleting
-    a file field will creating or delete a file.
-    Feature not implemented yet.
     """
     def __init__(
         self,
         *,
         directory: builtins.str = ...,
-        managed: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["directory", b"directory", "managed", b"managed"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["directory", b"directory"]) -> None: ...
 
 global___FileType = FileType

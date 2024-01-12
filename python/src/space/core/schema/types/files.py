@@ -37,7 +37,7 @@ class File(pa.ExtensionType):
       directory: a directory to add as a prefix of file paths
     """
     # TODO: managed is not supported yet.
-    self._file_type = meta.FileType(directory=directory, managed=False)
+    self._file_type = meta.FileType(directory=directory)
     pa.ExtensionType.__init__(self, pa.string(), self.EXTENSION_NAME)
 
   def __arrow_ext_serialize__(self) -> bytes:
