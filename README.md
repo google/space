@@ -188,6 +188,7 @@ datasource = RandomAccessDataSource(
   deserialize=False)
 
 len(datasource)
+datasource[2]
 ```
 
 A dataset or view can also be read as a Ray dataset:

@@ -189,3 +189,11 @@ message LogicalPlan {
   // Key is UDF name; value is pickle file path.
   map<string, string> udfs = 2;
 }
+
+// A field type representing a file.
+// NEXT_ID: 2
+message FileType {
+  // The common directory of all files stored as the field.
+  // Used as the path prefix when read or write files.
+  string directory = 1;
+}

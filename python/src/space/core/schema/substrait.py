@@ -20,9 +20,8 @@ from typing import Any, List
 import pyarrow as pa
 from substrait.type_pb2 import NamedStruct, Type
 
-from space.core.schema.constants import TF_FEATURES_TYPE
 import space.core.schema.arrow as arrow_schema
-from space.core.schema.types import TfFeatures
+from space.core.schema.types import File, TfFeatures
 
 
 def substrait_fields(schema: pa.Schema) -> NamedStruct:
@@ -42,6 +41,7 @@ def _substrait_fields(fields: List[pa.Field],
   return [_substrait_field(f, mutable_names) for f in fields]
 
 
+# pylint: disable=too-many-branches
 def _substrait_field(field: pa.Field,
                      mutable_names: List[str],
                      is_list_item=False) -> Type:
@@ -81,16 +81,28 @@ def _substrait_field(field: pa.Field,
     # TfFeatures is persisted in Substrait as a user defined type, with
     # parameters [TF_FEATURES_TYPE, __arrow_ext_serialize__()].
     _set_field_id(type_.user_defined, field_id)
-    serialized = Type.Parameter(
-        string=field.type.__arrow_ext_serialize__())  # type: ignore[arg-type]
-    type_.user_defined.type_parameters.extend(
-        [Type.Parameter(string=TF_FEATURES_TYPE), serialized])
+    type_.user_defined.type_parameters.extend([
+        Type.Parameter(string=TfFeatures.EXTENSION_NAME),
+        _serialized_ext_type(field.type)
+    ])
+  elif isinstance(field.type, File):
+    # File is persisted in Substrait as a user defined type, with
+    # parameters [FILE_TYPE, __arrow_ext_serialize__()].
+    _set_field_id(type_.user_defined, field_id)
+    type_.user_defined.type_parameters.extend([
+        Type.Parameter(string=File.EXTENSION_NAME),
+        _serialized_ext_type(field.type)
+    ])
   else:
-    raise TypeError(
-        f"Type {field.type} of field {field.name} is not supported")
+    raise TypeError(f"Type {field.type} of field {field.name} is not supported")
 
   return type_
 
 
 def _set_field_id(msg: Any, field_id: int) -> None:
   msg.type_variation_reference = field_id
+
+
+def _serialized_ext_type(type_: pa.ExtensionType) -> Type.Parameter:
+  return Type.Parameter(
+      string=type_.__arrow_ext_serialize__())  # type: ignore[arg-type]

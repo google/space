@@ -14,4 +14,5 @@
 #
 """Defines custom types."""
 
+from space.core.schema.types.files import File
 from space.core.schema.types.tf_features import TfFeatures

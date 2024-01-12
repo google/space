@@ -14,9 +14,6 @@
 #
 """Constants for schema."""
 
-# Substrait type name of Arrow custom type TfFeatures.
-TF_FEATURES_TYPE = "TF_FEATURES"
-
 FILE_PATH_FIELD = "_FILE"
 ROW_ID_FIELD = "_ROW_ID"
 FIELD_ID_FIELD = "_FIELD_ID"

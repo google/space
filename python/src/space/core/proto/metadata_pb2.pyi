@@ -453,3 +453,25 @@ class LogicalPlan(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["logical_plan", b"logical_plan", "udfs", b"udfs"]) -> None: ...
 
 global___LogicalPlan = LogicalPlan
+
+@typing_extensions.final
+class FileType(google.protobuf.message.Message):
+    """A field type representing a file.
+    NEXT_ID: 2
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DIRECTORY_FIELD_NUMBER: builtins.int
+    directory: builtins.str
+    """The common directory of all files stored as the field.
+    Used as the path prefix when read or write files.
+    """
+    def __init__(
+        self,
+        *,
+        directory: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["directory", b"directory"]) -> None: ...
+
+global___FileType = FileType
