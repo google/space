@@ -17,41 +17,39 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from ray.data.block import Block, BlockMetadata
-from ray.data.datasource.datasource import Datasource, Reader, ReadTask
-from ray.data.datasource.datasource import WriteResult
-from ray.types import ObjectRef
-
 from space.core.ops.read import FileSetReadOp
 from space.core.options import ReadOptions
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
+from space.core.utils.lazy_imports_utils import ray, ray_datasource
 
 if TYPE_CHECKING:
   from space.core.storage import Storage
 
 
-class SpaceDataSource(Datasource):
+class SpaceDataSource(ray_datasource.Datasource):
   """A Ray data source for a Space dataset."""
 
   # pylint: disable=arguments-differ,too-many-arguments
   def create_reader(  # type: ignore[override]
-      self, storage: Storage, read_options: ReadOptions) -> Reader:
+      self, storage: Storage,
+      read_options: ReadOptions) -> ray_datasource.Reader:
     return _SpaceDataSourceReader(storage, read_options)
 
-  def do_write(self, blocks: List[ObjectRef[Block]],
-               metadata: List[BlockMetadata],
-               ray_remote_args: Optional[Dict[str, Any]],
-               location: str) -> List[ObjectRef[WriteResult]]:
+  def do_write(
+      self, blocks: List[ray.types.ObjectRef[ray.data.block.Block]],
+      metadata: List[ray.data.block.BlockMetadata],
+      ray_remote_args: Optional[Dict[str, Any]],
+      location: str) -> List[ray.types.ObjectRef[ray_datasource.WriteResult]]:
     """Write a Ray dataset into Space datasets."""
     raise NotImplementedError("Write from a Ray dataset is not supported")
 
   def on_write_complete(  # type: ignore[override]
-      self, write_results: List[WriteResult]) -> None:
+      self, write_results: List[ray_datasource.WriteResult]) -> None:
     raise NotImplementedError("Write from a Ray dataset is not supported")
 
 
-class _SpaceDataSourceReader(Reader):
+class _SpaceDataSourceReader(ray_datasource.Reader):
 
   def __init__(self, storage: Storage, read_options: ReadOptions):
     self._storage = storage
@@ -66,8 +64,8 @@ class _SpaceDataSourceReader(Reader):
   # Note: The `parallelism` which is supposed to indicate how many `ReadTask` to
   # return will have no effect here, since we map each query into a `ReadTask`.
   # TODO: to properly handle the error that returned list is empty.
-  def get_read_tasks(self, parallelism: int) -> List[ReadTask]:
-    read_tasks: List[ReadTask] = []
+  def get_read_tasks(self, parallelism: int) -> List[ray_datasource.ReadTask]:
+    read_tasks: List[ray_datasource.ReadTask] = []
     file_set = self._storage.data_files(self._read_options.filter_,
                                         self._read_options.snapshot_id)
 
@@ -77,7 +75,7 @@ class _SpaceDataSourceReader(Reader):
       # The metadata about the block that we know prior to actually executing
       # the read task.
       # TODO: to populate the storage values.
-      block_metadata = BlockMetadata(
+      block_metadata = ray.data.block.BlockMetadata(
           num_rows=1,
           size_bytes=1,
           schema=None,
@@ -90,7 +88,7 @@ class _SpaceDataSourceReader(Reader):
                    file_set=task_file_set):
         return _read_file_set(location, metadata, file_set, self._read_options)
 
-      read_tasks.append(ReadTask(_read_fn, block_metadata))
+      read_tasks.append(ray_datasource.ReadTask(_read_fn, block_metadata))
 
     return read_tasks
 
@@ -99,5 +97,5 @@ class _SpaceDataSourceReader(Reader):
 # whether row group granularity is needed.
 def _read_file_set(location: str, metadata: meta.StorageMetadata,
                    file_set: rt.FileSet,
-                   read_options: ReadOptions) -> List[Block]:
+                   read_options: ReadOptions) -> List[ray.data.block.Block]:
   return list(FileSetReadOp(location, metadata, file_set, read_options))
