@@ -1,8 +1,8 @@
 [project]
-name = "space"
+name = "space-datasets"
 version = "0.0.1"
 authors = [{ name = "Space team", email = "no-reply@google.com" }]
-description = "A storage framework for machine learning datasets"
+description = "Unified storage framework for machine learning datasets"
 license = { text = "Apache-2.0" }
 classifiers = [
   "License :: OSI Approved :: Apache Software License",
