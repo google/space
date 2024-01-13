@@ -81,8 +81,7 @@ class LazyModule:
           )
       except ImportError as exception:
         if self.error_callback is not None:
-          self.error_callback(exception=exception,
-                              module_name=self.module_name)
+          self.error_callback(exception=exception, module_name=self.module_name)
         raise exception
     return getattr(self.module, name)
 
@@ -193,3 +192,4 @@ with lazy_imports(error_callback=array_record_error_callback):
 
 with lazy_imports():
   import ray  # type: ignore[import-untyped] # pylint: disable=unused-import
+  from ray.data.datasource import datasource as ray_datasource  # pylint: disable=unused-import
