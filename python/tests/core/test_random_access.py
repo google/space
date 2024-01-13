@@ -31,10 +31,8 @@ class TestRandomAccessDataSource:
   @pytest.fixture
   def tf_features(self):
     features_dict = f.FeaturesDict({
-        "image_id":
-        np.int64,
-        "objects":
-        f.Sequence({"bbox": f.BBoxFeature()}),
+        "image_id": np.int64,
+        "objects": f.Sequence({"bbox": f.BBoxFeature()}),
     })
     return TfFeatures(features_dict)
 
@@ -79,6 +77,7 @@ class TestRandomAccessDataSource:
 
     runner = ds.local()
     _write_data(ds, runner, input_data, test_serializer)
+    runner.delete(pc.field("id") == 60)  # Test modified dataset
 
     addresses = None
     if test_external_addresses:
@@ -89,13 +88,12 @@ class TestRandomAccessDataSource:
       addresses = addresses.flatten()
 
     data_source = RandomAccessDataSource(
-        {f: location
-         for f in feature_fields},
+        {f: location for f in feature_fields},
         addresses,
         deserialize=test_serializer,
         use_array_record_data_source=test_array_record_data_source)
     assert len(data_source) == sum(
-        batch_sizes) if addresses is None else addresses.num_rows
+        batch_sizes) - 1 if addresses is None else addresses.num_rows
 
     indexes = list(range(len(data_source)))
     random.shuffle(indexes)
@@ -107,12 +105,14 @@ class TestRandomAccessDataSource:
     else:
       results = data_source[indexes]
 
-    input_data_rows = _read_batches(input_data, feature_fields,
-                                    test_external_addresses)
+    filter_ = lambda a: a != 60  # pylint: disable=unnecessary-lambda-assignment
+    if test_external_addresses:
+      filter_ = lambda a: a > 50 and a != 60  # pylint: disable=unnecessary-lambda-assignment
+
+    input_data_rows = _read_batches(input_data, feature_fields, filter_)
     if len(feature_fields) > 1:
       expected = {
-          f: [input_data_rows[i][f] for i in indexes]
-          for f in feature_fields
+          f: [input_data_rows[i][f] for i in indexes] for f in feature_fields
       }
     else:
       f = feature_fields[0]
@@ -183,8 +183,8 @@ class TestRandomAccessDataSource:
     else:
       results = data_source[indexes]
 
-    input_data_rows0 = _read_batches(input_data0, ["feature0"], False)
-    input_data_rows1 = _read_batches(input_data1, ["feature1"], False)
+    input_data_rows0 = _read_batches(input_data0, ["feature0"], None)
+    input_data_rows1 = _read_batches(input_data1, ["feature1"], None)
     expected = {
         "feature0": [input_data_rows0[i]["feature0"] for i in indexes],
         "feature1": [input_data_rows1[i]["feature1"] for i in indexes]
@@ -219,11 +219,11 @@ def _generate_data(batch_sizes, feature_fields, test_serializer):
   return result
 
 
-def _read_batches(data, feature_fields, apply_filter):
+def _read_batches(data, feature_fields, filter_):
   result = []
   for batch in data:
     for i in range(len(batch["id"])):
-      if apply_filter and batch["id"][i] <= 50:
+      if filter_ is not None and not filter_(batch["id"][i]):
         continue
 
       row = {"id": batch["id"][i]}
@@ -253,8 +253,8 @@ def _write_data(ds, runner, input_data, test_serializer):
     runner.append(serializer.serialize(data) if test_serializer else data)
 
 
-def _create_and_write_dataset(location, feature_field, batch_sizes,
-                              tf_features, test_serializer):
+def _create_and_write_dataset(location, feature_field, batch_sizes, tf_features,
+                              test_serializer):
   feature_fields = [feature_field]
   schema = pa.schema([("id", pa.int64()), (feature_field, tf_features)])
   ds = Dataset.create(location,

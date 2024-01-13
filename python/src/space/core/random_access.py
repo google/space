@@ -264,20 +264,24 @@ def build_file_instructions(
 
     indexes.sort()
 
-    previous_idx = indexes[0]
-    start, end = indexes[0], indexes[-1]
-    for idx in indexes:
-      if idx not in (0, previous_idx + 1) or idx == end:
-        if idx == end:
-          previous_idx = idx
-
-        # TODO: to populate FileInstruction.examples_in_shard.
+    # All records in the file, including deleted.
+    num_records = indexes[-1] + 1
+    start = indexes[0]
+    for i, idx in enumerate(indexes):
+      if i == len(indexes) - 1:
         file_instructions.append(
-            shard_utils.FileInstruction(filename=full_file_path,
-                                        skip=start,
-                                        take=previous_idx - start + 1,
-                                        examples_in_shard=end + 1))
-        start = idx
-      previous_idx = idx
+            _file_instruction(full_file_path, start, idx, num_records))
+      elif indexes[i + 1] > idx + 1:
+        file_instructions.append(
+            _file_instruction(full_file_path, start, idx, num_records))
+        start = indexes[i + 1]
 
   return file_instructions
+
+
+def _file_instruction(file_path: str, start: int, end: int,
+                      total_records) -> shard_utils.FileInstruction:
+  return shard_utils.FileInstruction(filename=file_path,
+                                     skip=start,
+                                     take=end - start + 1,
+                                     examples_in_shard=total_records)
