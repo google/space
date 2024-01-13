@@ -148,25 +148,24 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
     """
 
   @abstractmethod
-  def append_array_record(self, input_dir: str,
+  def append_array_record(self, pattern: str,
                           index_fn: ArrayRecordIndexFn) -> JobResult:
     """Append data from ArrayRecord files without copying data.
-    
-    TODO: to support a pattern of files to expand.
 
     Args:
-      input_dir: the folder of ArrayRecord files.
-      index_fn: a function that build index fields from each TFDS record.
+      pattern: path pattern of the input ArrayRecord files, e.g.,
+        "/directory/*.array_record"
+      index_fn: generate columnar fields for ArrayRecord rows to write to
+        Parquet files to populate index fields
     """
 
   @abstractmethod
-  def append_parquet(self, input_dir: str) -> JobResult:
+  def append_parquet(self, pattern: str) -> JobResult:
     """Append data from Parquet files without copying data.
-    
-    TODO: to support a pattern of files to expand.
 
     Args:
-      input_dir: the folder of Parquet files.
+      pattern: path pattern of the input Parquet files, e.g.,
+        "/directory/*.parquet"
     """
 
   def upsert(self, data: InputData) -> JobResult:
@@ -244,16 +243,16 @@ class LocalRunner(BaseReadWriteRunner):
     return op.finish()
 
   @StorageMixin.transactional
-  def append_array_record(self, input_dir: str,
+  def append_array_record(self, pattern: str,
                           index_fn: ArrayRecordIndexFn) -> Optional[rt.Patch]:
     op = LocalArrayRecordLoadOp(self._storage.location, self._storage.metadata,
-                                input_dir, index_fn, self._file_options)
+                                pattern, index_fn, self._file_options)
     return op.write()
 
   @StorageMixin.transactional
-  def append_parquet(self, input_dir: str) -> Optional[rt.Patch]:
+  def append_parquet(self, pattern: str) -> Optional[rt.Patch]:
     op = LocalParquetLoadOp(self._storage.location, self._storage.metadata,
-                            input_dir)
+                            pattern)
     return op.write()
 
   @StorageMixin.transactional

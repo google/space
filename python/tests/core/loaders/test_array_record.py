@@ -30,10 +30,8 @@ class TestLocalArrayRecordLoadOp:
   @pytest.fixture
   def tf_features(self):
     features_dict = f.FeaturesDict({
-        "image_id":
-        np.int64,
-        "objects":
-        f.Sequence({"bbox": f.BBoxFeature()}),
+        "image_id": np.int64,
+        "objects": f.Sequence({"bbox": f.BBoxFeature()}),
     })
     return TfFeatures(features_dict)
 
@@ -54,15 +52,16 @@ class TestLocalArrayRecordLoadOp:
         "image_id": 456,
         "objects": {
             "bbox":
-            np.array([[0.1, 0.2, 0.3, 0.4], [0.1, 0.2, 0.3, 0.4]], np.float32)
+                np.array([[0.1, 0.2, 0.3, 0.4], [0.1, 0.2, 0.3, 0.4]],
+                         np.float32)
         }
     }]
 
     # Create dummy ArrayRecord files.
     input_dir = tmp_path / "array_record"
     input_dir.mkdir(parents=True)
-    _write_array_record_files(
-        input_dir, [tf_features.serialize(r) for r in features_data])
+    _write_array_record_files(input_dir,
+                              [tf_features.serialize(r) for r in features_data])
 
     def index_fn(record):
       assert len(record['features']) == 1
@@ -73,7 +72,8 @@ class TestLocalArrayRecordLoadOp:
       }
 
     runner = ds.local()
-    response = runner.append_array_record(input_dir, index_fn)
+    response = runner.append_array_record(f"{input_dir}/*.array_record",
+                                          index_fn)
     assert response.storage_statistics_update == meta.StorageStatistics(
         num_rows=2,
         index_compressed_bytes=104,

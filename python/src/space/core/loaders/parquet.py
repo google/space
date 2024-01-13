@@ -15,11 +15,11 @@
 """Load Parquet files into Space datasets."""
 
 from typing import Optional
+import glob
 
 import pyarrow.parquet as pq
 
 from space.core.manifests import IndexManifestWriter
-from space.core.loaders.utils import list_files
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
 from space.core.ops import utils
@@ -31,18 +31,21 @@ class LocalParquetLoadOp(StoragePathsMixin):
   """Load ArrayRecord files into Space without copying data."""
 
   def __init__(self, location: str, metadata: meta.StorageMetadata,
-               input_dir: str):
+               pattern: str):
+    """
+    Args:
+      pattern: file path pattern of the input Parquet files, e.g.,
+        "/directory/*.parquet"
+    """
     StoragePathsMixin.__init__(self, location)
 
     self._metadata = metadata
-    self._input_dir = input_dir
 
     assert len(self._metadata.schema.record_fields) == 0
-
     self._physical_schema = arrow.arrow_schema(self._metadata.schema.fields,
                                                set(),
                                                physical=True)
-    self._input_files = list_files(input_dir, suffix=".parquet")
+    self._input_files = glob.glob(pattern)
 
   def write(self) -> Optional[rt.Patch]:
     """Write metadata files to load Parquet files to Space dataset."""
