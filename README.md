@@ -1,41 +1,45 @@
-# Space: Storage Framework for Machine Learning Datasets
+# Space: Unified Storage for Machine Learning
 
 [![Python CI](https://github.com/google/space/actions/workflows/python-ci.yml/badge.svg?branch=main)](https://github.com/google/space/actions/workflows/python-ci.yml)
 
 <hr/>
 
-Space is a hybrid column/row oriented storage framework for Machine Learning datasets. It brings data warehouse/lake (e.g., Iceberg/DeltaLake/Hudi + Spark) features, e.g., data mutation, version management, OLAP queries, materialized views, to ML datasets, for simplifying DataOps and MLOps.
+Unify data in your entire machine learning lifecycle with **Space**, a comprehensive storage solution that seamlessly handles data from ingestion to training.
 
-For each row of data, Space stores bulky unstructured fields in random access row oriented format (record fields), and stores the addresses (pairs of file and row ID) together with the other fields in columnar files (index fields). By decoupling unstructured data and processing only addresses, it can efficiently support all OLAP/columnar style data operations, e.g., sort, join. It automatically reads data from addresses in its APIs when needed, e.g., feed data into training frameworks.
+**Key Features:**
+- **Ground Truth Database**
+  - Store and manage data locally or in the cloud.
+  - Ingest from various sources, including ML datasets, files, and labeling tools.
+  - Support data manipulation (append, insert, update, delete) and version control.
+- **OLAP Database and Lakehouse**
+  - Analyze data distribution using SQL engines like [DuckDB](https://github.com/duckdb/duckdb).
+- **Distributed Data Processing Pipelines**
+  - Integrate with processing frameworks like [Ray](https://github.com/ray-project/ray) for efficient data transformation.
+  - Store processed results as Materialized Views (MVs), and incrementally update MVs when the source is changed.
+- **Seamless Training Framework Integration**
+  - Access Space datasets and MVs directly via random access interfaces.
+  - Convert to popular ML dataset formats (e.g., [TFDS](https://github.com/tensorflow/datasets), [HuggingFace](https://github.com/huggingface/datasets), [Ray](https://github.com/ray-project/ray)).
 
-<img src="docs/pics/space_overview.png" width="800" />
+<img src="docs/pics/overview.png" width="700" />
 
-## Ecosystem Integration
+**Benefits:**
+- **Enhanced Efficiency:** Save time and cost by unifying storage and avoiding unnecessary data transfers.
+- **Accelerated Insights:** Quickly analyze data with SQL capabilities.
+- **Simplified Workflow:** Streamline your entire ML process from data ingestion to training in one graph of transforms and MVs.
+- **Ecosystem Integration:** Leverage open source file formats for effortless integration with existing tools.
 
-Space uses [Arrow](https://arrow.apache.org/docs/python/index.html) in the API surface, e.g., schema, filter, data IO. It supports the following file formats:
+## Space 101
 
-- [Parquet](https://parquet.apache.org/) for storing columnar data.
-- [ArrayRecord](https://github.com/google/array_record), a high-performance random access row format for ML training. [ArrayRecord](https://www.tensorflow.org/datasets/tfless_tfds) is the successor format in [Tensorflow Datasets](https://www.tensorflow.org/datasets) after [TFRecord](https://www.tensorflow.org/tutorials/load_data/tfrecord).
+Space uses [Arrow](https://arrow.apache.org/docs/python/index.html) in the API surface, e.g., schema, filter, data IO. Data operations in Space can run locally or distributedly in [Ray](https://github.com/ray-project/ray) clusters.
 
-Because these file formats are native for the most popular OLAP engines and ML frameworks, ecosystem integration is easy: data can be moved between Space and other frameworks, with zero or minimized file rewrite. In addition, Space can be easily integrated with frameworks using Arrow, e.g., [Ray](https://docs.ray.io/en/latest/index.html). Data operations in Space can run locally, or distributedly in Ray clusters.
+Please read [the design](docs/design.md) for more details.
 
-We expect to support more file formats (e.g., [TFRecord](https://www.tensorflow.org/tutorials/load_data/tfrecord), [Lance](https://github.com/lancedb/lancedb)) and compute frameworks (e.g., [Dask](https://www.dask.org/)) in future.
+## Onboarding Examples
 
-## Table Format Design
-
-Data warehouse/lake features are empowered by a simple, copy-on-write open table format. Its metadata files use [Protobuf](https://protobuf.dev/) and Parquet files. The metadata Parquet files (aka, manifest files) store the information of data files, i.e., file path, storage statistics, and column statistics (min, max). One row represents one data file. There are two types of manifest files, for index/record fields respectively.
-
-Users can query the manifest files as Arrow tables to get insights of the storage (method `index_manifest`). See more details in the [Segment Anything example](/notebooks/segment_anything_tutorial.ipynb).
-
-Space uses **relative file paths** everywhere in metadata that gives us superior portability. A Space dataset stored in Cloud Storage can be mapped to local files using [FUSE](https://en.wikipedia.org/wiki/Filesystem_in_Userspace). And it is immediately usable after downloading or moving. It is perfect for incrementally publishing or sharing datasets.
-
-## More Readings
-
-### Examples
-- [Load TFDS datasets into Space: COCO as example](notebooks/tfds_coco_tutorial.ipynb)
-- [Labeling training data using Space as DB: LabelStudio as example](notebooks/label_studio_tutorial.ipynb)
-- [Load custom data and build transform pipeline: Segment Anything as example](notebooks/segment_anything_tutorial.ipynb)
-- [Incrementally build embedding indexes using materialized views](notebooks/incremental_embedding_index.ipynb)
+- [Manage Tensorflow COCO dataset](notebooks/tfds_coco_tutorial.ipynb)
+- [Ground truth database of LabelStudio](notebooks/label_studio_tutorial.ipynb)
+- [Transforms and materialized views: Segment Anything as example](notebooks/segment_anything_tutorial.ipynb)
+- [Incrementally build embedding vector indexes](notebooks/incremental_embedding_index.ipynb)
 
 ## Quick Start
 
@@ -213,7 +217,7 @@ huggingface_ds = load_dataset("parquet", data_files={"train": ds.index_files()})
 
 ```
 
-## Staus
+## Status
 Space is a new project under active development.
 
 ## Disclaimer
