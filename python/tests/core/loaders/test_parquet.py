@@ -54,7 +54,7 @@ class TestLocalParquetLoadOp:
                        [pa.Table.from_pydict(input_data[1])])
 
     runner = ds.local()
-    response = runner.append_parquet(input_dir)
+    response = runner.append_parquet(f"{input_dir}/*.parquet")
     assert response.storage_statistics_update == meta.StorageStatistics(
         num_rows=5,
         index_compressed_bytes=214,

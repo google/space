@@ -227,13 +227,13 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
     return op.finish()
 
   @StorageMixin.transactional
-  def append_array_record(self, input_dir: str,
+  def append_array_record(self, pattern: str,
                           index_fn: ArrayRecordIndexFn) -> Optional[rt.Patch]:
     raise NotImplementedError(
         "append_array_record not supported yet in Ray runner")
 
   @StorageMixin.transactional
-  def append_parquet(self, input_dir: str) -> Optional[rt.Patch]:
+  def append_parquet(self, pattern: str) -> Optional[rt.Patch]:
     raise NotImplementedError("append_parquet not supported yet in Ray runner")
 
   @StorageMixin.transactional

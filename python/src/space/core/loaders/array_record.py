@@ -15,12 +15,12 @@
 """Load ArrayRecord files into Space datasets."""
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
+import glob
 
 import pyarrow as pa
 from typing_extensions import TypeAlias
 
 from space.core.fs.array_record import read_record_file
-from space.core.loaders.utils import list_files
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
 from space.core.ops import utils
@@ -38,13 +38,17 @@ class LocalArrayRecordLoadOp(StoragePathsMixin):
 
   # pylint: disable=too-many-arguments
   def __init__(self, location: str, metadata: meta.StorageMetadata,
-               input_dir: str, index_fn: ArrayRecordIndexFn,
+               pattern: str, index_fn: ArrayRecordIndexFn,
                file_options: FileOptions):
+    """
+    Args:
+      pattern: file path pattern of the input ArrayRecord files, e.g.,
+        "/directory/*.array_record"
+    """
     StoragePathsMixin.__init__(self, location)
     self._file_options = file_options
 
     self._metadata = metadata
-    self._input_dir = input_dir
     self._index_fn = index_fn
 
     record_fields = set(self._metadata.schema.record_fields)
@@ -62,7 +66,7 @@ class LocalArrayRecordLoadOp(StoragePathsMixin):
     self._record_field = self._record_fields[0]
 
     self._serializer = DictSerializer.create(logical_schema)
-    self._input_files = list_files(input_dir, substr=".array_record")
+    self._input_files = glob.glob(pattern)
 
   def write(self) -> Optional[rt.Patch]:
     """Write index files to load ArrayRecord files to Space dataset."""
