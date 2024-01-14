@@ -52,7 +52,13 @@ def read_change_data(
         f"End snapshot ID {end_snapshot_id} should not be lower than start "
         f"snapshot ID {start_snapshot_id}")
 
-  all_snapshot_ids = sorted(storage.snapshot_ids)
+  all_snapshot_ids = [end_snapshot_id]
+  current_snapshot = storage.snapshot(end_snapshot_id)
+  while (current_snapshot.snapshot_id > start_snapshot_id
+      and current_snapshot.parent_snapshot_id != current_snapshot.snapshot_id):
+    current_snapshot = storage.snapshot(current_snapshot.parent_snapshot_id)
+    all_snapshot_ids.insert(0, current_snapshot.snapshot_id)
+
   all_snapshot_ids_set = set(all_snapshot_ids)
 
   if start_snapshot_id not in all_snapshot_ids_set:
@@ -64,11 +70,8 @@ def read_change_data(
         f"Start snapshot ID not found: {end_snapshot_id}")
 
   for snapshot_id in all_snapshot_ids:
-    if snapshot_id <= start_snapshot_id:
+    if snapshot_id == start_snapshot_id:
       continue
-
-    if snapshot_id > end_snapshot_id:
-      break
 
     for result in iter(_LocalChangeDataReadOp(storage, snapshot_id)):
       yield result

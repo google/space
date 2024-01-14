@@ -267,7 +267,8 @@ class Storage(paths.StoragePathsMixin):
         snapshot_id=new_snapshot_id,
         create_time=proto_now(),
         manifest_files=current_snapshot.manifest_files,
-        storage_statistics=current_snapshot.storage_statistics)
+        storage_statistics=current_snapshot.storage_statistics,
+        parent_snapshot_id=current_snapshot.snapshot_id)
     _patch_manifests(snapshot.manifest_files, patch)
 
     if patch.HasField('change_log'):
