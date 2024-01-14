@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from datetime import datetime
 from google.protobuf.timestamp_pb2 import Timestamp
 import pyarrow.compute as pc
 import pyarrow as pa
 import pytest
+import pytz
 from substrait.type_pb2 import NamedStruct, Type
 
 from space.core.fs.parquet import write_parquet_file
@@ -321,23 +323,45 @@ class TestStorage:
                              schema=_SCHEMA,
                              primary_keys=["int64"],
                              record_fields=[])
+
+    create_time1 = datetime.utcfromtimestamp(
+        storage.metadata.snapshots[0].create_time.seconds).replace(
+            tzinfo=pytz.utc)
+    assert storage.versions().to_pydict() == {
+        "snapshot_id": [0],
+        "tag_or_branch": [None],
+        "create_time": [create_time1]
+    }
+
     storage.add_tag("tag1")
 
     with pytest.raises(errors.UserInputError, match=r".*already exist.*"):
       storage.add_tag("tag1")
 
     storage.add_tag("tag2")
-    metadata = storage.metadata
 
     snapshot_id1 = storage.version_to_snapshot_id("tag1")
     snapshot_id2 = storage.version_to_snapshot_id("tag2")
 
+    metadata = storage.metadata
     assert len(metadata.refs) == 2
     assert snapshot_id1 == metadata.current_snapshot_id
     assert snapshot_id2 == metadata.current_snapshot_id
+
+    assert storage.versions().to_pydict() == {
+        "snapshot_id": [0, 0],
+        "tag_or_branch": ["tag1", "tag2"],
+        "create_time": [create_time1, create_time1]
+    }
 
     storage.remove_tag("tag1")
 
     with pytest.raises(errors.UserInputError, match=r".*not found.*"):
       storage.remove_tag("tag1")
     assert len(storage.metadata.refs) == 1
+
+    assert storage.versions().to_pydict() == {
+        "snapshot_id": [0],
+        "tag_or_branch": ["tag2"],
+        "create_time": [create_time1]
+    }

@@ -222,6 +222,25 @@ huggingface_ds = load_dataset("parquet", data_files={"train": ds.index_files()})
 
 ```
 
+### Inspect Metadata
+
+Show all dataset or MV versions (snapshot IDs and tags/branches):
+```python
+ds.versions()
+```
+
+List file path of all index (Parquet) files:
+```python
+ds.index_files()
+# Or show more statistics information of Parquet files.
+ds.storage.index_manifest(...)  # Accept filter and snapshot_id
+```
+
+Show statistics information of all ArrayRecord files:
+```python
+ds.record_manifest(...)  # Accept filter and snapshot_id
+```
+
 ## Status
 Space is a new project under active development.
 

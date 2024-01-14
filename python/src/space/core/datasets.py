@@ -52,8 +52,8 @@ class Dataset(View):
       primary_keys: un-enforced primary keys.
       record_fields: fields stored in row format (ArrayRecord).
     """
-    return Dataset(
-        Storage.create(location, schema, primary_keys, record_fields))
+    return Dataset(Storage.create(location, schema, primary_keys,
+                                  record_fields))
 
   @classmethod
   def load(cls, location: str) -> Dataset:
@@ -90,10 +90,9 @@ class Dataset(View):
     data_files = self._storage.data_files()
     return [self._storage.full_path(f.path) for f in data_files.index_files]
 
-  @property
-  def snapshot_ids(self) -> List[int]:
-    """A list of all alive snapshot IDs in the dataset."""
-    return self._storage.snapshot_ids
+  def versions(self) -> pa.Table:
+    """Return a table of versions (snapshot, tag, branch) in the storage."""
+    return self._storage.versions()
 
   @property
   def sources(self) -> Dict[str, Dataset]:
