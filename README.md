@@ -50,6 +50,12 @@ Install:
 pip install space-datasets
 ```
 
+Or install from code:
+```bash
+cd python
+pip install .[dev]
+```
+
 Optionally, setup [GCS FUSE](https://cloud.google.com/storage/docs/gcs-fuse) to use files on Google Cloud Storage (GCS) (or [S3](https://github.com/s3fs-fuse/s3fs-fuse), [Azure](https://github.com/Azure/azure-storage-fuse)):
 
 ```bash
