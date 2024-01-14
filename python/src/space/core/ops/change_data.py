@@ -55,7 +55,7 @@ def read_change_data(
   all_snapshot_ids = [end_snapshot_id]
   current_snapshot = storage.snapshot(end_snapshot_id)
   while (current_snapshot.snapshot_id > start_snapshot_id
-      and current_snapshot.parent_snapshot_id != current_snapshot.snapshot_id):
+      and current_snapshot.HasField("parent_snapshot_id")):
     current_snapshot = storage.snapshot(current_snapshot.parent_snapshot_id)
     all_snapshot_ids.insert(0, current_snapshot.snapshot_id)
 
