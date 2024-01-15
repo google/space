@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from datetime import datetime
 import threading
 from typing import Iterable, Optional
 
@@ -20,6 +21,7 @@ import pytest
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
+import pytz
 from tensorflow_datasets import features as f
 
 from space import Dataset, LocalRunner, TfFeatures
@@ -144,6 +146,18 @@ class TestLocalRunner:
 
     ds.add_tag(tag="insert1")
     assert local_runner.read_all() == sample_data1
+
+    create_time0 = datetime.utcfromtimestamp(
+        ds.storage.metadata.snapshots[0].create_time.seconds).replace(
+            tzinfo=pytz.utc)
+    create_time1 = datetime.utcfromtimestamp(
+        ds.storage.metadata.snapshots[1].create_time.seconds).replace(
+            tzinfo=pytz.utc)
+    assert ds.versions().to_pydict() == {
+        "snapshot_id": [1, 0],
+        "tag_or_branch": ["insert1", None],
+        "create_time": [create_time1, create_time0]
+    }
 
     sample_data2 = _generate_data([3, 4])
     local_runner.append(sample_data2)

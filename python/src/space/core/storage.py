@@ -15,6 +15,7 @@
 """Underlying storage implementation for datasets."""
 
 from __future__ import annotations
+from datetime import datetime
 from os import path
 from typing import Collection, Dict, Iterator, List, Optional, Union
 from typing_extensions import TypeAlias
@@ -50,6 +51,7 @@ Version: TypeAlias = Union[str, int]
 _INIT_SNAPSHOT_ID = 0
 
 
+# pylint: disable=too-many-public-methods
 class Storage(paths.StoragePathsMixin):
   """Storage manages data files by metadata using the Space format.
   
@@ -57,7 +59,7 @@ class Storage(paths.StoragePathsMixin):
   """
 
   def __init__(self, location: str, metadata_file: str,
-                 metadata: meta.StorageMetadata):
+               metadata: meta.StorageMetadata):
     super().__init__(location)
     self._fs = create_fs(location)
     self._metadata = metadata
@@ -159,8 +161,7 @@ class Storage(paths.StoragePathsMixin):
 
     new_metadata_path = paths.new_metadata_path(paths.metadata_dir(location))
 
-    snapshot = meta.Snapshot(snapshot_id=_INIT_SNAPSHOT_ID,
-                             create_time=now)
+    snapshot = meta.Snapshot(snapshot_id=_INIT_SNAPSHOT_ID, create_time=now)
     metadata.snapshots[metadata.current_snapshot_id].CopyFrom(snapshot)
 
     storage = Storage(location, new_metadata_path, metadata)
@@ -173,7 +174,7 @@ class Storage(paths.StoragePathsMixin):
     fs = create_fs(location)
     entry_point = _read_entry_point(fs, location)
     return Storage(location, entry_point.metadata_file,
-                       _read_metadata(fs, location, entry_point))
+                   _read_metadata(fs, location, entry_point))
 
   def reload(self) -> bool:
     """Check whether the storage files has been updated by other writers, if
@@ -327,6 +328,40 @@ class Storage(paths.StoragePathsMixin):
   def snapshot_ids(self) -> List[int]:
     """A list of all alive snapshot IDs in the dataset."""
     return list(self._metadata.snapshots)
+
+  def versions(self) -> pa.Table:
+    """Return a table of versions (snapshot, tag, branch) in the storage."""
+    time_type = pa.timestamp('s', tz='UTC')
+
+    snapshot_ids, create_times = [], []
+    for id_, snapshot in self._metadata.snapshots.items():
+      snapshot_ids.append(id_)
+      create_times.append(
+          pa.scalar(datetime.utcfromtimestamp(snapshot.create_time.seconds),
+                    type=time_type))
+
+    snapshot_id_table = pa.Table.from_arrays(  # type: ignore[call-arg]
+        [snapshot_ids, create_times],  # type: ignore[arg-type]
+        schema=pa.schema([
+            ("snapshot_id", pa.int64()),  # type: ignore[list-item]
+            ("create_time", time_type)  # type: ignore[list-item]
+        ]))
+
+    ref_keys, ref_ids = [], []
+    for key, ref in self._metadata.refs.items():
+      ref_keys.append(key)
+      ref_ids.append(ref.snapshot_id)
+
+    ref_table = pa.Table.from_arrays(  # type: ignore[call-arg]
+        [ref_ids, ref_keys],  # type: ignore[arg-type]
+        schema=pa.schema([
+            ("snapshot_id", pa.int64()),  # type: ignore[list-item]
+            ("tag_or_branch", pa.string())  # type: ignore[list-item]
+        ]))
+
+    return snapshot_id_table.join(ref_table,
+                                  keys=["snapshot_id"],
+                                  join_type="left outer")
 
   def ray_dataset(self, read_options: ReadOptions) -> ray.Dataset:
     """Return a Ray dataset for a Space storage."""
