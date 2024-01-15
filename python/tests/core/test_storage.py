@@ -348,7 +348,9 @@ class TestStorage:
     assert snapshot_id1 == metadata.current_snapshot_id
     assert snapshot_id2 == metadata.current_snapshot_id
 
-    assert storage.versions().to_pydict() == {
+    versions = storage.versions().to_pydict()
+    versions["tag_or_branch"].sort()
+    assert versions == {
         "snapshot_id": [0, 0],
         "tag_or_branch": ["tag1", "tag2"],
         "create_time": [create_time1, create_time1]

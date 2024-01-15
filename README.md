@@ -8,31 +8,28 @@ Unify data in your entire machine learning lifecycle with **Space**, a comprehen
 
 **Key Features:**
 - **Ground Truth Database**
-  - Store and manage data locally or in the cloud.
+  - Store and manage data in open source file formats, locally or in the cloud.
   - Ingest from various sources, including ML datasets, files, and labeling tools.
   - Support data manipulation (append, insert, update, delete) and version control.
 - **OLAP Database and Lakehouse**
-  - Analyze data distribution using SQL engines like [DuckDB](https://github.com/duckdb/duckdb).
+  - [Iceberg](https://github.com/apache/iceberg) style [open table format](/docs/design.md#metadata-design).
+  - Optimized for unstructued data via [reference](./docs/design.md#data-files) operations.
+  - Quickly analyze data using SQL engines like [DuckDB](https://github.com/duckdb/duckdb).
 - **Distributed Data Processing Pipelines**
   - Integrate with processing frameworks like [Ray](https://github.com/ray-project/ray) for efficient data transformation.
-  - Store processed results as Materialized Views (MVs), and incrementally update MVs when the source is changed.
+  - Store processed results as Materialized Views (MVs); incrementally update MVs when the source is changed.
 - **Seamless Training Framework Integration**
   - Access Space datasets and MVs directly via random access interfaces.
   - Convert to popular ML dataset formats (e.g., [TFDS](https://github.com/tensorflow/datasets), [HuggingFace](https://github.com/huggingface/datasets), [Ray](https://github.com/ray-project/ray)).
 
-<img src="docs/pics/overview.png" width="700" />
-
-**Benefits:**
-- **Enhanced Efficiency:** Save time and cost by unifying storage and avoiding unnecessary data transfers.
-- **Accelerated Insights:** Quickly analyze data with SQL capabilities.
-- **Simplified Workflow:** Streamline your entire ML process from data ingestion to training in one graph of transforms and MVs.
-- **Ecosystem Integration:** Leverage open source file formats for effortless integration with existing tools.
+<img src="docs/pics/overview.png" width="800" />
 
 ## Space 101
 
-Space uses [Arrow](https://arrow.apache.org/docs/python/index.html) in the API surface, e.g., schema, filter, data IO. Data operations in Space can run locally or distributedly in [Ray](https://github.com/ray-project/ray) clusters.
-
-Please read [the design](docs/design.md) for more details.
+- Space uses [Arrow](https://arrow.apache.org/docs/python/index.html) in the API surface, e.g., schema, filter, data IO.
+- Data operations in Space can run locally or distributedly in [Ray](https://github.com/ray-project/ray) clusters.
+- All file paths in Space are [relative](./docs/design.md#relative-paths); datasets are immediately usable after downloading or moving.
+- Please read [the design](docs/design.md) for more details.
 
 ## Onboarding Examples
 
@@ -43,7 +40,15 @@ Please read [the design](docs/design.md) for more details.
 
 ## Quick Start
 
-### Install and Setup
+- [Install](#install)
+- [Cloud Storage](#cloud-storage)
+- [Create and Load Datasets](#create-and-load-datasets)
+- [Write and Read](#write-and-read)
+- [Transform and Materialized Views](#transform-and-materialized-views)
+- [ML Frameworks Integration](#ml-frameworks-integration)
+- [Inspect Metadata](#inspect-metadata)
+
+### Install
 
 Install:
 ```bash
@@ -56,6 +61,8 @@ cd python
 pip install .[dev]
 ```
 
+### Cloud Storage
+
 Optionally, setup [GCS FUSE](https://cloud.google.com/storage/docs/gcs-fuse) to use files on Google Cloud Storage (GCS) (or [S3](https://github.com/s3fs-fuse/s3fs-fuse), [Azure](https://github.com/Azure/azure-storage-fuse)):
 
 ```bash
@@ -64,7 +71,7 @@ gcsfuse <mybucket> "/path/to/<mybucket>"
 
 Space has not yet implemented Cloud Storage file systems. FUSE is the current suggested approach.
 
-### Create Empty Datasets
+### Create and Load Datasets
 
 Create a Space dataset with two index fields (`id`, `image_name`) (store in Parquet) and a record field (`feature`) (store in ArrayRecord).
 
@@ -86,7 +93,7 @@ ds = Dataset.create(
   record_fields=["feature"])
 
 # Load the dataset from files later:
-# ds = Dataset.load("/path/to/<mybucket>/example_ds")
+ds = Dataset.load("/path/to/<mybucket>/example_ds")
 ```
 
 ### Write and Read
@@ -98,7 +105,7 @@ import pyarrow.compute as pc
 # Create a local or Ray runner.
 runner = ds.local()  # or ds.ray()
 
-# Appending data generates a new dataset version `snapshot_id=1`.
+# Appending data generates a new dataset version `snapshot_id=1`
 # Write methods:
 # - append(...): no primary key check.
 # - insert(...): fail if primary key exists.
@@ -109,13 +116,19 @@ runner.append({
   "image_name": [f"{i}.jpg" for i in ids],
   "feature": [f"somedata{i}".encode("utf-8") for i in ids]
 })
+ds.add_tag("after_append")  # Version management: add tag to snapshot
 
-# Deletion generates a new version `snapshot_id=2`.
+# Deletion generates a new version `snapshot_id=2`
 runner.delete(pc.field("id") == 1)
+ds.add_tag("after_delete")
 
-# Version management: add tags to snapshots.
-ds.add_tag("after_add", 1)
-ds.add_tag("after_delete", 2)
+# Show all versions
+ds.versions().to_pandas()
+# >>>
+#    snapshot_id               create_time tag_or_branch
+# 0            2 2024-01-12 20:23:57+00:00  after_delete
+# 1            1 2024-01-12 20:23:38+00:00  after_append
+# 2            0 2024-01-12 20:22:51+00:00          None
 
 # Read options:
 # - filter_: optional, apply a filter (push down to reader).
@@ -124,7 +137,7 @@ ds.add_tag("after_delete", 2)
 runner.read_all(
   filter_=pc.field("image_name")=="2.jpg",
   fields=["feature"],
-  version="after_add"  # or 1
+  version="after_add"  # or snapshot ID `1`
 )
 
 # Read the changes between version 0 and 2.
@@ -224,21 +237,16 @@ huggingface_ds = load_dataset("parquet", data_files={"train": ds.index_files()})
 
 ### Inspect Metadata
 
-Show all dataset or MV versions (snapshot IDs and tags/branches):
-```python
-ds.versions()
-```
-
 List file path of all index (Parquet) files:
 ```python
 ds.index_files()
 # Or show more statistics information of Parquet files.
-ds.storage.index_manifest(...)  # Accept filter and snapshot_id
+ds.storage.index_manifest()  # Accept filter and snapshot_id
 ```
 
 Show statistics information of all ArrayRecord files:
 ```python
-ds.record_manifest(...)  # Accept filter and snapshot_id
+ds.storage.record_manifest()  # Accept filter and snapshot_id
 ```
 
 ## Status

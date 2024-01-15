@@ -14,7 +14,6 @@
 
 from datetime import datetime
 import threading
-import pytz
 from typing import Iterable, Optional
 
 import pytest
@@ -22,6 +21,7 @@ import pytest
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
+import pytz
 from tensorflow_datasets import features as f
 
 from space import Dataset, LocalRunner, TfFeatures
