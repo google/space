@@ -41,7 +41,7 @@ class DirCatalog(BaseCatalog):
                      record_fields: List[str]) -> Dataset:
     # TODO: should disallow overwriting an entry point file, to avoid creating
     # two datasets at the same location.
-    return Dataset.create(self._dataset_name(name), schema, primary_keys,
+    return Dataset.create(self._dataset_location(name), schema, primary_keys,
                           record_fields)
 
   def delete_dataset(self, name: str) -> None:
@@ -50,17 +50,17 @@ class DirCatalog(BaseCatalog):
   def dataset(self, name: str) -> Union[Dataset, MaterializedView]:
     # TODO: to catch file not found and re-throw a DatasetNotFoundError.
     # TODO: to support loading a materialized view.
-    return Dataset.load(self._dataset_name(name))
+    return Dataset.load(self._dataset_location(name))
 
   def datasets(self) -> List[DatasetInfo]:
     results = []
     for ds_name in os.listdir(self._location):
-      ds_location = self._dataset_name(ds_name)
+      ds_location = self._dataset_location(ds_name)
       if os.path.isdir(ds_location) and os.path.isfile(
           paths.entry_point_path(ds_location)):
         results.append(DatasetInfo(ds_name, ds_location))
 
     return results
 
-  def _dataset_name(self, name: str) -> str:
+  def _dataset_location(self, name: str) -> str:
     return os.path.join(self._location, name)
