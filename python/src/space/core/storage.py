@@ -359,9 +359,10 @@ class Storage(paths.StoragePathsMixin):
             ("tag_or_branch", pa.string())  # type: ignore[list-item]
         ]))
 
+    sort_args = [("create_time", "descending")]
     return snapshot_id_table.join(ref_table,
                                   keys=["snapshot_id"],
-                                  join_type="left outer")
+                                  join_type="left outer").sort_by(sort_args)
 
   def ray_dataset(self, read_options: ReadOptions) -> ray.Dataset:
     """Return a Ray dataset for a Space storage."""
