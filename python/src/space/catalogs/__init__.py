@@ -11,14 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-"""Space is a storage framework for ML datasets."""
-
-from space.catalogs.base import DatasetInfo
-from space.catalogs.directory import DirCatalog
-from space.core.datasets import Dataset
-from space.core.options import JoinOptions, Range, ReadOptions
-from space.core.runners import LocalRunner
-from space.core.random_access import RandomAccessDataSource
-from space.core.schema.types import File, TfFeatures
-from space.core.views import MaterializedView

@@ -40,7 +40,7 @@ class ArrowFileSystem(BaseFileSystem):
 
   def write_proto(self, file_path: str, msg: ProtoT) -> None:
     # TODO: the current implement overwrite an existing file; to support an
-    # to disallow overwrite.
+    # option to disallow overwrite.
     tmp_file_path = f"{file_path}.{random_id()}.tmp"
 
     with self._fs.open_output_stream(tmp_file_path) as f:
