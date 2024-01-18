@@ -52,24 +52,23 @@ def read_change_data(
         f"End snapshot ID {end_snapshot_id} should not be lower than start "
         f"snapshot ID {start_snapshot_id}")
 
-  all_snapshot_ids = [end_snapshot_id]
+  all_snapshot_ids = []
   current_snapshot = storage.snapshot(end_snapshot_id)
-  while (current_snapshot.snapshot_id > start_snapshot_id
-      and current_snapshot.HasField("parent_snapshot_id")):
-    current_snapshot = storage.snapshot(current_snapshot.parent_snapshot_id)
+  while current_snapshot.snapshot_id >= start_snapshot_id:
     all_snapshot_ids.insert(0, current_snapshot.snapshot_id)
+    if not current_snapshot.HasField("parent_snapshot_id"):
+      break
+    current_snapshot = storage.snapshot(current_snapshot.parent_snapshot_id)
 
   all_snapshot_ids_set = set(all_snapshot_ids)
 
   if start_snapshot_id not in all_snapshot_ids_set:
-    raise errors.VersionNotFoundError(
-        f"Start snapshot ID not found: {start_snapshot_id}")
-
-  if end_snapshot_id not in all_snapshot_ids_set:
-    raise errors.VersionNotFoundError(
-        f"Start snapshot ID not found: {end_snapshot_id}")
+    raise errors.UserInputError(
+        f"Start snapshot {start_snapshot_id} is not the  ancestor of "
+        f"end snapshot{end_snapshot_id}")
 
   for snapshot_id in all_snapshot_ids:
+    # start_snapshot_id is excluded.
     if snapshot_id == start_snapshot_id:
       continue
 

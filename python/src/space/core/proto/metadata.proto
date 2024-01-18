@@ -106,7 +106,7 @@ message Snapshot {
   // File path of the change log of the snapshot.
   string change_log_file = 5;
 
-  // The snapshot ID for of the parent snapshot.
+  // The snapshot ID of the parent snapshot.
   optional int64 parent_snapshot_id = 6;
 }
 

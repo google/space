@@ -236,7 +236,7 @@ class Snapshot(google.protobuf.message.Message):
     change_log_file: builtins.str
     """File path of the change log of the snapshot."""
     parent_snapshot_id: builtins.int
-    """The snapshot ID for of the parent snapshot."""
+    """The snapshot ID of the parent snapshot."""
     def __init__(
         self,
         *,
