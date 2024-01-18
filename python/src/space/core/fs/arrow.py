@@ -20,6 +20,7 @@ from google.protobuf import text_format
 from pyarrow import fs
 
 from space.core.fs.base import BaseFileSystem, ProtoT
+from space.core.utils import errors
 from space.core.utils.protos import proto_to_text
 from space.core.utils.uuids import random_id
 
@@ -38,9 +39,16 @@ class ArrowFileSystem(BaseFileSystem):
   def create_dir(self, dir_path: str) -> None:
     self._fs.create_dir(dir_path)
 
-  def write_proto(self, file_path: str, msg: ProtoT) -> None:
-    # TODO: the current implement overwrite an existing file; to support an
-    # option to disallow overwrite.
+  def write_proto(self,
+                  file_path: str,
+                  msg: ProtoT,
+                  fail_if_exists: bool = False) -> None:
+    # TODO: this check is not atomic; a more file system specific implement is
+    # needed.
+    if fail_if_exists and self._fs.get_file_info(
+        file_path).type != fs.FileType.NotFound:
+      raise errors.FileExistError(f"File {file_path} already exists")
+
     tmp_file_path = f"{file_path}.{random_id()}.tmp"
 
     with self._fs.open_output_stream(tmp_file_path) as f:

@@ -170,6 +170,7 @@ class TestLocalRunner:
     ds.remove_tag(tag="insert1")
     with pytest.raises(errors.VersionNotFoundError) as excinfo:
       local_runner.read_all(version="insert1")
+
     assert "Version insert1 is not found" in str(excinfo.value)
 
   def test_dataset_with_file_type(self, tmp_path):
