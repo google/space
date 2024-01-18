@@ -18,6 +18,7 @@ import pyarrow as pa
 import pytest
 
 from space import DatasetInfo, DirCatalog
+from space.core.utils import errors
 
 
 class TestDirectoryCatalog:
@@ -51,3 +52,8 @@ class TestDirectoryCatalog:
     key_fn = lambda ds: ds.location  # pylint: disable=unnecessary-lambda-assignment
     assert sorted(cat.datasets(), key=key_fn) == sorted(
         [ds1_info, DatasetInfo("ds2", ds2.storage.location)], key=key_fn)
+
+    with pytest.raises(errors.StorageExistError) as excinfo:
+      cat.create_dataset("ds2", schema, pks, records)
+
+    assert "already exists" in str(excinfo.value)

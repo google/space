@@ -41,3 +41,11 @@ class TransactionError(SpaceRuntimeError):
 
 class LogicalPlanError(SpaceRuntimeError):
   """Errors from parsing logical plan."""
+
+
+class FileExistError(UserInputError):
+  """Errors caused by a file to create already exists."""
+
+
+class StorageExistError(UserInputError):
+  """Errors caused by a storage to create already exists."""

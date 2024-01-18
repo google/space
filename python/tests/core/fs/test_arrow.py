@@ -16,6 +16,7 @@ import pytest
 
 from space.core.fs.arrow import ArrowLocalFileSystem
 import space.core.proto.metadata_pb2 as meta
+from space.core.utils import errors
 
 
 class TestArrowLocalFileSystem:
@@ -57,3 +58,8 @@ class TestArrowLocalFileSystem:
     write_msg = meta.StorageMetadata(current_snapshot_id=200)
     fs.write_proto(file_path, write_msg)
     assert self._read_proto(fs, file_path).current_snapshot_id == 200
+
+    with pytest.raises(errors.FileExistError) as excinfo:
+      fs.write_proto(file_path, write_msg, fail_if_exists=True)
+
+    assert "already exists" in str(excinfo.value)

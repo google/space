@@ -398,7 +398,13 @@ class Storage(paths.StoragePathsMixin):
     self._fs.create_dir(self._data_dir)
     self._fs.create_dir(self._metadata_dir)
     self._fs.create_dir(self._change_data_dir)
-    self._write_metadata(metadata_path, self._metadata)
+
+    try:
+      self._write_metadata(metadata_path,
+                           self._metadata,
+                           fail_if_entry_point_exists=True)
+    except errors.FileExistError as e:
+      raise errors.StorageExistError(str(e)) from None
 
   def _next_snapshot_id(self) -> int:
     return self._metadata.current_snapshot_id + 1
@@ -407,12 +413,14 @@ class Storage(paths.StoragePathsMixin):
       self,
       metadata_path: str,
       metadata: meta.StorageMetadata,
+      fail_if_entry_point_exists: bool = False,
   ) -> None:
     """Persist a StorageMetadata to files."""
     self._fs.write_proto(metadata_path, metadata)
     self._fs.write_proto(
         self._entry_point_file,
-        meta.EntryPoint(metadata_file=self.short_path(metadata_path)))
+        meta.EntryPoint(metadata_file=self.short_path(metadata_path)),
+        fail_if_exists=fail_if_entry_point_exists)
 
 
 def _patch_manifests(manifest_files: meta.ManifestFiles, patch: rt.Patch):

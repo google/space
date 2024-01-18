@@ -30,8 +30,18 @@ class BaseFileSystem(ABC):
     """Create a new directory."""
 
   @abstractmethod
-  def write_proto(self, file_path: str, msg: ProtoT) -> None:
-    """Write a proto message in text format to a file."""
+  def write_proto(self,
+                  file_path: str,
+                  msg: ProtoT,
+                  fail_if_exists: bool = False) -> None:
+    """Write a proto message in text format to a file.
+    
+    Args:
+      file_path: full path of the file to write to
+      msg: the proto message to write
+      fail_if_exists: if true, fail when the file already exists; otherwise
+        truncate the file
+    """
 
   @abstractmethod
   def read_proto(self, file_path: str, empty_msg: ProtoT) -> ProtoT:

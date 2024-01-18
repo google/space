@@ -78,6 +78,14 @@ class TestStorage:
                              primary_keys=["int64"],
                              record_fields=["binary"])
 
+    with pytest.raises(errors.StorageExistError) as excinfo:
+      Storage.create(location=str(location),
+                     schema=_SCHEMA,
+                     primary_keys=["int64"],
+                     record_fields=["binary"])
+
+    assert "already exists" in str(excinfo.value)
+
     entry_point_file = location / "metadata" / _ENTRY_POINT_FILE
     assert entry_point_file.exists()
 
