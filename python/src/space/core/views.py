@@ -205,8 +205,7 @@ class View(ABC):
     from space.core.transform.join import JoinTransform
     from space.ray.ops.join import JoinInput
     return JoinTransform(join_keys=keys,
-                         left=JoinInput(left, left_fields,
-                                        left_reference_read),
+                         left=JoinInput(left, left_fields, left_reference_read),
                          right=JoinInput(right, right_fields,
                                          right_reference_read))
 
@@ -293,11 +292,15 @@ class MaterializedView:
   @classmethod
   def load(cls, location: str) -> MaterializedView:
     """Load a materialized view from files."""
-    storage = Storage.load(location)
-    metadata = storage.metadata
-    plan = metadata.logical_plan.logical_plan
+    return load_materialized_view(Storage.load(location))
 
-    # pylint: disable=cyclic-import,import-outside-toplevel
-    from space.core.transform.udfs import load_view
-    view = load_view(storage.location, metadata, plan)
-    return MaterializedView(storage, view)
+
+def load_materialized_view(storage: Storage) -> MaterializedView:
+  """Load a materialized view from a storage."""
+  metadata = storage.metadata
+  plan = metadata.logical_plan.logical_plan
+
+  # pylint: disable=cyclic-import,import-outside-toplevel
+  from space.core.transform.udfs import load_view
+  view = load_view(storage.location, metadata, plan)
+  return MaterializedView(storage, view)
