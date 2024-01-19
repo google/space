@@ -22,7 +22,7 @@ from typing import List, Union
 import pyarrow as pa
 
 from space.core.datasets import Dataset
-from space.core.views import MaterializedView
+from space.core.views import MaterializedView, View
 
 
 class BaseCatalog(ABC):
@@ -42,6 +42,14 @@ class BaseCatalog(ABC):
       schema: the schema of the storage.
       primary_keys: un-enforced primary keys.
       record_fields: fields stored in row format (ArrayRecord).
+    """
+
+  def materialize(self, name: str, view: View):
+    """Create a new materialized view.
+    
+    Args:
+      name: the materialized view name.
+      view: the view to be materialized.
     """
 
   @abstractmethod

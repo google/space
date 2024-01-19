@@ -21,8 +21,10 @@ import pyarrow as pa
 
 from space.catalogs.base import BaseCatalog, DatasetInfo
 from space.core.datasets import Dataset
-from space.core.utils import paths
-from space.core.views import MaterializedView
+import space.core.proto.metadata_pb2 as meta
+from space.core.storage import Storage
+from space.core.utils import errors, paths
+from space.core.views import MaterializedView, View, load_materialized_view
 
 
 class DirCatalog(BaseCatalog):
@@ -39,18 +41,28 @@ class DirCatalog(BaseCatalog):
   def create_dataset(self, name: str, schema: pa.Schema,
                      primary_keys: List[str],
                      record_fields: List[str]) -> Dataset:
-    # TODO: should disallow overwriting an entry point file, to avoid creating
-    # two datasets at the same location.
     return Dataset.create(self._dataset_location(name), schema, primary_keys,
                           record_fields)
+
+  def materialize(self, name: str, view: View):
+    return view.materialize(self._dataset_location(name))
 
   def delete_dataset(self, name: str) -> None:
     raise NotImplementedError("delete_dataset has not been implemented")
 
   def dataset(self, name: str) -> Union[Dataset, MaterializedView]:
-    # TODO: to catch file not found and re-throw a DatasetNotFoundError.
-    # TODO: to support loading a materialized view.
-    return Dataset.load(self._dataset_location(name))
+    try:
+      storage = Storage.load(self._dataset_location(name))
+    except FileNotFoundError as e:
+      raise errors.StorageNotFoundError(str(e)) from None
+
+    if storage.metadata.type == meta.StorageMetadata.DATASET:
+      return Dataset(storage)
+    elif storage.metadata.type == meta.StorageMetadata.MATERIALIZED_VIEW:
+      return load_materialized_view(storage)
+
+    raise errors.SpaceRuntimeError(
+        f"Storage type {storage.metadata.type} is not supported")
 
   def datasets(self) -> List[DatasetInfo]:
     results = []

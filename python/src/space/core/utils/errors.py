@@ -31,6 +31,18 @@ class PrimaryKeyExistError(UserInputError):
   """Errors caused by duplicated primary keys."""
 
 
+class FileExistError(UserInputError):
+  """Errors caused by a file to create already exists."""
+
+
+class StorageExistError(UserInputError):
+  """Errors caused by a storage to create already exists."""
+
+
+class StorageNotFoundError(UserInputError):
+  """The storage to load is not found."""
+
+
 class SpaceRuntimeError(RuntimeError):
   """Basic class of errors thrown from Space runtime."""
 
@@ -41,11 +53,3 @@ class TransactionError(SpaceRuntimeError):
 
 class LogicalPlanError(SpaceRuntimeError):
   """Errors from parsing logical plan."""
-
-
-class FileExistError(UserInputError):
-  """Errors caused by a file to create already exists."""
-
-
-class StorageExistError(UserInputError):
-  """Errors caused by a storage to create already exists."""
