@@ -17,7 +17,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-from typing import Iterator, List, Optional, Tuple, Union
+from typing import Iterator, List, Optional, Union
 
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -30,7 +30,7 @@ from space.core.ops import utils
 from space.core.ops.utils import FileOptions
 from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import InputData, InputIteratorFn
-from space.core.ops.change_data import ChangeType, read_change_data
+from space.core.ops.change_data import ChangeData, ChangeType, read_change_data
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions
 from space.core.options import JoinOptions, ReadOptions
@@ -44,7 +44,7 @@ from space.ray.ops.utils import singleton_storage
 
 if TYPE_CHECKING:
   from space.core.datasets import Dataset
-  from space.core.storage import Storage, Version
+  from space.core.storage import Storage, Transaction, Version
   from space.core.views import MaterializedView, View
 
 
@@ -88,21 +88,21 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
         join_options).to_arrow_refs():
       yield ray.get(ref)
 
-  def diff(
-      self, start_version: Union[Version],
-      end_version: Union[Version]) -> Iterator[Tuple[ChangeType, pa.Table]]:
+  def diff(self, start_version: Union[Version],
+           end_version: Union[Version]) -> Iterator[ChangeData]:
     self._source_storage.reload()
     source_changes = read_change_data(
         self._source_storage,
         self._source_storage.version_to_snapshot_id(start_version),
         self._source_storage.version_to_snapshot_id(end_version))
 
-    for change_type, data in source_changes:
+    for change in source_changes:
       # TODO: skip processing the data for deletions; the caller is usually
       # only interested at deleted primary keys.
-      processed_remote_data = self._view.process_source(data)
+      processed_remote_data = self._view.process_source(change.data)
       processed_data = ray.get(processed_remote_data.to_arrow_refs())
-      yield change_type, pa.concat_tables(processed_data)
+      yield ChangeData(change.snapshot_id, change.type_,
+                       pa.concat_tables(processed_data))
 
   @property
   def _source_storage(self) -> Storage:
@@ -164,19 +164,44 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
     start_snapshot_id = self._storage.metadata.current_snapshot_id
 
     job_results: List[JobResult] = []
-    for change_type, data in self.diff(start_snapshot_id, end_snapshot_id):
-      # In the scope of changes from the same snapshot, must process DELETE
-      # before ADD.
-      if change_type == ChangeType.DELETE:
-        job_results.append(self._process_delete(data))
-      elif change_type == ChangeType.ADD:
-        job_results.append(self._process_append(data))
-      else:
-        raise NotImplementedError(f"Change type {change_type} not supported")
+    patches: List[Optional[rt.Patch]] = []
+    previous_snapshot_id: Optional[int] = None
+
+    txn = self._start_txn()
+    for change in self.diff(start_snapshot_id, end_snapshot_id):
+      # Commit when changes from the same snapshot end.
+      if (previous_snapshot_id is not None and
+          change.snapshot_id != previous_snapshot_id):
+        txn.commit(utils.merge_patches(patches))
+        patches.clear()
+
+        # Stop early when something is wrong.
+        r = txn.result()
+        if r.state == JobResult.State.FAILED:
+          return job_results + [r]
+
+        job_results.append(r)
+        txn = self._start_txn()
+
+      try:
+        if change.type_ == ChangeType.DELETE:
+          patches.append(self._process_delete(change.data))
+        elif change.type_ == ChangeType.ADD:
+          patches.append(self._process_append(change.data))
+        else:
+          raise NotImplementedError(f"Change type {change.type_} not supported")
+      except (errors.SpaceRuntimeError, errors.UserInputError) as e:
+        r = JobResult(JobResult.State.FAILED, None, repr(e))
+        return job_results + [r]
+
+      previous_snapshot_id = change.snapshot_id
+
+    if patches:
+      txn.commit(utils.merge_patches(patches))
+      job_results.append(txn.result())
 
     return job_results
 
-  @StorageMixin.transactional
   def _process_delete(self, data: pa.Table) -> Optional[rt.Patch]:
     filter_ = utils.primary_key_filter(self._storage.primary_keys, data)
     if filter_ is None:
@@ -187,12 +212,15 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
                          self._file_options)
     return op.delete()
 
-  @StorageMixin.transactional
   def _process_append(self, data: pa.Table) -> Optional[rt.Patch]:
     op = LocalAppendOp(self._storage.location, self._storage.metadata,
                        self._file_options)
     op.write(data)
     return op.finish()
+
+  def _start_txn(self) -> Transaction:
+    with self._storage.transaction() as txn:
+      return txn
 
 
 class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):

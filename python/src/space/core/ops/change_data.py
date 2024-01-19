@@ -14,8 +14,9 @@
 #
 """Change data feed that computes delta between two snapshots."""
 
+from dataclasses import dataclass
 from enum import Enum
-from typing import Iterator, Tuple, List
+from typing import Iterator, List
 
 import pyarrow as pa
 from pyroaring import BitMap  # type: ignore[import-not-found]
@@ -40,9 +41,19 @@ class ChangeType(Enum):
   # DELETE, on the same primary key in one snapshot change.
 
 
-def read_change_data(
-    storage: Storage, start_snapshot_id: int,
-    end_snapshot_id: int) -> Iterator[Tuple[ChangeType, pa.Table]]:
+@dataclass
+class ChangeData:
+  """Information and data of a change."""
+  # Snapshot ID that the change was committed to.
+  snapshot_id: int
+  # The change type.
+  type_: ChangeType
+  # The change data.
+  data: pa.Table
+
+
+def read_change_data(storage: Storage, start_snapshot_id: int,
+                     end_snapshot_id: int) -> Iterator[ChangeData]:
   """Read change data from a start to an end snapshot.
   
   start_snapshot_id is excluded; end_snapshot_id is included.
@@ -82,6 +93,7 @@ class _LocalChangeDataReadOp(StoragePathsMixin):
 
     self._storage = storage
     self._metadata = self._storage.metadata
+    self._snapshot_id = snapshot_id
 
     if snapshot_id not in self._metadata.snapshots:
       raise errors.VersionNotFoundError(
@@ -93,8 +105,8 @@ class _LocalChangeDataReadOp(StoragePathsMixin):
     change_log_file = self._storage.full_path(snapshot.change_log_file)
     self._change_log = _read_change_log_proto(fs, change_log_file)
 
-  def __iter__(self) -> Iterator[Tuple[ChangeType, pa.Table]]:
-    # TODO: must return deletion first, otherwise when the upstream re-apply
+  def __iter__(self) -> Iterator[ChangeData]:
+    # Must return deletion first, otherwise when the upstream re-apply
     # deletions and additions, it may delete newly added data.
     # TODO: to enforce this check upstream, or merge deletion+addition as a
     # update.
@@ -105,7 +117,7 @@ class _LocalChangeDataReadOp(StoragePathsMixin):
       yield self._read_bitmap_rows(ChangeType.ADD, bitmap)
 
   def _read_bitmap_rows(self, change_type: ChangeType,
-                        bitmap: meta.RowBitmap) -> Tuple[ChangeType, pa.Table]:
+                        bitmap: meta.RowBitmap) -> ChangeData:
     file_set = rt.FileSet(index_files=[rt.DataFile(path=bitmap.file)])
     read_op = FileSetReadOp(self._storage.location, self._metadata, file_set)
 
@@ -115,7 +127,7 @@ class _LocalChangeDataReadOp(StoragePathsMixin):
       data = data.filter(
           mask=_bitmap_mask(bitmap.roaring_bitmap, data.num_rows))
 
-    return (change_type, data)
+    return ChangeData(self._snapshot_id, change_type, data)
 
 
 def _read_change_log_proto(fs: BaseFileSystem,
