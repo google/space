@@ -96,6 +96,25 @@ ds = Dataset.create(
 ds = Dataset.load("/path/to/<mybucket>/example_ds")
 ```
 
+Optionally, you can use `catalogs` to manage datasets by names instead of locations:
+
+```py
+from space import DirCatalog
+
+# DirCatalog manages datasets in a directory.
+catalog = DirCatalog("/path/to/<mybucket>")
+
+# Same as the creation above.
+ds = catalog.create_dataset("example_ds", schema,
+  primary_keys=["id"], record_fields=["feature"])
+
+# Same as the load above.
+ds = catalog.dataset("example_ds")
+
+# List all datasets and materialized views.
+print(catalog.datasets())
+```
+
 ### Write and Read
 
 Append, delete some data. Each mutation generates a new version of data, represented by an increasing integer ID. We expect to support the [Iceberg](https://iceberg.apache.org/docs/latest/branching/) style tags and branches for better version management.
@@ -182,6 +201,8 @@ for d in view_runner.read():
   print(d)
 
 mv = view.materialize("/path/to/<mybucket>/example_mv")
+# Or use a catalog:
+# mv = catalog.materialize("example_mv", view)
 
 mv_runner = mv.ray()
 # Refresh the MV up to version `1`.
@@ -251,6 +272,10 @@ ds.storage.record_manifest()  # Accept filter and snapshot_id
 
 ## Status
 Space is a new project under active development.
+
+:construction: Ongoing tasks:
+- Iceberg style version branches.
+- Performance benchmark and improvement.
 
 ## Disclaimer
 This is not an officially supported Google product.
