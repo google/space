@@ -24,7 +24,7 @@ import ray
 
 from space import Dataset, JoinOptions, Range
 from space.core.jobs import JobResult
-from space.core.ops.change_data import ChangeType
+from space.core.ops.change_data import ChangeData, ChangeType
 from space.core.ops.read import read_record_column
 from space.core.utils import errors
 from space.core.utils.uuids import random_id
@@ -145,6 +145,7 @@ class TestRayReadWriteRunner:
                           input_fields=["int64", "float64"],
                           output_schema=view_schema)
     mv = view.materialize(str(tmp_path / "mv"))
+    mv1 = view.materialize(str(tmp_path / "mv1"))
 
     ds_runner = ds.local()
     view_runner = view.ray()
@@ -156,20 +157,22 @@ class TestRayReadWriteRunner:
         "binary": [b"b1", b"b2", b"b3"]
     })
 
-    expected_change0 = (ChangeType.ADD,
-                        pa.Table.from_pydict({
-                            "int64": [1, 2, 3],
-                            "float64": [1.1, 1.2, 1.3],
-                        }))
+    expected_change0 = ChangeData(
+        ds.storage.metadata.current_snapshot_id, ChangeType.ADD,
+        pa.Table.from_pydict({
+            "int64": [1, 2, 3],
+            "float64": [1.1, 1.2, 1.3],
+        }))
     assert list(view_runner.diff(0, 1)) == [expected_change0]
 
     # Test deletion.
     ds_runner.delete(pc.field("int64") == 2)
-    expected_change1 = (ChangeType.DELETE,
-                        pa.Table.from_pydict({
-                            "int64": [2],
-                            "float64": [1.2]
-                        }))
+    expected_change1 = ChangeData(
+        ds.storage.metadata.current_snapshot_id, ChangeType.DELETE,
+        pa.Table.from_pydict({
+            "int64": [2],
+            "float64": [1.2]
+        }))
     assert list(view_runner.diff(1, 2)) == [expected_change1]
 
     # Test that diff supports tags.
@@ -185,11 +188,11 @@ class TestRayReadWriteRunner:
     ray_runner = mv.ray()
     local_runner = mv.local()
 
-    ray_runner.refresh(1)
-    assert local_runner.read_all() == expected_change0[1]
-    assert ray_runner.read_all() == expected_change0[1]
+    assert len(ray_runner.refresh(1)) == 1
+    assert local_runner.read_all() == expected_change0.data
+    assert ray_runner.read_all() == expected_change0.data
 
-    ray_runner.refresh()
+    assert len(ray_runner.refresh()) == 1
     assert local_runner.read_all() == pa.Table.from_pydict({
         "int64": [1, 3],
         "float64": [1.1, 1.3],
@@ -203,6 +206,37 @@ class TestRayReadWriteRunner:
         errors.VersionNotFoundError,
         match=r".*Target snapshot ID 3 higher than source dataset version 2.*"):
       ray_runner.refresh(3)
+
+    # Test upsert's diff.
+    ds_runner.upsert({
+        "int64": [3, 4],
+        "float64": [0.33, 0.4],
+        "binary": [b"b3", b"b4"]
+    })
+    assert list(ds_runner.diff(2, 3)) == [
+        ChangeData(
+            3, ChangeType.DELETE,
+            pa.Table.from_pydict({
+                "int64": [3],
+                "float64": [0.3],
+                "binary": [b"b3"]
+            })),
+        ChangeData(
+            3, ChangeType.ADD,
+            pa.Table.from_pydict({
+                "int64": [3, 4],
+                "float64": [0.33, 0.4],
+                "binary": [b"b3", b"b4"]
+            }))
+    ]
+
+    # Test refresh multiple snapshots.
+    ray_runner = mv1.ray()
+    assert len(ray_runner.refresh()) == 3
+    assert ray_runner.read_all() == pa.Table.from_pydict({
+        "int64": [1, 3, 4],
+        "float64": [1.1, 1.33, 1.4],
+    })
 
   def test_diff_filter(self, sample_dataset):
     # A sample UDF for testing.
@@ -222,20 +256,22 @@ class TestRayReadWriteRunner:
         "binary": [b"b1", b"b2", b"b3"]
     })
 
-    expected_change0 = (ChangeType.ADD,
-                        pa.Table.from_pydict({
-                            "int64": [2, 3],
-                            "float64": [0.2, 0.3]
-                        }))
+    expected_change0 = ChangeData(
+        sample_dataset.storage.metadata.current_snapshot_id, ChangeType.ADD,
+        pa.Table.from_pydict({
+            "int64": [2, 3],
+            "float64": [0.2, 0.3]
+        }))
     assert list(view_runner.diff(0, 1)) == [expected_change0]
 
     # Test deletion.
     ds_runner.delete(pc.field("int64") == 2)
-    expected_change1 = (ChangeType.DELETE,
-                        pa.Table.from_pydict({
-                            "int64": [2],
-                            "float64": [0.2]
-                        }))
+    expected_change1 = ChangeData(
+        sample_dataset.storage.metadata.current_snapshot_id, ChangeType.DELETE,
+        pa.Table.from_pydict({
+            "int64": [2],
+            "float64": [0.2]
+        }))
     assert list(view_runner.diff(1, 2)) == [expected_change1]
 
     # Test several changes.

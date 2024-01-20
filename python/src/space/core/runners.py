@@ -17,9 +17,8 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from functools import wraps
-from typing import Callable, Iterator, List, Optional, Tuple, Union
+from typing import Callable, Iterator, List, Optional, Union
 
-from absl import logging  # type: ignore[import-untyped]
 import pyarrow as pa
 import pyarrow.compute as pc
 
@@ -30,7 +29,7 @@ from space.core.loaders.parquet import LocalParquetLoadOp
 from space.core.ops.append import LocalAppendOp
 from space.core.ops.append import FileOptions
 from space.core.ops.base import InputData, InputIteratorFn
-from space.core.ops.change_data import ChangeType, read_change_data
+from space.core.ops.change_data import ChangeData, read_change_data
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions, LocalInsertOp
 from space.core.ops.read import FileSetReadOp
@@ -78,7 +77,7 @@ class BaseReadOnlyRunner(ABC):
 
   @abstractmethod
   def diff(self, start_version: Union[int],
-           end_version: Union[int]) -> Iterator[Tuple[ChangeType, pa.Table]]:
+           end_version: Union[int]) -> Iterator[ChangeData]:
     """Read the change data between two versions.
     
     start_version is excluded; end_version is included. 
@@ -102,11 +101,9 @@ class StorageMixin:
         with self._storage.transaction() as txn:  # pylint: disable=protected-access
           txn.commit(fn(self, *args, **kwargs))
           r = txn.result()
-          logging.info(f"Job result:\n{r}")
           return r
       except (errors.SpaceRuntimeError, errors.UserInputError) as e:
         r = JobResult(JobResult.State.FAILED, None, repr(e))
-        logging.warning(f"Job result:\n{r}")
         return r
 
     return decorated
@@ -215,7 +212,7 @@ class LocalRunner(BaseReadWriteRunner):
 
   @StorageMixin.reload
   def diff(self, start_version: Version,
-           end_version: Version) -> Iterator[Tuple[ChangeType, pa.Table]]:
+           end_version: Version) -> Iterator[ChangeData]:
     return read_change_data(self._storage,
                             self._storage.version_to_snapshot_id(start_version),
                             self._storage.version_to_snapshot_id(end_version))

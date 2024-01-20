@@ -16,7 +16,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from space import Dataset
-from space.core.ops.change_data import ChangeType
+from space.core.ops.change_data import ChangeData, ChangeType
 
 
 def test_read_change_data(tmp_path, all_types_schema, all_types_input_data):
@@ -32,20 +32,22 @@ def test_read_change_data(tmp_path, all_types_schema, all_types_input_data):
 
   changes = list(runner.diff(0, 1))
   assert len(changes) == 1
-  expected_change0 = (ChangeType.ADD, runner.read_all())
+  expected_change0 = ChangeData(ds.storage.metadata.current_snapshot_id,
+                                ChangeType.ADD, runner.read_all())
   assert changes[0] == expected_change0
 
   # Validate DELETE changes.
   runner.delete((pc.field("string") == "a") | (pc.field("string") == "A"))
   changes = list(runner.diff(1, 2))
   assert len(changes) == 1
-  expected_change1 = (ChangeType.DELETE,
-                      pa.Table.from_pydict({
-                          "int64": [1, 0],
-                          "float64": [0.1, -0.1],
-                          "bool": [True, False],
-                          "string": ["a", "A"]
-                      }))
+  expected_change1 = ChangeData(
+      ds.storage.metadata.current_snapshot_id, ChangeType.DELETE,
+      pa.Table.from_pydict({
+          "int64": [1, 0],
+          "float64": [0.1, -0.1],
+          "bool": [True, False],
+          "string": ["a", "A"]
+      }))
   assert changes[0] == expected_change1
 
   # Validate Upsert operation's changes.
@@ -58,14 +60,17 @@ def test_read_change_data(tmp_path, all_types_schema, all_types_input_data):
   runner.upsert(upsert_data)
   changes = list(runner.diff(2, 3))
   assert len(changes) == 2
-  expected_change2 = (ChangeType.DELETE,
-                      pa.Table.from_pydict({
-                          "int64": [2, 3],
-                          "float64": [0.2, 0.3],
-                          "bool": [False, False],
-                          "string": ["b", "c"]
-                      }))
-  expected_change3 = (ChangeType.ADD, pa.Table.from_pydict(upsert_data))
+  expected_change2 = ChangeData(
+      ds.storage.metadata.current_snapshot_id, ChangeType.DELETE,
+      pa.Table.from_pydict({
+          "int64": [2, 3],
+          "float64": [0.2, 0.3],
+          "bool": [False, False],
+          "string": ["b", "c"]
+      }))
+  expected_change3 = ChangeData(ds.storage.metadata.current_snapshot_id,
+                                ChangeType.ADD,
+                                pa.Table.from_pydict(upsert_data))
   assert changes == [expected_change2, expected_change3]
 
   # Validate diff with several snapshot in-between

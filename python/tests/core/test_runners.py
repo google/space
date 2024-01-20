@@ -26,7 +26,7 @@ from tensorflow_datasets import features as f
 
 from space import Dataset, LocalRunner, TfFeatures
 from space.core.jobs import JobResult
-from space.core.ops.change_data import ChangeType
+from space.core.ops.change_data import ChangeData, ChangeType
 from space.core.schema.types import File
 from space.core.utils import errors
 
@@ -122,12 +122,17 @@ class TestLocalRunner:
 
     sample_data1 = _generate_data([1, 2])
     local_runner1.append(sample_data1)
+    snapshot_id1 = ds1.storage.metadata.current_snapshot_id
     assert local_runner2.read_all() == sample_data1
 
     sample_data2 = _generate_data([3, 4])
     local_runner1.append(sample_data2)
-    assert list(local_runner2.diff(0, 2)) == [(ChangeType.ADD, sample_data1),
-                                              (ChangeType.ADD, sample_data2)]
+    snapshot_id2 = ds1.storage.metadata.current_snapshot_id
+
+    assert list(local_runner2.diff(0, 2)) == [
+        ChangeData(snapshot_id1, ChangeType.ADD, sample_data1),
+        ChangeData(snapshot_id2, ChangeType.ADD, sample_data2)
+    ]
 
     sample_data3 = _generate_data([5])
     sample_data4 = _generate_data([6])
