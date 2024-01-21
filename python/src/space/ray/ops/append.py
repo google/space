@@ -26,6 +26,7 @@ from space.core.ops.base import InputData, InputIteratorFn
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
 from space.core.utils.lazy_imports_utils import ray
+from space.ray.options import RayOptions
 
 
 class RayAppendOp(BaseAppendOp):
@@ -35,31 +36,33 @@ class RayAppendOp(BaseAppendOp):
   def __init__(self,
                location: str,
                metadata: meta.StorageMetadata,
-               parallelism: int,
+               ray_options: RayOptions,
                file_options: FileOptions,
                record_address_input: bool = False):
     """
     Args:
       record_address_input: if true, input record fields are addresses.
     """
-    self._parallelism = parallelism
+    self._ray_options = ray_options
     self._actors = [
         _AppendActor.remote(  # type: ignore[attr-defined] # pylint: disable=no-member
             location, metadata, file_options, record_address_input)
-        for _ in range(parallelism)
+        for _ in range(self._ray_options.max_parallelism)
     ]
 
   def write(self, data: InputData) -> None:
     if not isinstance(data, pa.Table):
       data = pa.Table.from_pydict(data)
 
-    shard_size = data.num_rows // self._parallelism
+    num_shards = self._ray_options.max_parallelism
+
+    shard_size = data.num_rows // num_shards
     if shard_size == 0:
       shard_size = 1
 
     responses = []
     offset = 0
-    for i in range(self._parallelism):
+    for i in range(num_shards):
       shard = data.slice(offset=offset, length=shard_size)
       responses.append(self._actors[i].write.remote(shard))
 

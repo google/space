@@ -27,7 +27,8 @@ from space.core.storage import Storage
 from space.core.transform.plans import LogicalPlanBuilder
 from space.core.utils.lazy_imports_utils import ray
 from space.core.views import View
-from space.ray.runners import RayOptions, RayReadWriterRunner
+from space.ray.options import RayOptions
+from space.ray.runners import RayReadWriterRunner
 
 
 class Dataset(View):

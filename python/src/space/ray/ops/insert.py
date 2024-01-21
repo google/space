@@ -28,15 +28,16 @@ import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
 from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray
+from space.ray.options import RayOptions
 
 
 class RayInsertOp(LocalInsertOp):
   """Insert data to a dataset with distributed duplication check."""
 
   def __init__(self, storage: Storage, options: InsertOptions,
-               parallelism: int, file_options: FileOptions):
+               ray_options: RayOptions, file_options: FileOptions):
     LocalInsertOp.__init__(self, storage, options, file_options)
-    self._parallelism = parallelism
+    self._ray_options = ray_options
 
   def _check_duplication(self, data_files: rt.FileSet, filter_: pc.Expression):
     remote_duplicated_values = []
@@ -50,11 +51,10 @@ class RayInsertOp(LocalInsertOp):
 
     for duplicated in ray.get(remote_duplicated_values):
       if duplicated:
-        raise errors.PrimaryKeyExistError(
-            "Primary key to insert already exist")
+        raise errors.PrimaryKeyExistError("Primary key to insert already exist")
 
   def _append(self, data: pa.Table, patches: List[Optional[rt.Patch]]) -> None:
-    append_op = RayAppendOp(self._location, self._metadata, self._parallelism,
+    append_op = RayAppendOp(self._location, self._metadata, self._ray_options,
                             self._file_options)
     append_op.write(data)
     patches.append(append_op.finish())
@@ -64,5 +64,4 @@ class RayInsertOp(LocalInsertOp):
 def _remote_filter_matched(location: str, metadata: meta.StorageMetadata,
                            data_files: rt.FileSet, pk_filter: pc.Expression,
                            primary_keys: List[str]) -> bool:
-  return filter_matched(location, metadata, data_files, pk_filter,
-                        primary_keys)
+  return filter_matched(location, metadata, data_files, pk_filter, primary_keys)

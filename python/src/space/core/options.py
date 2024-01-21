@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""APIs of Space core lib."""
+"""Options of Space core lib."""
 
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional
