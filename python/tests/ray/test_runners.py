@@ -119,13 +119,26 @@ class TestRayReadWriteRunner:
     view = sample_dataset.map_batches(fn=_sample_map_udf,
                                       output_schema=sample_dataset.schema,
                                       output_record_fields=["binary"])
-    view_runner = view.ray()
     assert_equal(
-        view_runner.read_all().sort_by("int64"),
+        view.ray().read_all().sort_by("int64"),
         pa.concat_tables([
             pa.Table.from_pydict({
                 "int64": [10, 11, 12],
                 "float64": [v / 10 + 1 for v in [10, 11, 12]],
+                "binary": [f"b{v}".encode("utf-8") for v in [10, 11, 12]]
+            })
+        ]).sort_by("int64"))
+
+    # Test a transform on a view.
+    transform_on_view = view.map_batches(fn=_sample_map_udf,
+                                         output_schema=view.schema,
+                                         output_record_fields=["binary"])
+    assert_equal(
+        transform_on_view.ray().read_all().sort_by("int64"),
+        pa.concat_tables([
+            pa.Table.from_pydict({
+                "int64": [10, 11, 12],
+                "float64": [v / 10 + 2 for v in [10, 11, 12]],
                 "binary": [f"b{v}".encode("utf-8") for v in [10, 11, 12]]
             })
         ]).sort_by("int64"))
@@ -238,7 +251,7 @@ class TestRayReadWriteRunner:
         "float64": [1.1, 1.33, 1.4],
     })
 
-  def test_diff_filter(self, sample_dataset):
+  def test_filter_transform(self, sample_dataset):
     # A sample UDF for testing.
     def _sample_filter_udf(row: Dict[str, Any]) -> Dict[str, Any]:
       return row["float64"] > 0.1

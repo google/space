@@ -34,6 +34,7 @@ def ray_dataset(view: View, read_options: ReadOptions) -> ray.Dataset:
     return view.ray_dataset(read_options, empty_join_options)
 
   # For non-dataset views, fields can't be pushed down to storage.
+  fields = read_options.fields
   read_options.fields = None
-  return view.ray_dataset(read_options, empty_join_options).select_columns(
-      read_options.fields)
+  return view.ray_dataset(read_options,
+                          empty_join_options).select_columns(fields)
