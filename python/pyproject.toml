@@ -8,7 +8,6 @@ license = { text = "Apache-2.0" }
 classifiers = [
   "License :: OSI Approved :: Apache Software License",
   "Operating System :: OS Independent",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -28,9 +27,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "pandas",
+  "pandas == 2.1.4",
   "pyarrow-stubs",
-  "ray",
+  "ray == 2.9.1",
   "tensorflow",
   "types-protobuf",
 ]

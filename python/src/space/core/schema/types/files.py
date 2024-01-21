@@ -27,7 +27,11 @@ from space.core.utils.constants import UTF_8
 
 
 class File(pa.ExtensionType):
-  """A custom Arrow type for files."""
+  """A custom Arrow type representing data in a standalone file.
+  
+  TODO: several features to add, e.g., auto read file content, write a new file
+  at data write time, serializer/deserializer.
+  """
 
   EXTENSION_NAME = "space.file"
 

@@ -24,13 +24,6 @@ Unify data in your entire machine learning lifecycle with **Space**, a comprehen
 
 <img src="docs/pics/overview.png" width="800" />
 
-## Space 101
-
-- Space uses [Arrow](https://arrow.apache.org/docs/python/index.html) in the API surface, e.g., schema, filter, data IO.
-- Data operations in Space can run locally or distributedly in [Ray](https://github.com/ray-project/ray) clusters.
-- All file paths in Space are [relative](./docs/design.md#relative-paths); datasets are immediately usable after downloading or moving.
-- Please read [the design](docs/design.md) for more details.
-
 ## Onboarding Examples
 
 - [Manage Tensorflow COCO dataset](notebooks/tfds_coco_tutorial.ipynb)
@@ -38,10 +31,19 @@ Unify data in your entire machine learning lifecycle with **Space**, a comprehen
 - [Transforms and materialized views: Segment Anything as example](notebooks/segment_anything_tutorial.ipynb)
 - [Incrementally build embedding vector indexes](notebooks/incremental_embedding_index.ipynb)
 
+## Space 101
+
+- Space uses [Arrow](https://arrow.apache.org/docs/python/index.html) in the API surface, e.g., schema, filter, data IO.
+- All file paths in Space are [relative](./docs/design.md#relative-paths); datasets are immediately usable after downloading or moving.
+- Space stores data itself, or a reference of data, in Parquet files. The reference can be the address of a row in ArrayRecord file, or the path of a standalone file (limitted support, see `space.core.schema.types.files`).
+- `space.TfFeatures` is a built-in field type providing serializers for nested dicts of numpy arrays, based on [TFDS FeaturesDict](https://www.tensorflow.org/datasets/api_docs/python/tfds/features/FeaturesDict).
+- Please find more information in [the design page](docs/design.md).
+
 ## Quick Start
 
 - [Install](#install)
 - [Cloud Storage](#cloud-storage)
+- [Cluster setup](#cluster-setup)
 - [Create and Load Datasets](#create-and-load-datasets)
 - [Write and Read](#write-and-read)
 - [Transform and Materialized Views](#transform-and-materialized-views)
@@ -71,6 +73,24 @@ gcsfuse <mybucket> "/path/to/<mybucket>"
 
 Space has not yet implemented Cloud Storage file systems. FUSE is the current suggested approach.
 
+### Cluster Setup
+
+Optionally, setup a cluster to run Space operations distributedly. We support Ray clusters, on the Ray cluster head/worker nodes:
+```bash
+# Start a Ray head node (IP 123.45.67.89, for example).
+# See https://docs.ray.io/en/latest/ray-core/starting-ray.html for details.
+ray start --head --port=6379
+```
+
+Using [Cloud Storage + FUSE](#cloud-storage) is required in the distributed mode, because the Ray cluster and the client machine should operate on the same directory of files. Run `gcsfuse` on all machines and the mapped local directory paths **must be the same**.
+
+Run the following code on the client machine to connect to the Ray cluster:
+```py
+import ray
+# Connect to the Ray cluster.
+ray.init(address="ray://123.45.67.89:10001")
+```
+
 ### Create and Load Datasets
 
 Create a Space dataset with two index fields (`id`, `image_name`) (store in Parquet) and a record field (`feature`) (store in ArrayRecord).
@@ -90,7 +110,7 @@ ds = Dataset.create(
   "/path/to/<mybucket>/example_ds",
   schema,
   primary_keys=["id"],
-  record_fields=["feature"])
+  record_fields=["feature"])  # Store this field in ArrayRecord files
 
 # Load the dataset from files later:
 ds = Dataset.load("/path/to/<mybucket>/example_ds")
@@ -120,9 +140,13 @@ print(catalog.datasets())
 Append, delete some data. Each mutation generates a new version of data, represented by an increasing integer ID. We expect to support the [Iceberg](https://iceberg.apache.org/docs/latest/branching/) style tags and branches for better version management.
 ```py
 import pyarrow.compute as pc
+from space import RayOptions
 
-# Create a local or Ray runner.
-runner = ds.local()  # or ds.ray()
+# Create a local runner:
+runner = ds.local()
+
+# Or create a Ray runner:
+runner = ds.ray(ray_options=RayOptions(max_parallelism=8))
 
 # Appending data generates a new dataset version `snapshot_id=1`
 # Write methods:
@@ -205,8 +229,8 @@ mv = view.materialize("/path/to/<mybucket>/example_mv")
 # mv = catalog.materialize("example_mv", view)
 
 mv_runner = mv.ray()
-# Refresh the MV up to version `1`.
-mv_runner.refresh(1)  # mv_runner.refresh() refresh to the latest version
+# Refresh the MV up to version tag `after_add` of the source.
+mv_runner.refresh("after_add")  # mv_runner.refresh() refresh to the latest version
 
 # Use the MV runner instead of view runner to directly read from materialized
 # view files, no data processing any more.

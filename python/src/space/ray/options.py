@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Space is a storage framework for ML datasets."""
+"""Options of Space Ray lib."""
 
-from space.catalogs.base import DatasetInfo
-from space.catalogs.directory import DirCatalog
-from space.core.datasets import Dataset
-from space.core.options import JoinOptions, Range, ReadOptions
-from space.core.runners import LocalRunner
-from space.core.random_access import RandomAccessDataSource
-from space.core.schema.types import File, TfFeatures
-from space.core.views import MaterializedView
-from space.ray.options import RayOptions
+from dataclasses import dataclass
+
+
+@dataclass
+class RayOptions:
+  """Options of Ray runners."""
+  # The max parallelism of computing resources to use in a Ray cluster.
+  max_parallelism: int = 8

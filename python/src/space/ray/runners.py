@@ -15,7 +15,7 @@
 """Ray runner implementations."""
 
 from __future__ import annotations
-from dataclasses import dataclass
+import copy
 from typing import TYPE_CHECKING
 from typing import Iterator, List, Optional, Union
 
@@ -41,17 +41,12 @@ from space.ray.ops.append import RayAppendOp
 from space.ray.ops.delete import RayDeleteOp
 from space.ray.ops.insert import RayInsertOp
 from space.ray.ops.utils import singleton_storage
+from space.ray.options import RayOptions
 
 if TYPE_CHECKING:
   from space.core.datasets import Dataset
   from space.core.storage import Storage, Transaction, Version
   from space.core.views import MaterializedView, View
-
-
-@dataclass
-class RayOptions:
-  """Options of Ray runners."""
-  parallelism: int = 2
 
 
 class RayReadOnlyRunner(BaseReadOnlyRunner):
@@ -237,7 +232,7 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
   @StorageMixin.transactional
   def append(self, data: InputData) -> Optional[rt.Patch]:
     op = RayAppendOp(self._storage.location, self._storage.metadata,
-                     self._ray_options.parallelism, self._file_options)
+                     self._ray_options, self._file_options)
     op.write(data)
     return op.finish()
 
@@ -248,8 +243,12 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
     if not isinstance(source_fns, list):
       source_fns = [source_fns]
 
+    ray_options = copy.deepcopy(self._ray_options)
+    ray_options.max_parallelism = min(len(source_fns),
+                                      ray_options.max_parallelism)
+
     op = RayAppendOp(self._storage.location, self._storage.metadata,
-                     self._ray_options.parallelism, self._file_options)
+                     ray_options, self._file_options)
     op.write_from(source_fns)
 
     return op.finish()
@@ -267,8 +266,8 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
   @StorageMixin.transactional
   def _insert(self, data: InputData,
               mode: InsertOptions.Mode) -> Optional[rt.Patch]:
-    op = RayInsertOp(self._storage, InsertOptions(mode=mode),
-                     self._ray_options.parallelism, self._file_options)
+    op = RayInsertOp(self._storage, InsertOptions(mode=mode), self._ray_options,
+                     self._file_options)
     return op.write(data)
 
   @StorageMixin.transactional
