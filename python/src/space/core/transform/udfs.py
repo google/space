@@ -109,6 +109,7 @@ class BaseUdfTransform(View):
           "`fields` is not supported for views, use `input_fields` of "
           "transforms (map_batches, filter) instead")
 
+    read_options.fields = self.input_fields
     return self._transform(
         transform_utils.ray_dataset(self.input_, read_options))
 
@@ -228,8 +229,7 @@ def _load_udf(location: str, metadata: meta.StorageMetadata,
         "Only UDF is supported in logical plan extension URIs")
 
   # Load the UDF from file.
-  pickle_path = metadata.logical_plan.udfs[
-      fn_extension.extension_function.name]
+  pickle_path = metadata.logical_plan.udfs[fn_extension.extension_function.name]
   udf = UserDefinedFn.load(path.join(location, pickle_path))
 
   # Build the input view and input argument field names.
