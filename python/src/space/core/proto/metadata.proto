@@ -84,7 +84,7 @@ message Schema {
 
 // Storage snapshot persisting physical metadata such as manifest file paths.
 // It is used for obtaining all alive data file paths for a given snapshot.
-// NEXT_ID: 6
+// NEXT_ID: 7
 message Snapshot {
   // The snapshot ID.
   int64 snapshot_id = 1;
@@ -104,6 +104,9 @@ message Snapshot {
 
   // File path of the change log of the snapshot.
   string change_log_file = 5;
+
+  // The snapshot ID of the parent snapshot.
+  optional int64 parent_snapshot_id = 6;
 }
 
 // Reference to a snapshot.
