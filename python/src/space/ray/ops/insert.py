@@ -18,6 +18,7 @@ from typing import List, Optional
 
 import pyarrow as pa
 import pyarrow.compute as pc
+import ray
 
 from space.ray.ops.append import RayAppendOp
 from space.core.ops.insert import InsertOptions, LocalInsertOp
@@ -27,7 +28,6 @@ import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
 from space.core.utils import errors
-from space.core.utils.lazy_imports_utils import ray
 from space.ray.options import RayOptions
 
 

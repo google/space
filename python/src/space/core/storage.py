@@ -40,10 +40,9 @@ from space.core.schema import arrow
 from space.core.schema import substrait as substrait_schema
 from space.core.schema.utils import validate_logical_schema
 from space.core.utils import errors, paths
-from space.core.utils.lazy_imports_utils import ray
+from space.core.utils.lazy_imports_utils import ray, ray_data_sources
 from space.core.utils.protos import proto_now
 from space.core.utils.uuids import uuid_
-from space.ray.data_sources import SpaceDataSource
 
 Version: TypeAlias = Union[str, int]
 
@@ -367,7 +366,7 @@ class Storage(paths.StoragePathsMixin):
 
   def ray_dataset(self, read_options: ReadOptions) -> ray.Dataset:
     """Return a Ray dataset for a Space storage."""
-    return ray.data.read_datasource(SpaceDataSource(),
+    return ray.data.read_datasource(ray_data_sources.SpaceDataSource(),
                                     storage=self,
                                     read_options=read_options)
 
