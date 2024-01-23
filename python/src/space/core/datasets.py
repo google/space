@@ -25,10 +25,9 @@ from space.core.options import JoinOptions, ReadOptions
 from space.core.runners import LocalRunner
 from space.core.storage import Storage
 from space.core.transform.plans import LogicalPlanBuilder
-from space.core.utils.lazy_imports_utils import ray
+from space.core.utils.lazy_imports_utils import ray, ray_runners
 from space.core.views import View
 from space.ray.options import RayOptions
-from space.ray.runners import RayReadWriterRunner
 
 
 class Dataset(View):
@@ -120,8 +119,10 @@ class Dataset(View):
     """Return a Ray dataset for a Space dataset."""
     return self._storage.ray_dataset(read_options)
 
-  def ray(self,
-          file_options: Optional[FileOptions] = None,
-          ray_options: Optional[RayOptions] = None) -> RayReadWriterRunner:
+  def ray(
+      self,
+      file_options: Optional[FileOptions] = None,
+      ray_options: Optional[RayOptions] = None
+  ) -> ray_runners.RayReadWriterRunner:
     """Get a Ray runner."""
-    return RayReadWriterRunner(self, file_options, ray_options)
+    return ray_runners.RayReadWriterRunner(self, file_options, ray_options)

@@ -20,6 +20,7 @@ from typing import List, Optional, TYPE_CHECKING
 
 import pyarrow as pa
 import pyarrow.compute as pc
+import ray
 
 from space.core.options import JoinOptions, Range, ReadOptions
 from space.core.schema import arrow
@@ -28,7 +29,6 @@ from space.core.schema.utils import (file_path_field_name, stats_field_name,
                                      row_id_field_name)
 import space.core.transform.utils as transform_utils
 from space.core.utils import errors
-from space.core.utils.lazy_imports_utils import ray
 from space.ray.ops.utils import singleton_storage
 
 if TYPE_CHECKING:

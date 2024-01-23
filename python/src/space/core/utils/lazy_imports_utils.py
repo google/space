@@ -192,4 +192,5 @@ with lazy_imports(error_callback=array_record_error_callback):
 
 with lazy_imports():
   import ray  # type: ignore[import-untyped] # pylint: disable=unused-import
-  from ray.data.datasource import datasource as ray_datasource  # pylint: disable=unused-import
+  from space.ray import data_sources as ray_data_sources  # pylint: disable=unused-import,cyclic-import
+  from space.ray import runners as ray_runners  # pylint: disable=unused-import,cyclic-import

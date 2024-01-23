@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 import pyarrow as pa
+import ray
 
 from space.core.ops import utils
 from space.core.ops.utils import FileOptions
@@ -25,7 +26,6 @@ from space.core.ops.append import BaseAppendOp, LocalAppendOp
 from space.core.ops.base import InputData, InputIteratorFn
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
-from space.core.utils.lazy_imports_utils import ray
 from space.ray.options import RayOptions
 
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import Optional
 
 import pyarrow.compute as pc
+import ray
 
 from space.core.ops import utils
 from space.core.ops.utils import FileOptions
@@ -25,7 +26,6 @@ from space.core.ops.delete import BaseDeleteOp, FileSetDeleteOp
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
 from space.core.storage import Storage
-from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.paths import StoragePathsMixin
 
 
@@ -63,8 +63,8 @@ class RayDeleteOp(BaseDeleteOp, StoragePathsMixin):
 
 
 @ray.remote
-def _delete(location: str, metadata: meta.StorageMetadata,
-            file_set: rt.FileSet, filter_: pc.Expression,
+def _delete(location: str, metadata: meta.StorageMetadata, file_set: rt.FileSet,
+            filter_: pc.Expression,
             file_options: FileOptions) -> Optional[rt.Patch]:
   return FileSetDeleteOp(location, metadata, file_set, filter_,
                          file_options).delete()

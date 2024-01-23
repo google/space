@@ -21,6 +21,7 @@ from typing import Iterator, List, Optional, Union
 
 import pyarrow as pa
 import pyarrow.compute as pc
+import ray
 
 from space.core.jobs import JobResult
 from space.core.loaders.array_record import ArrayRecordIndexFn
@@ -36,7 +37,6 @@ from space.core.ops.insert import InsertOptions
 from space.core.options import JoinOptions, ReadOptions
 import space.core.proto.runtime_pb2 as rt
 from space.core.utils import errors
-from space.core.utils.lazy_imports_utils import ray
 from space.ray.ops.append import RayAppendOp
 from space.ray.ops.delete import RayDeleteOp
 from space.ray.ops.insert import RayInsertOp

@@ -31,11 +31,10 @@ from space.core.schema import FieldIdManager
 from space.core.storage import Storage
 from space.core.transform.plans import LogicalPlanBuilder, UserDefinedFn
 from space.core.utils import errors
-from space.core.utils.lazy_imports_utils import ray  # pylint: disable=unused-import
+from space.core.utils.lazy_imports_utils import ray, ray_runners  # pylint: disable=unused-import
 from space.core.utils.paths import UDF_DIR, metadata_dir
 from space.core.runners import LocalRunner
 from space.core.schema.utils import validate_logical_schema
-from space.ray.runners import RayMaterializedViewRunner, RayReadOnlyRunner
 
 if TYPE_CHECKING:
   from space.core.datasets import Dataset
@@ -96,9 +95,9 @@ class View(ABC):
                   join_options: JoinOptions) -> ray.Dataset:
     """Return a Ray dataset for a Space view."""
 
-  def ray(self) -> RayReadOnlyRunner:
+  def ray(self) -> ray_runners.RayReadOnlyRunner:
     """Return a Ray runner for the view."""
-    return RayReadOnlyRunner(self)
+    return ray_runners.RayReadOnlyRunner(self)
 
   def materialize(self, location: str) -> MaterializedView:
     """Materialize a view to files in the Space storage format.
@@ -262,9 +261,10 @@ class MaterializedView:
 
   def ray(
       self,
-      file_options: Optional[FileOptions] = None) -> RayMaterializedViewRunner:
+      file_options: Optional[FileOptions] = None
+  ) -> ray_runners.RayMaterializedViewRunner:
     """Return a Ray runner for the materialized view."""
-    return RayMaterializedViewRunner(self, file_options)
+    return ray_runners.RayMaterializedViewRunner(self, file_options)
 
   def local(self) -> LocalRunner:
     """Get a runner that runs operations locally.
