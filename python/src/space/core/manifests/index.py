@@ -40,8 +40,8 @@ def _stats_subfields(type_: pa.DataType) -> List[pa.Field]:
 
 
 def _manifest_schema(
-    schema: pa.Schema, primary_keys: List[str]
-) -> Tuple[pa.Schema, List[Tuple[int, pa.DataType]]]:
+    schema: pa.Schema,
+    primary_keys: List[str]) -> Tuple[pa.Schema, List[Tuple[int, pa.DataType]]]:
   """Build the index manifest file schema, based on storage schema."""
   primary_keys_ = set(primary_keys)
 
@@ -220,10 +220,9 @@ class _IndexManifests:
   index_uncompressed_bytes: pa.Int64Array
 
 
-def read_index_manifests(
-    manifest_path: str,
-    manifest_file_id: int,
-    filter_: Optional[pc.Expression] = None) -> rt.FileSet:
+def read_index_manifests(manifest_path: str,
+                         manifest_file_id: int,
+                         filter_: Optional[pc.Expression] = None) -> rt.FileSet:
   """Read an index manifest file.
   
   Args:
@@ -241,6 +240,8 @@ def read_index_manifests(
 
   file_set = rt.FileSet()
   for i in range(table.num_rows):
+    # TODO: to populate record_uncompressed_bytes by sampling record manifest
+    # files.
     stats = meta.StorageStatistics(
         num_rows=manifests.num_rows[i].as_py(),
         index_compressed_bytes=manifests.index_compressed_bytes[i].as_py(),

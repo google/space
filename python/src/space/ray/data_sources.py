@@ -59,7 +59,7 @@ class _SpaceDataSourceReader(Reader):
 
   def estimate_inmemory_data_size(self) -> Optional[int]:
     # TODO: to implement this method.
-    return 1
+    return None
 
   # Create a list of `ReadTask`, one for each file group. Those tasks will be
   # executed in parallel.
@@ -72,14 +72,15 @@ class _SpaceDataSourceReader(Reader):
                                         self._read_options.snapshot_id)
 
     for index_file in file_set.index_files:
+      stats = index_file.storage_statistics
       task_file_set = rt.FileSet(index_files=[index_file])
 
       # The metadata about the block that we know prior to actually executing
       # the read task.
       # TODO: to populate the storage values.
       block_metadata = BlockMetadata(
-          num_rows=1,
-          size_bytes=1,
+          num_rows=stats.num_rows,
+          size_bytes=None,
           schema=None,
           input_files=None,
           exec_stats=None,
