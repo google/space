@@ -74,8 +74,8 @@ def read_change_data(storage: Storage, start_snapshot_id: int,
 
   if start_snapshot_id != all_snapshot_ids[0]:
     raise errors.UserInputError(
-        f"Start snapshot {start_snapshot_id} is not the  ancestor of "
-        f"end snapshot{end_snapshot_id}")
+        f"Start snapshot {start_snapshot_id} is not the ancestor of end "
+        f"snapshot {end_snapshot_id}")
 
   for snapshot_id in all_snapshot_ids[1:]:
     for result in iter(_LocalChangeDataReadOp(storage, snapshot_id)):
