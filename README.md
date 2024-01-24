@@ -148,6 +148,14 @@ runner = ds.local()
 # Or create a Ray runner:
 runner = ds.ray(ray_options=RayOptions(max_parallelism=8))
 
+# To avoid https://github.com/ray-project/ray/issues/41333, wrap the runner 
+# with @ray.remote when running in a remote Ray cluster.
+#
+# @ray.remote
+# def run():
+#   return runner.read_all()
+#
+
 # Appending data generates a new dataset version `snapshot_id=1`
 # Write methods:
 # - append(...): no primary key check.
