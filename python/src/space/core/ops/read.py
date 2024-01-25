@@ -90,6 +90,8 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
 
   def __iter__(self) -> Iterator[pa.Table]:
     for file in self._file_set.index_files:
+      row_range_read = file.selected_rows.end > 0
+
       # TODO: always loading the whole table is inefficient, to only load the
       # required row groups.
       index_data = pq.read_table(
@@ -97,7 +99,7 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
           columns=self._selected_fields,
           filters=self._options.filter_)  # type: ignore[arg-type]
 
-      if file.selected_rows.end > 0:
+      if row_range_read:
         length = file.selected_rows.end - file.selected_rows.start
         index_data = index_data.slice(file.selected_rows.start, length)
 
@@ -116,10 +118,15 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
               (column_id,
                arrow.binary_field(self._record_fields_dict[field_id])))
 
-      for batch in index_data.to_batches(
-          max_chunksize=self._options.batch_size):
-        yield self._read_index_and_record(pa.table(batch), index_column_ids,
+      # The batch size enforcement is applied as row range.
+      if row_range_read:
+        yield self._read_index_and_record(index_data, index_column_ids,
                                           record_columns)
+      else:
+        for batch in index_data.to_batches(
+            max_chunksize=self._options.batch_size):
+          yield self._read_index_and_record(pa.table(batch), index_column_ids,
+                                            record_columns)
 
   def _read_index_and_record(
       self, index_data: pa.Table, index_column_ids: List[int],

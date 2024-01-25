@@ -81,7 +81,7 @@ class _SpaceDataSourceReader(Reader):
     for index_file in file_set.index_files:
       num_rows = index_file.storage_statistics.num_rows
 
-      if (self._ray_options.enable_index_file_row_range_block and
+      if (self._ray_options.enable_row_range_block and
           self._read_options.batch_size):
         batch_size = self._read_options.batch_size
         num_blocks = math.ceil(num_rows / batch_size)

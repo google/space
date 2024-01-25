@@ -34,4 +34,4 @@ class RayOptions:
   # If enabled, a Ray block size is capped by the provided read batch size.
   # The cost is possible duplicated read of index files. It should be disabled
   # when most data are stored in index files.
-  enable_index_file_row_range_block: bool = True
+  enable_row_range_block: bool = True

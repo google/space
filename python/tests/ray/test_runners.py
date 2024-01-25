@@ -65,15 +65,26 @@ def _sample_partition_fn(range_: Range) -> List[Range]:
 
 class TestRayReadWriteRunner:
 
-  def test_write_read_dataset(self, sample_dataset):
-    runner = sample_dataset.ray(ray_options=RayOptions(max_parallelism=4))
+  @pytest.mark.parametrize("enable_row_range_block,batch_size", [
+      (True, None),
+      (False, None),
+      (True, 1),
+      (False, 1),
+      (True, 3),
+      (False, 3),
+  ])
+  def test_write_read_dataset(self, sample_dataset, enable_row_range_block,
+                              batch_size):
+    runner = sample_dataset.ray(ray_options=RayOptions(
+        max_parallelism=4, enable_row_range_block=enable_row_range_block))
 
     # Test append.
     input_data0 = generate_data([1, 2, 3])
     runner.append(input_data0)
 
-    assert_equal(runner.read_all().sort_by("int64"),
-                 input_data0.sort_by("int64"))
+    assert_equal(
+        runner.read_all(batch_size=batch_size).sort_by("int64"),
+        input_data0.sort_by("int64"))
 
     input_data1 = generate_data([4, 5])
     input_data2 = generate_data([6, 7])
@@ -86,7 +97,7 @@ class TestRayReadWriteRunner:
     ])
 
     assert_equal(
-        runner.read_all().sort_by("int64"),
+        runner.read_all(batch_size=batch_size).sort_by("int64"),
         pa.concat_tables(
             [input_data0, input_data1, input_data2, input_data3,
              input_data4]).sort_by("int64"))
@@ -98,7 +109,7 @@ class TestRayReadWriteRunner:
 
     runner.upsert(generate_data([7, 12]))
     assert_equal(
-        runner.read_all().sort_by("int64"),
+        runner.read_all(batch_size=batch_size).sort_by("int64"),
         pa.concat_tables([
             input_data0, input_data1, input_data2, input_data3, input_data4,
             generate_data([12])
@@ -107,7 +118,7 @@ class TestRayReadWriteRunner:
     # Test delete.
     runner.delete(pc.field("int64") < 10)
     assert_equal(
-        runner.read_all().sort_by("int64"),
+        runner.read_all(batch_size=batch_size).sort_by("int64"),
         pa.concat_tables([generate_data([10, 11, 12])]).sort_by("int64"))
 
     # Test reading views.
@@ -120,7 +131,7 @@ class TestRayReadWriteRunner:
                                       output_schema=sample_dataset.schema,
                                       output_record_fields=["binary"])
     assert_equal(
-        view.ray().read_all().sort_by("int64"),
+        view.ray().read_all(batch_size=batch_size).sort_by("int64"),
         pa.concat_tables([
             pa.Table.from_pydict({
                 "int64": [10, 11, 12],
@@ -134,7 +145,8 @@ class TestRayReadWriteRunner:
                                          output_schema=view.schema,
                                          output_record_fields=["binary"])
     assert_equal(
-        transform_on_view.ray().read_all().sort_by("int64"),
+        transform_on_view.ray().read_all(
+            batch_size=batch_size).sort_by("int64"),
         pa.concat_tables([
             pa.Table.from_pydict({
                 "int64": [10, 11, 12],
@@ -143,12 +155,15 @@ class TestRayReadWriteRunner:
             })
         ]).sort_by("int64"))
 
-  def test_read_batch_size(self, tmp_path, sample_schema):
+  @pytest.mark.parametrize("enable_row_range_block", [(True,), (False,)])
+  def test_read_batch_size(self, tmp_path, sample_schema,
+                           enable_row_range_block):
     ds = Dataset.create(str(tmp_path / f"dataset_{random_id()}"),
                         sample_schema,
                         primary_keys=["int64"],
                         record_fields=["binary"])
-    runner = ds.ray(ray_options=RayOptions(max_parallelism=1))
+    runner = ds.ray(ray_options=RayOptions(
+        max_parallelism=1, enable_row_range_block=enable_row_range_block))
     data = generate_data(range(0, 60))
     runner.append(data)
 

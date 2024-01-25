@@ -8,7 +8,7 @@ Unify data in your entire machine learning lifecycle with **Space**, a comprehen
 
 **Key Features:**
 - **Ground Truth Database**
-  - Store and manage data in open source file formats, locally or in the cloud.
+  - Store and manage multimodal data in open source file formats, row or columnar, local or in cloud.
   - Ingest from various sources, including ML datasets, files, and labeling tools.
   - Support data manipulation (append, insert, update, delete) and version control.
 - **OLAP Database and Lakehouse**
@@ -185,6 +185,7 @@ ds.versions().to_pandas()
 # - filter_: optional, apply a filter (push down to reader).
 # - fields: optional, field selection.
 # - version: optional, snapshot_id or tag, time travel back to an old version.
+# - batch_size: optional, output size.
 runner.read_all(
   filter_=pc.field("image_name")=="2.jpg",
   fields=["feature"],

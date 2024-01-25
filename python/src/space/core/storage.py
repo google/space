@@ -375,8 +375,7 @@ class Storage(paths.StoragePathsMixin):
                                   read_options=read_options,
                                   parallelism=ray_options.max_parallelism)
 
-    if (not ray_options.enable_index_file_row_range_block and
-        read_options.batch_size):
+    if (not ray_options.enable_row_range_block and read_options.batch_size):
       return ds.repartition(math.ceil(ds.count() / read_options.batch_size))
 
     return ds
