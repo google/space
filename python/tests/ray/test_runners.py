@@ -149,7 +149,11 @@ class TestRayReadWriteRunner:
                         primary_keys=["int64"],
                         record_fields=["binary"])
     runner = ds.ray(ray_options=RayOptions(max_parallelism=1))
-    runner.append(generate_data(range(0, 60)))
+    data = generate_data(range(0, 60))
+    runner.append(data)
+
+    assert runner.read_all(
+        batch_size=3).sort_by("int64") == data.sort_by("int64")
 
     for d in runner.read(batch_size=10):
       assert d.num_rows == 10
