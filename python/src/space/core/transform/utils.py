@@ -20,21 +20,23 @@ from typing import TYPE_CHECKING
 from space.core.datasets import Dataset
 from space.core.options import JoinOptions, ReadOptions
 from space.core.utils.lazy_imports_utils import ray
+from space.ray.options import RayOptions
 
 if TYPE_CHECKING:
   from space.core.views import View
 
 
-def ray_dataset(view: View, read_options: ReadOptions) -> ray.Dataset:
+def ray_dataset(view: View, ray_options: RayOptions,
+                read_options: ReadOptions) -> ray.Dataset:
   """A wrapper for creating Ray dataset for datasets and views."""
   empty_join_options = JoinOptions()
 
   if isinstance(view, Dataset):
     # Push input_fields down to the dataset to read less data.
-    return view.ray_dataset(read_options, empty_join_options)
+    return view.ray_dataset(ray_options, read_options, empty_join_options)
 
   # For non-dataset views, fields can't be pushed down to storage.
   fields = read_options.fields
   read_options.fields = None
-  return view.ray_dataset(read_options,
+  return view.ray_dataset(ray_options, read_options,
                           empty_join_options).select_columns(fields)

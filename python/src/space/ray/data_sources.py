@@ -15,6 +15,7 @@
 """Implement Ray data sources for Space datasets."""
 
 from __future__ import annotations
+from functools import partial
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from ray.data.block import Block, BlockMetadata
@@ -24,7 +25,6 @@ from ray.types import ObjectRef
 
 from space.core.ops.read import FileSetReadOp
 from space.core.options import ReadOptions
-import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 
 if TYPE_CHECKING:
@@ -66,6 +66,7 @@ class _SpaceDataSourceReader(Reader):
   # Note: The `parallelism` which is supposed to indicate how many `ReadTask` to
   # return will have no effect here, since we map each query into a `ReadTask`.
   # TODO: to properly handle the error that returned list is empty.
+  # TODO: to use parallelism when generating blocks.
   def get_read_tasks(self, parallelism: int) -> List[ReadTask]:
     read_tasks: List[ReadTask] = []
     file_set = self._storage.data_files(self._read_options.filter_,
@@ -86,19 +87,11 @@ class _SpaceDataSourceReader(Reader):
           exec_stats=None,
       )
 
-      def _read_fn(location=self._storage.location,
-                   metadata=self._storage.metadata,
-                   file_set=task_file_set):
-        return _read_file_set(location, metadata, file_set, self._read_options)
-
-      read_tasks.append(ReadTask(_read_fn, block_metadata))
+      # TODO: A single index file (with record files) is a single block. To
+      # check whether row group granularity is needed.
+      read_fn = partial(FileSetReadOp, self._storage.location,
+                        self._storage.metadata, task_file_set,
+                        self._read_options)
+      read_tasks.append(ReadTask(read_fn, block_metadata))
 
     return read_tasks
-
-
-# TODO: A single index file (with record files) is a single block. To check
-# whether row group granularity is needed.
-def _read_file_set(location: str, metadata: meta.StorageMetadata,
-                   file_set: rt.FileSet,
-                   read_options: ReadOptions) -> List[Block]:
-  return list(FileSetReadOp(location, metadata, file_set, read_options))

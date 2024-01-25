@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional
 
 import cloudpickle  # type: ignore[import-untyped]
 import pyarrow as pa
@@ -47,8 +47,8 @@ class UserDefinedFn:
   output_schema: pa.Schema
   # The record fields in the output schema.
   output_record_fields: List[str]
-  # If reading the input view by batches, number of rows per batch.
-  batch_size: int = -1
+  # If reading the input view by batches, number of rows per input batch.
+  batch_size: Optional[int] = None
 
   # TODO: file operations need to be through the FileSystem interface.
 

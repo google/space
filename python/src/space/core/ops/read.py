@@ -59,7 +59,7 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
                options: Optional[ReadOptions] = None):
     StoragePathsMixin.__init__(self, location)
 
-    # TODO: to validate that filter_ does not contain record files.
+    # TODO: to validate that filter_ does not contain record fields.
 
     self._metadata = metadata
     self._file_set = file_set
@@ -90,28 +90,36 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
 
   def __iter__(self) -> Iterator[pa.Table]:
     for file in self._file_set.index_files:
-      yield self._read_index_and_record(file.path)
+      # TODO: to read row group by row group if needed, maybe not because index
+      # data is usually small.
+      index_data = pq.read_table(
+          self.full_path(file.path),
+          columns=self._selected_fields,
+          filters=self._options.filter_)  # type: ignore[arg-type]
 
-  def _read_index_and_record(self, index_path: str) -> pa.Table:
-    index_data = pq.read_table(
-        self.full_path(index_path),
-        columns=self._selected_fields,
-        filters=self._options.filter_)  # type: ignore[arg-type]
+      if self._options.reference_read:
+        yield index_data
+        continue
 
-    if self._options.reference_read:
-      return index_data
+      index_column_ids: List[int] = []
+      record_columns: List[Tuple[int, pa.Field]] = []
+      for column_id, field in enumerate(index_data.schema):
+        field_id = arrow.field_id(field)
+        if field_id in self._index_field_ids or field_id == arrow.NULL_FIELD_ID:
+          index_column_ids.append(column_id)
+        else:
+          record_columns.append(
+              (column_id,
+               arrow.binary_field(self._record_fields_dict[field_id])))
 
-    index_column_ids: List[int] = []
-    record_columns: List[Tuple[int, pa.Field]] = []
-    for column_id, field in enumerate(index_data.schema):
-      field_id = arrow.field_id(field)
-      if field_id in self._index_field_ids or field_id == arrow.NULL_FIELD_ID:
-        index_column_ids.append(column_id)
-      else:
-        record_columns.append(
-            (column_id,
-             arrow.binary_field(self._record_fields_dict[field_id])))
+      for batch in index_data.to_batches(
+          max_chunksize=self._options.batch_size):
+        yield self._read_index_and_record(pa.table(batch), index_column_ids,
+                                          record_columns)
 
+  def _read_index_and_record(
+      self, index_data: pa.Table, index_column_ids: List[int],
+      record_columns: List[Tuple[int, pa.Field]]) -> pa.Table:
     result_data = index_data.select(index_column_ids)  # type: ignore[arg-type]
 
     # Read record fields from addresses.

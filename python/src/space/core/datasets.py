@@ -113,16 +113,17 @@ class Dataset(View):
 
   def ray_dataset(
       self,
+      ray_options: RayOptions,
       read_options: ReadOptions = ReadOptions(),
       join_options: JoinOptions = JoinOptions()
   ) -> ray.Dataset:
     """Return a Ray dataset for a Space dataset."""
-    return self._storage.ray_dataset(read_options)
+    return self._storage.ray_dataset(ray_options, read_options)
 
   def ray(
       self,
-      file_options: Optional[FileOptions] = None,
-      ray_options: Optional[RayOptions] = None
+      ray_options: Optional[RayOptions] = None,
+      file_options: Optional[FileOptions] = None
   ) -> ray_runners.RayReadWriterRunner:
     """Get a Ray runner."""
-    return ray_runners.RayReadWriterRunner(self, file_options, ray_options)
+    return ray_runners.RayReadWriterRunner(self, ray_options, file_options)

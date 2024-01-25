@@ -52,8 +52,9 @@ if TYPE_CHECKING:
 class RayReadOnlyRunner(BaseReadOnlyRunner):
   """A read-only Ray runner."""
 
-  def __init__(self, view: View):
+  def __init__(self, view: View, ray_options: Optional[RayOptions]):
     self._view = view
+    self._ray_options = RayOptions() if ray_options is None else ray_options
 
   # pylint: disable=too-many-arguments
   def read(
@@ -62,6 +63,7 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
       fields: Optional[List[str]] = None,
       version: Optional[Version] = None,
       reference_read: bool = False,
+      batch_size: Optional[int] = None,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
     """Read data from the dataset as an iterator.
@@ -77,10 +79,11 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
 
     snapshot_id = (None if version is None else
                    self._source_storage.version_to_snapshot_id(version))
+    read_options = ReadOptions(filter_, fields, snapshot_id, reference_read,
+                               batch_size)
 
-    for ref in self._view.ray_dataset(
-        ReadOptions(filter_, fields, snapshot_id, reference_read),
-        join_options).to_arrow_refs():
+    for ref in self._view.ray_dataset(self._ray_options, read_options,
+                                      join_options).to_arrow_refs():
       yield ray.get(ref)
 
   def diff(self, start_version: Union[Version],
@@ -94,6 +97,7 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
     for change in source_changes:
       # TODO: skip processing the data for deletions; the caller is usually
       # only interested at deleted primary keys.
+      # TODO: to split change data into chunks for parallel processing.
       processed_remote_data = self._view.process_source(change.data)
       processed_data = ray.get(processed_remote_data.to_arrow_refs())
       yield ChangeData(change.snapshot_id, change.type_,
@@ -108,10 +112,12 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
 class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
   """Ray runner for materialized views."""
 
-  def __init__(self, mv: MaterializedView, file_options: Optional[FileOptions]):
-    RayReadOnlyRunner.__init__(self, mv.view)
+  def __init__(self, mv: MaterializedView, ray_options: Optional[RayOptions],
+               file_options: Optional[FileOptions]):
+    RayReadOnlyRunner.__init__(self, mv.view, ray_options)
     StorageMixin.__init__(self, mv.storage)
     self._file_options = FileOptions() if file_options is None else file_options
+    self._ray_options = RayOptions() if ray_options is None else ray_options
 
   # pylint: disable=too-many-arguments
   @StorageMixin.reload
@@ -121,6 +127,7 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
       fields: Optional[List[str]] = None,
       version: Optional[Version] = None,
       reference_read: bool = False,
+      batch_size: Optional[int] = None,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
     """Read data from the dataset as an iterator.
@@ -136,10 +143,11 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
     """
     snapshot_id = (None if version is None else
                    self._storage.version_to_snapshot_id(version))
+    read_options = ReadOptions(filter_, fields, snapshot_id, reference_read,
+                               batch_size)
 
-    for ref in self._storage.ray_dataset(
-        ReadOptions(filter_, fields, snapshot_id,
-                    reference_read)).to_arrow_refs():
+    for ref in self._storage.ray_dataset(self._ray_options,
+                                         read_options).to_arrow_refs():
       yield ray.get(ref)
 
   def refresh(self,
@@ -223,9 +231,9 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
 
   def __init__(self,
                dataset: Dataset,
-               file_options: Optional[FileOptions] = None,
-               ray_options: Optional[RayOptions] = None):
-    RayReadOnlyRunner.__init__(self, dataset)
+               ray_options: Optional[RayOptions] = None,
+               file_options: Optional[FileOptions] = None):
+    RayReadOnlyRunner.__init__(self, dataset, ray_options)
     BaseReadWriteRunner.__init__(self, dataset.storage, file_options)
     self._ray_options = RayOptions() if ray_options is None else ray_options
 
