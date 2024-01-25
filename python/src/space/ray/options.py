@@ -22,3 +22,16 @@ class RayOptions:
   """Options of Ray runners."""
   # The max parallelism of computing resources to use in a Ray cluster.
   max_parallelism: int = 8
+
+  # Enable using a row range of an index file as a Ray data block, in the Ray
+  # datasource.
+  #
+  # When disabled, the minimal Ray block is data from one index file and
+  # the records it references. Read batch size is achieved by repartition the
+  # dataset. For an index Parquet file with 1 million rows, loading the block
+  # needs to read all 1 million records, which is too expensive.
+  #
+  # If enabled, a Ray block size is capped by the provided read batch size.
+  # The cost is possible duplicated read of index files. It should be disabled
+  # when most data are stored in index files.
+  enable_index_file_row_range_block: bool = True

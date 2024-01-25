@@ -65,7 +65,7 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
     self._file_set = file_set
 
     # TODO: to validate options, e.g., fields are valid.
-    self._options = ReadOptions() if options is None else options
+    self._options = options or ReadOptions()
 
     record_fields = set(self._metadata.schema.record_fields)
     self._physical_schema = arrow.arrow_schema(self._metadata.schema.fields,
@@ -90,12 +90,16 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
 
   def __iter__(self) -> Iterator[pa.Table]:
     for file in self._file_set.index_files:
-      # TODO: to read row group by row group if needed, maybe not because index
-      # data is usually small.
+      # TODO: always loading the whole table is inefficient, to only load the
+      # required row groups.
       index_data = pq.read_table(
           self.full_path(file.path),
           columns=self._selected_fields,
           filters=self._options.filter_)  # type: ignore[arg-type]
+
+      if file.selected_rows.end > 0:
+        length = file.selected_rows.end - file.selected_rows.start
+        index_data = index_data.slice(file.selected_rows.start, length)
 
       if self._options.reference_read:
         yield index_data

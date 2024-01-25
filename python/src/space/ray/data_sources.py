@@ -16,7 +16,9 @@
 
 from __future__ import annotations
 from functools import partial
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+import math
+from typing import (Any, Callable, Dict, Iterator, List, Optional,
+                    TYPE_CHECKING)
 
 from ray.data.block import Block, BlockMetadata
 from ray.data.datasource.datasource import Datasource, Reader, ReadTask
@@ -26,6 +28,7 @@ from ray.types import ObjectRef
 from space.core.ops.read import FileSetReadOp
 from space.core.options import ReadOptions
 import space.core.proto.runtime_pb2 as rt
+from space.ray.options import RayOptions
 
 if TYPE_CHECKING:
   from space.core.storage import Storage
@@ -36,8 +39,9 @@ class SpaceDataSource(Datasource):
 
   # pylint: disable=arguments-differ,too-many-arguments
   def create_reader(  # type: ignore[override]
-      self, storage: Storage, read_options: ReadOptions) -> Reader:
-    return _SpaceDataSourceReader(storage, read_options)
+      self, storage: Storage, ray_options: RayOptions,
+      read_options: ReadOptions) -> Reader:
+    return _SpaceDataSourceReader(storage, ray_options, read_options)
 
   def do_write(self, blocks: List[ObjectRef[Block]],
                metadata: List[BlockMetadata],
@@ -53,8 +57,10 @@ class SpaceDataSource(Datasource):
 
 class _SpaceDataSourceReader(Reader):
 
-  def __init__(self, storage: Storage, read_options: ReadOptions):
+  def __init__(self, storage: Storage, ray_options: RayOptions,
+               read_options: ReadOptions):
     self._storage = storage
+    self._ray_options = ray_options
     self._read_options = read_options
 
   def estimate_inmemory_data_size(self) -> Optional[int]:
@@ -73,25 +79,45 @@ class _SpaceDataSourceReader(Reader):
                                         self._read_options.snapshot_id)
 
     for index_file in file_set.index_files:
-      stats = index_file.storage_statistics
-      task_file_set = rt.FileSet(index_files=[index_file])
+      num_rows = index_file.storage_statistics.num_rows
 
-      # The metadata about the block that we know prior to actually executing
-      # the read task.
-      # TODO: to populate the storage values.
-      block_metadata = BlockMetadata(
-          num_rows=stats.num_rows,
-          size_bytes=None,
-          schema=None,
-          input_files=None,
-          exec_stats=None,
-      )
+      if (self._ray_options.enable_index_file_row_range_block and
+          self._read_options.batch_size):
+        batch_size = self._read_options.batch_size
+        num_blocks = math.ceil(num_rows / batch_size)
 
-      # TODO: A single index file (with record files) is a single block. To
-      # check whether row group granularity is needed.
-      read_fn = partial(FileSetReadOp, self._storage.location,
-                        self._storage.metadata, task_file_set,
-                        self._read_options)
-      read_tasks.append(ReadTask(read_fn, block_metadata))
+        for i in range(num_blocks):
+          index_file_slice = rt.DataFile()
+          index_file_slice.CopyFrom(index_file)
+
+          rows = index_file_slice.selected_rows
+          rows.start = i * batch_size
+          rows.end = min((i + 1) * batch_size, num_rows)
+
+          read_tasks.append(
+              ReadTask(self._read_fn(index_file_slice),
+                       _block_metadata(rows.end - rows.start)))
+      else:
+        read_tasks.append(
+            ReadTask(self._read_fn(index_file), _block_metadata(num_rows)))
 
     return read_tasks
+
+  def _read_fn(self, index_file: rt.DataFile) -> Callable[..., Iterator[Block]]:
+    return partial(FileSetReadOp, self._storage.location,
+                   self._storage.metadata, rt.FileSet(index_files=[index_file]),
+                   self._read_options)  # type: ignore[return-value]
+
+
+def _block_metadata(num_rows: int) -> BlockMetadata:
+  """The metadata about the block that we know prior to actually executing the
+  read task.
+  """
+  # TODO: to populate the storage values.
+  return BlockMetadata(
+      num_rows=num_rows,
+      size_bytes=None,
+      schema=None,
+      input_files=None,
+      exec_stats=None,
+  )

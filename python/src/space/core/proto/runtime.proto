@@ -19,7 +19,7 @@ import "space/core/proto/metadata.proto";
 package space.proto;
 
 // Information of a data file.
-// NEXT_ID: 4
+// NEXT_ID: 5
 message DataFile {
   // Data file path.
   string path = 1;
@@ -29,6 +29,17 @@ message DataFile {
 
   // Locally assigned manifest file IDs.
   int64 manifest_file_id = 3;
+
+  message Range {
+    // Inclusive.
+    int64 start = 1;
+    // Exclusive.
+    int64 end = 2;
+  }
+
+  // A range of selected rows in the data file.
+  // Used for partially reading an index file and its records.
+  Range selected_rows = 4;
 }
 
 // A set of associated data and manifest files.

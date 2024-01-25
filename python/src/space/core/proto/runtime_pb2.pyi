@@ -33,14 +33,33 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 @typing_extensions.final
 class DataFile(google.protobuf.message.Message):
     """Information of a data file.
-    NEXT_ID: 4
+    NEXT_ID: 5
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
+    class Range(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        START_FIELD_NUMBER: builtins.int
+        END_FIELD_NUMBER: builtins.int
+        start: builtins.int
+        """Inclusive."""
+        end: builtins.int
+        """Exclusive."""
+        def __init__(
+            self,
+            *,
+            start: builtins.int = ...,
+            end: builtins.int = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "start", b"start"]) -> None: ...
+
     PATH_FIELD_NUMBER: builtins.int
     STORAGE_STATISTICS_FIELD_NUMBER: builtins.int
     MANIFEST_FILE_ID_FIELD_NUMBER: builtins.int
+    SELECTED_ROWS_FIELD_NUMBER: builtins.int
     path: builtins.str
     """Data file path."""
     @property
@@ -48,15 +67,21 @@ class DataFile(google.protobuf.message.Message):
         """Storage statistics of data in the file."""
     manifest_file_id: builtins.int
     """Locally assigned manifest file IDs."""
+    @property
+    def selected_rows(self) -> global___DataFile.Range:
+        """A range of selected rows in the data file.
+        Used for partially reading an index file and its records.
+        """
     def __init__(
         self,
         *,
         path: builtins.str = ...,
         storage_statistics: space.core.proto.metadata_pb2.StorageStatistics | None = ...,
         manifest_file_id: builtins.int = ...,
+        selected_rows: global___DataFile.Range | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["storage_statistics", b"storage_statistics"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["manifest_file_id", b"manifest_file_id", "path", b"path", "storage_statistics", b"storage_statistics"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["selected_rows", b"selected_rows", "storage_statistics", b"storage_statistics"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["manifest_file_id", b"manifest_file_id", "path", b"path", "selected_rows", b"selected_rows", "storage_statistics", b"storage_statistics"]) -> None: ...
 
 global___DataFile = DataFile
 

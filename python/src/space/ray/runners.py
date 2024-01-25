@@ -54,7 +54,7 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
 
   def __init__(self, view: View, ray_options: Optional[RayOptions]):
     self._view = view
-    self._ray_options = RayOptions() if ray_options is None else ray_options
+    self._ray_options = ray_options or RayOptions()
 
   # pylint: disable=too-many-arguments
   def read(
@@ -116,8 +116,8 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
                file_options: Optional[FileOptions]):
     RayReadOnlyRunner.__init__(self, mv.view, ray_options)
     StorageMixin.__init__(self, mv.storage)
-    self._file_options = FileOptions() if file_options is None else file_options
-    self._ray_options = RayOptions() if ray_options is None else ray_options
+    self._file_options = file_options or FileOptions()
+    self._ray_options = ray_options or RayOptions()
 
   # pylint: disable=too-many-arguments
   @StorageMixin.reload
@@ -235,7 +235,7 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
                file_options: Optional[FileOptions] = None):
     RayReadOnlyRunner.__init__(self, dataset, ray_options)
     BaseReadWriteRunner.__init__(self, dataset.storage, file_options)
-    self._ray_options = RayOptions() if ray_options is None else ray_options
+    self._ray_options = ray_options or RayOptions()
 
   @StorageMixin.transactional
   def append(self, data: InputData) -> Optional[rt.Patch]:
