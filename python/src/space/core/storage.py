@@ -43,6 +43,7 @@ from space.core.utils import errors, paths
 from space.core.utils.lazy_imports_utils import ray, ray_data_sources
 from space.core.utils.protos import proto_now
 from space.core.utils.uuids import uuid_
+from space.ray.options import RayOptions
 
 Version: TypeAlias = Union[str, int]
 
@@ -364,11 +365,20 @@ class Storage(paths.StoragePathsMixin):
                                   keys=["snapshot_id"],
                                   join_type="left outer").sort_by(sort_args)
 
-  def ray_dataset(self, read_options: ReadOptions) -> ray.Dataset:
+  def ray_dataset(self, ray_options: RayOptions,
+                  read_options: ReadOptions) -> ray.Dataset:
     """Return a Ray dataset for a Space storage."""
-    return ray.data.read_datasource(ray_data_sources.SpaceDataSource(),
-                                    storage=self,
-                                    read_options=read_options)
+    ds = ray.data.read_datasource(ray_data_sources.SpaceDataSource(),
+                                  storage=self,
+                                  read_options=read_options,
+                                  parallelism=ray_options.max_parallelism)
+
+    if read_options.batch_size is not None:
+      num_rows = ds.count()
+      assert num_rows >= 0 and read_options.batch_size > 0
+      return ds.repartition(num_rows // read_options.batch_size)
+
+    return ds
 
   def index_manifest(self,
                      filter_: Optional[pc.Expression] = None,

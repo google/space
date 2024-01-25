@@ -30,6 +30,7 @@ from space.core.schema.utils import (file_path_field_name, stats_field_name,
 import space.core.transform.utils as transform_utils
 from space.core.utils import errors
 from space.ray.ops.utils import singleton_storage
+from space.ray.options import RayOptions
 
 if TYPE_CHECKING:
   from space.core.views import View
@@ -50,13 +51,15 @@ class RayJoinOp:
 
   # pylint: disable=too-many-arguments
   def __init__(self, left: JoinInput, right: JoinInput, join_keys: List[str],
-               schema: pa.Schema, options: JoinOptions):
+               schema: pa.Schema, join_options: JoinOptions,
+               ray_options: RayOptions):
     assert len(join_keys) == 1
     self._join_key = join_keys[0]
 
     self._left, self._right = left, right
     self._schema = schema
-    self._options = options
+    self._join_options = join_options
+    self._ray_options = ray_options
 
     self._left_record_fields = _selected_record_fields(left)
     self._right_record_fields = _selected_record_fields(right)
@@ -71,19 +74,19 @@ class RayJoinOp:
       join_range = Range(min_=max(left_range.min_, right_range.min_),
                          max_=min(left_range.max_, right_range.max_),
                          include_max=True)
-      ranges = ([join_range] if self._options.partition_fn is None else
-                self._options.partition_fn(join_range))
+      ranges = ([join_range] if self._join_options.partition_fn is None else
+                self._join_options.partition_fn(join_range))
 
     results = []
     for range_ in ranges:
       filter_ = _range_to_filter(self._join_key, range_)
       left_ds = transform_utils.ray_dataset(
-          self._left.view,
+          self._left.view, self._ray_options,
           ReadOptions(filter_,
                       self._left.fields,
                       reference_read=self._left.reference_read))
       right_ds = transform_utils.ray_dataset(
-          self._right.view,
+          self._right.view, self._ray_options,
           ReadOptions(filter_,
                       self._right.fields,
                       reference_read=self._right.reference_read))

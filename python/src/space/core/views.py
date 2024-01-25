@@ -35,6 +35,7 @@ from space.core.utils.lazy_imports_utils import ray, ray_runners  # pylint: disa
 from space.core.utils.paths import UDF_DIR, metadata_dir
 from space.core.runners import LocalRunner
 from space.core.schema.utils import validate_logical_schema
+from space.ray.options import RayOptions
 
 if TYPE_CHECKING:
   from space.core.datasets import Dataset
@@ -91,13 +92,16 @@ class View(ABC):
     """Process input data using the transform defined by the view."""
 
   @abstractmethod
-  def ray_dataset(self, read_options: ReadOptions,
+  def ray_dataset(self, ray_options: RayOptions, read_options: ReadOptions,
                   join_options: JoinOptions) -> ray.Dataset:
     """Return a Ray dataset for a Space view."""
 
-  def ray(self) -> ray_runners.RayReadOnlyRunner:
+  def ray(
+      self,
+      ray_options: Optional[RayOptions] = None
+  ) -> ray_runners.RayReadOnlyRunner:
     """Return a Ray runner for the view."""
-    return ray_runners.RayReadOnlyRunner(self)
+    return ray_runners.RayReadOnlyRunner(self, ray_options)
 
   def materialize(self, location: str) -> MaterializedView:
     """Materialize a view to files in the Space storage format.
@@ -117,7 +121,7 @@ class View(ABC):
                   output_schema: pa.Schema,
                   input_fields: Optional[List[str]] = None,
                   output_record_fields: Optional[List[str]] = None,
-                  batch_size: int = -1) -> View:
+                  batch_size: Optional[int] = None) -> View:
     """Transform batches of data by a user defined function.
 
     Args:
@@ -126,7 +130,7 @@ class View(ABC):
         fields.
       output_schema: the output schema.
       output_record_fields: record fields in the output, default to empty.
-      batch_size: the number of rows per batch.
+      batch_size: the number of rows per fn input batch.
     """
     # Assign field IDs to the output schema.
     field_id_mgr = FieldIdManager(next_field_id=0)
@@ -261,10 +265,12 @@ class MaterializedView:
 
   def ray(
       self,
+      ray_options: Optional[RayOptions] = None,
       file_options: Optional[FileOptions] = None
   ) -> ray_runners.RayMaterializedViewRunner:
     """Return a Ray runner for the materialized view."""
-    return ray_runners.RayMaterializedViewRunner(self, file_options)
+    return ray_runners.RayMaterializedViewRunner(self, ray_options,
+                                                 file_options)
 
   def local(self) -> LocalRunner:
     """Get a runner that runs operations locally.

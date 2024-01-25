@@ -50,6 +50,7 @@ class BaseReadOnlyRunner(ABC):
       fields: Optional[List[str]] = None,
       version: Optional[Version] = None,
       reference_read: bool = False,
+      batch_size: Optional[int] = None,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
     """Read data from the dataset as an iterator."""
@@ -61,11 +62,12 @@ class BaseReadOnlyRunner(ABC):
       fields: Optional[List[str]] = None,
       version: Optional[Version] = None,
       reference_read: bool = False,
+      batch_size: Optional[int] = None,
       join_options: JoinOptions = JoinOptions()
   ) -> Optional[pa.Table]:
     """Read data from the dataset as an Arrow table."""
     all_data = []
-    for data in self.read(filter_, fields, version, reference_read,
+    for data in self.read(filter_, fields, version, reference_read, batch_size,
                           join_options):
       if data.num_rows > 0:
         all_data.append(data)
@@ -199,16 +201,19 @@ class LocalRunner(BaseReadWriteRunner):
       fields: Optional[List[str]] = None,
       version: Optional[Version] = None,
       reference_read: bool = False,
+      batch_size: Optional[int] = None,
       join_options: JoinOptions = JoinOptions()
   ) -> Iterator[pa.Table]:
     snapshot_id = (None if version is None else
                    self._storage.version_to_snapshot_id(version))
+    read_options = ReadOptions(filter_, fields, snapshot_id, reference_read,
+                               batch_size)
 
     return iter(
         FileSetReadOp(
             self._storage.location, self._storage.metadata,
             self._storage.data_files(filter_, snapshot_id=snapshot_id),
-            ReadOptions(filter_, fields, reference_read=reference_read)))
+            read_options))
 
   @StorageMixin.reload
   def diff(self, start_version: Version,

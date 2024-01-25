@@ -22,7 +22,7 @@ import pyarrow.compute as pc
 import pytest
 import ray
 
-from space import Dataset, JoinOptions, Range
+from space import Dataset, JoinOptions, Range, RayOptions
 from space.core.jobs import JobResult
 from space.core.ops.change_data import ChangeData, ChangeType
 from space.core.ops.read import read_record_column
@@ -66,7 +66,7 @@ def _sample_partition_fn(range_: Range) -> List[Range]:
 class TestRayReadWriteRunner:
 
   def test_write_read_dataset(self, sample_dataset):
-    runner = sample_dataset.ray()
+    runner = sample_dataset.ray(ray_options=RayOptions(max_parallelism=4))
 
     # Test append.
     input_data0 = generate_data([1, 2, 3])
@@ -142,6 +142,17 @@ class TestRayReadWriteRunner:
                 "binary": [f"b{v}".encode("utf-8") for v in [10, 11, 12]]
             })
         ]).sort_by("int64"))
+
+  def test_read_batch_size(self, tmp_path, sample_schema):
+    ds = Dataset.create(str(tmp_path / f"dataset_{random_id()}"),
+                        sample_schema,
+                        primary_keys=["int64"],
+                        record_fields=["binary"])
+    runner = ds.ray(ray_options=RayOptions(max_parallelism=1))
+    runner.append(generate_data(range(0, 60)))
+
+    for d in runner.read(batch_size=10):
+      assert d.num_rows == 10
 
   def test_diff_map_batches(self, tmp_path, sample_dataset):
     ds = sample_dataset

@@ -28,6 +28,7 @@ from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray
 from space.core.views import View
 from space.ray.ops.join import JoinInput, RayJoinOp
+from space.ray.options import RayOptions
 
 if TYPE_CHECKING:
   from space.core.datasets import Dataset
@@ -105,11 +106,12 @@ class JoinTransform(View):
     return list(left_record_fields) + list(right_record_fields)
 
   def process_source(self, data: pa.Table) -> ray.Dataset:
-    raise NotImplementedError(
-        "Processing change data in join is not supported")
+    raise NotImplementedError("Processing change data in join is not supported")
 
-  def ray_dataset(self, read_options: ReadOptions,
+  def ray_dataset(self, ray_options: RayOptions, read_options: ReadOptions,
                   join_options: JoinOptions) -> ray.Dataset:
+    # TODO: to use paralelism specified by ray_options. Today parallelism is
+    # controlled by join_options.partition_fn.
     if read_options.fields is not None:
       raise errors.UserInputError(
           "`fields` is not supported for join, use `left_fields` and"
@@ -121,7 +123,7 @@ class JoinTransform(View):
       raise errors.UserInputError("`reference_read` is not supported for join")
 
     return RayJoinOp(self.left, self.right, self.join_keys, self.schema,
-                     join_options).ray_dataset()
+                     join_options, ray_options).ray_dataset()
 
   def to_relation(self, builder: LogicalPlanBuilder) -> Rel:
     raise NotImplementedError("Materialized view of join is not supported")

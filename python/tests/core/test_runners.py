@@ -56,11 +56,21 @@ class TestLocalRunner:
       local_runner.append(data_batch)
 
     filter_ = (pc.field("id") >= 49) & (pc.field("id") <= 50)
-    assert _read_pyarrow(local_runner, filter_) == _generate_data([49, 50])
-    assert _read_pyarrow(local_runner).num_rows == 90
+    assert local_runner.read_all(filter_) == _generate_data([49, 50])
+    assert local_runner.read_all(filter_,
+                                 batch_size=3) == _generate_data([49, 50])
+
+    assert local_runner.read_all().to_pydict() == _generate_data(
+        range(90)).to_pydict()
+    assert local_runner.read_all(batch_size=7).to_pydict() == _generate_data(
+        range(90)).to_pydict()
+
+    # Check read batch size.
+    for i, d in enumerate(local_runner.read(batch_size=10)):
+      assert d.num_rows == 10
 
     local_runner.delete(pc.field("id") >= 10)
-    assert _read_pyarrow(local_runner) == _generate_data(range(10))
+    assert local_runner.read_all() == _generate_data(range(10))
 
     storage = sample_dataset.storage
     index_manifest = pa.concat_tables(storage.index_manifest()).to_pydict()
@@ -196,11 +206,6 @@ class TestLocalRunner:
 
     assert ds.local().read_all() == sample_data
     assert ds.schema.field("file").type.full_path("123") == "test_folder/123"
-
-
-def _read_pyarrow(runner: LocalRunner,
-                  filter_: Optional[pc.Expression] = None) -> pa.Table:
-  return runner.read_all(filter_)
 
 
 def _generate_data(ids: Iterable[int]) -> pa.Table:

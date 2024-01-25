@@ -21,17 +21,6 @@ import pyarrow.compute as pc
 
 
 @dataclass
-class Range:
-  """A range of a field."""
-  # Always inclusive.
-  min_: Any
-  # Default exclusive.
-  max_: Any
-  # Max is inclusive when true.
-  include_max: bool = False
-
-
-@dataclass
 class ReadOptions:
   """Options of reading data."""
   # Filters on index fields.
@@ -43,6 +32,21 @@ class ReadOptions:
   # If true, read the references (e.g., address) of read record fields instead
   # of values.
   reference_read: bool = False
+  # The max number of rows per batch in read result.
+  # TODO: currently a batch can be smaller than batch_size, to enforce size to
+  # be equal to batch_size.
+  batch_size: Optional[int] = None
+
+
+@dataclass
+class Range:
+  """A range of a field."""
+  # Always inclusive.
+  min_: Any
+  # Default exclusive.
+  max_: Any
+  # Max is inclusive when true.
+  include_max: bool = False
 
 
 @dataclass

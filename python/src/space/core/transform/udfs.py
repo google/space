@@ -41,6 +41,7 @@ import space.core.transform.utils as transform_utils
 from space.core.utils import errors
 from space.core.utils.lazy_imports_utils import ray
 from space.core.views import View
+from space.ray.options import RayOptions
 
 
 @dataclass
@@ -102,7 +103,7 @@ class BaseUdfTransform(View):
     return self._transform(
         self.input_.process_source(data).select_columns(self.input_fields))
 
-  def ray_dataset(self, read_options: ReadOptions,
+  def ray_dataset(self, ray_options: RayOptions, read_options: ReadOptions,
                   join_options: JoinOptions) -> ray.Dataset:
     if read_options.fields is not None:
       raise errors.UserInputError(
@@ -111,7 +112,7 @@ class BaseUdfTransform(View):
 
     read_options.fields = self.input_fields
     return self._transform(
-        transform_utils.ray_dataset(self.input_, read_options))
+        transform_utils.ray_dataset(self.input_, ray_options, read_options))
 
   @abstractmethod
   def _transform(self, ds: ray.Dataset) -> ray.Dataset:
@@ -148,7 +149,8 @@ class MapTransform(BaseUdfTransform):
                                    expressions[0], rel.project.input, plan))
 
   def _transform(self, ds: ray.Dataset) -> ray.Dataset:
-    batch_size = self.udf.batch_size if self.udf.batch_size >= 0 else "default"
+    batch_size = ("default"
+                  if self.udf.batch_size is None else self.udf.batch_size)
     return ds.map_batches(self.udf.fn, batch_size=batch_size)
 
 
