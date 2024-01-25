@@ -14,7 +14,7 @@
 
 from datetime import datetime
 import threading
-from typing import Iterable, Optional
+from typing import Iterable
 
 import pytest
 
@@ -24,7 +24,7 @@ import pyarrow.compute as pc
 import pytz
 from tensorflow_datasets import features as f
 
-from space import Dataset, LocalRunner, TfFeatures
+from space import Dataset, TfFeatures
 from space.core.jobs import JobResult
 from space.core.ops.change_data import ChangeData, ChangeType
 from space.core.schema.types import File
@@ -66,7 +66,7 @@ class TestLocalRunner:
         range(90)).to_pydict()
 
     # Check read batch size.
-    for i, d in enumerate(local_runner.read(batch_size=10)):
+    for d in local_runner.read(batch_size=10):
       assert d.num_rows == 10
 
     local_runner.delete(pc.field("id") >= 10)
