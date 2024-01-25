@@ -68,7 +68,7 @@ class LocalInsertOp(BaseInsertOp, StoragePathsMixin):
     self._storage = storage
     self._metadata = self._storage.metadata
 
-    self._options = InsertOptions() if options is None else options
+    self._options = options or InsertOptions()
     self._file_options = file_options
 
   def write(self, data: InputData) -> Optional[rt.Patch]:

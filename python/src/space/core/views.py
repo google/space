@@ -272,12 +272,12 @@ class MaterializedView:
     return ray_runners.RayMaterializedViewRunner(self, ray_options,
                                                  file_options)
 
-  def local(self) -> LocalRunner:
+  def local(self, file_options: Optional[FileOptions] = None) -> LocalRunner:
     """Get a runner that runs operations locally.
     
     TODO: should use a read-only local runner.
     """
-    return LocalRunner(self._storage)
+    return LocalRunner(self._storage, file_options)
 
   @classmethod
   def create(cls, location: str, view: View, logical_plan: meta.LogicalPlan,

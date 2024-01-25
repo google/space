@@ -129,7 +129,7 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
                storage: Storage,
                file_options: Optional[FileOptions] = None):
     StorageMixin.__init__(self, storage)
-    self._file_options = FileOptions() if file_options is None else file_options
+    self._file_options = file_options or FileOptions()
 
   @abstractmethod
   def append(self, data: InputData) -> JobResult:

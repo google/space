@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 from datetime import datetime
+import math
 from os import path
 from typing import Collection, Dict, Iterator, List, Optional, Union
 from typing_extensions import TypeAlias
@@ -370,13 +371,12 @@ class Storage(paths.StoragePathsMixin):
     """Return a Ray dataset for a Space storage."""
     ds = ray.data.read_datasource(ray_data_sources.SpaceDataSource(),
                                   storage=self,
+                                  ray_options=ray_options,
                                   read_options=read_options,
                                   parallelism=ray_options.max_parallelism)
 
-    if read_options.batch_size is not None:
-      num_rows = ds.count()
-      assert num_rows >= 0 and read_options.batch_size > 0
-      return ds.repartition(num_rows // read_options.batch_size)
+    if (not ray_options.enable_row_range_block and read_options.batch_size):
+      return ds.repartition(math.ceil(ds.count() / read_options.batch_size))
 
     return ds
 
