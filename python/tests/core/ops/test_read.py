@@ -56,7 +56,7 @@ class TestFileSetReadOp:
         storage.metadata,
         storage.data_files(),
         # pylint: disable=singleton-comparison
-        ReadOptions(filter_=pc.field("bool") == True))
+        options=ReadOptions(filter_=pc.field("bool") == True))
     results = list(iter(read_op))
     assert len(results) == 1
     assert list(iter(read_op))[0] == pa.Table.from_pydict({

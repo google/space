@@ -12,6 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Proto messages used by Space runtime.
+//
+// Different from metadata.proto, protos here are not persisted in metadata
+// files. We use proto instead of Python classes for the capabilities of
+// serialization to bytes for cross machines/languages messaging. For example,
+// `FileSet` is sent to worker machine for processing, and `Patch` is sent back
+// for the coordinator machine to commit to storage. Pickling Python classses
+// may work but it may have more restrictions, especially when crossing
+// languages.
+
 syntax = "proto3";
 
 import "space/core/proto/metadata.proto";

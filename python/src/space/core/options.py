@@ -47,7 +47,10 @@ class ReadOptions:
   #
   # TODO: currently a batch can be smaller than batch_size (e.g., at boundary
   # of row groups), to enforce size to be equal to batch_size.
-  batch_size: Optional[int] = 16
+  batch_size: Optional[int] = None
+
+  def __post_init__(self):
+    self.batch_size = self.batch_size or 16
 
 
 @dataclass
