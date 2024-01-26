@@ -104,8 +104,9 @@ class _SpaceDataSourceReader(Reader):
     return read_tasks
 
   def _read_fn(self, index_file: rt.DataFile) -> Callable[..., Iterator[Block]]:
-    return partial(FileSetReadOp, self._storage.location,
-                   self._storage.metadata, rt.FileSet(index_files=[index_file]),
+    return partial(FileSetReadOp,
+                   self._storage.location, self._storage.metadata,
+                   rt.FileSet(index_files=[index_file]), None,
                    self._read_options)  # type: ignore[return-value]
 
 

@@ -19,11 +19,11 @@ from enum import Enum
 from typing import Iterator, List
 
 import pyarrow as pa
-from pyroaring import BitMap  # type: ignore[import-not-found]
 
 from space.core.fs.base import BaseFileSystem
 from space.core.fs.factory import create_fs
 from space.core.ops.read import FileSetReadOp
+from space.core.options import ReadOptions
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
@@ -35,6 +35,7 @@ class ChangeType(Enum):
   """Type of data changes."""
   # For added rows.
   ADD = 1
+
   # For deleted rows.
   DELETE = 2
   # TODO: to support UPDATE. UPDATE is currently described as an ADD after a
@@ -46,14 +47,17 @@ class ChangeData:
   """Information and data of a change."""
   # Snapshot ID that the change was committed to.
   snapshot_id: int
+
   # The change type.
   type_: ChangeType
+
   # The change data.
   data: pa.Table
 
 
 def read_change_data(storage: Storage, start_snapshot_id: int,
-                     end_snapshot_id: int) -> Iterator[ChangeData]:
+                     end_snapshot_id: int,
+                     read_options: ReadOptions) -> Iterator[ChangeData]:
   """Read change data from a start to an end snapshot.
   
   start_snapshot_id is excluded; end_snapshot_id is included.
@@ -78,19 +82,22 @@ def read_change_data(storage: Storage, start_snapshot_id: int,
         f"snapshot {end_snapshot_id}")
 
   for snapshot_id in all_snapshot_ids[1:]:
-    for result in iter(_LocalChangeDataReadOp(storage, snapshot_id)):
+    for result in iter(
+        _LocalChangeDataReadOp(storage, snapshot_id, read_options)):
       yield result
 
 
 class _LocalChangeDataReadOp(StoragePathsMixin):
   """Read changes of data from a given snapshot of a dataset."""
 
-  def __init__(self, storage: Storage, snapshot_id: int):
+  def __init__(self, storage: Storage, snapshot_id: int,
+               read_options: ReadOptions):
     StoragePathsMixin.__init__(self, storage.location)
 
     self._storage = storage
     self._metadata = self._storage.metadata
     self._snapshot_id = snapshot_id
+    self._read_options = read_options
 
     if snapshot_id not in self._metadata.snapshots:
       raise errors.VersionNotFoundError(
@@ -108,35 +115,27 @@ class _LocalChangeDataReadOp(StoragePathsMixin):
     # TODO: to enforce this check upstream, or merge deletion+addition as a
     # update.
     for bitmap in self._change_log.deleted_rows:
-      yield self._read_bitmap_rows(ChangeType.DELETE, bitmap)
+      for change in self._read_bitmap_rows(ChangeType.DELETE, bitmap):
+        yield change
 
     for bitmap in self._change_log.added_rows:
-      yield self._read_bitmap_rows(ChangeType.ADD, bitmap)
+      for change in self._read_bitmap_rows(ChangeType.ADD, bitmap):
+        yield change
 
   def _read_bitmap_rows(self, change_type: ChangeType,
-                        bitmap: meta.RowBitmap) -> ChangeData:
+                        bitmap: meta.RowBitmap) -> Iterator[ChangeData]:
     file_set = rt.FileSet(index_files=[rt.DataFile(path=bitmap.file)])
-    read_op = FileSetReadOp(self._storage.location, self._metadata, file_set)
+    read_op = FileSetReadOp(
+        self._storage.location,
+        self._metadata,
+        file_set,
+        row_bitmap=(None if bitmap.all_rows else bitmap.roaring_bitmap),
+        options=self._read_options)
 
-    data = pa.concat_tables(list(iter(read_op)))
-    # TODO: to read index fields first, apply mask, then read record fields.
-    if not bitmap.all_rows:
-      data = data.filter(
-          mask=_bitmap_mask(bitmap.roaring_bitmap, data.num_rows))
-
-    return ChangeData(self._snapshot_id, change_type, data)
+    for data in read_op:
+      yield ChangeData(self._snapshot_id, change_type, data)
 
 
 def _read_change_log_proto(fs: BaseFileSystem,
                            file_path: str) -> meta.ChangeLog:
   return fs.read_proto(file_path, meta.ChangeLog())
-
-
-def _bitmap_mask(serialized_bitmap: bytes, num_rows: int) -> List[bool]:
-  bitmap = BitMap.deserialize(serialized_bitmap)
-
-  mask = [False] * num_rows
-  for row_id in bitmap.to_array():
-    mask[row_id] = True
-
-  return mask

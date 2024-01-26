@@ -86,13 +86,16 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
                                       join_options).to_arrow_refs():
       yield ray.get(ref)
 
-  def diff(self, start_version: Union[Version],
-           end_version: Union[Version]) -> Iterator[ChangeData]:
+  def diff(self,
+           start_version: Union[Version],
+           end_version: Union[Version],
+           batch_size: Optional[int] = None) -> Iterator[ChangeData]:
     self._source_storage.reload()
     source_changes = read_change_data(
         self._source_storage,
         self._source_storage.version_to_snapshot_id(start_version),
-        self._source_storage.version_to_snapshot_id(end_version))
+        self._source_storage.version_to_snapshot_id(end_version),
+        ReadOptions(batch_size=batch_size))
 
     for change in source_changes:
       # TODO: skip processing the data for deletions; the caller is usually
@@ -151,7 +154,8 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
       yield ray.get(ref)
 
   def refresh(self,
-              target_version: Optional[Version] = None) -> List[JobResult]:
+              target_version: Optional[Version] = None,
+              batch_size: Optional[int] = None) -> List[JobResult]:
     """Refresh the materialized view by synchronizing from source dataset."""
     source_snapshot_id = self._source_storage.metadata.current_snapshot_id
     if target_version is None:
@@ -171,7 +175,7 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
     previous_snapshot_id: Optional[int] = None
 
     txn = self._start_txn()
-    for change in self.diff(start_snapshot_id, end_snapshot_id):
+    for change in self.diff(start_snapshot_id, end_snapshot_id, batch_size):
       # Commit when changes from the same snapshot end.
       if (previous_snapshot_id is not None and
           change.snapshot_id != previous_snapshot_id):

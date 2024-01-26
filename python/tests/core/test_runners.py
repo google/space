@@ -152,6 +152,18 @@ class TestLocalRunner:
     assert local_runner1.read_all() == pa.concat_tables(
         [sample_data1, sample_data2, sample_data3, sample_data4])
 
+  def test_diff_batch_size(self, sample_dataset):
+    ds = sample_dataset
+
+    ds.local().append(_generate_data(range(5)))
+
+    assert list(ds.local().diff(0, 1, batch_size=3)) == [
+        ChangeData(ds.storage.metadata.current_snapshot_id, ChangeType.ADD,
+                   _generate_data(range(3))),
+        ChangeData(ds.storage.metadata.current_snapshot_id, ChangeType.ADD,
+                   _generate_data(range(3, 5)))
+    ]
+
   def test_add_read_remove_tag(self, sample_dataset):
     ds = sample_dataset
     local_runner = ds.local()

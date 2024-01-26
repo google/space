@@ -121,8 +121,10 @@ def filter_matched(location: str, metadata: meta.StorageMetadata,
                    data_files: rt.FileSet, filter_: pc.Expression,
                    primary_keys: List[str]) -> bool:
   """Return True if there are data matching the provided filter."""
-  op = FileSetReadOp(location, metadata, data_files,
-                     ReadOptions(filter_=filter_, fields=primary_keys))
+  op = FileSetReadOp(location,
+                     metadata,
+                     data_files,
+                     options=ReadOptions(filter_=filter_, fields=primary_keys))
 
   for data in iter(op):
     if data.num_rows > 0:

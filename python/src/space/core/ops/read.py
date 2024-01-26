@@ -21,6 +21,7 @@ from typing import Iterator, Dict, List, Tuple, Optional
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
+from pyroaring import BitMap  # type: ignore[import-not-found]
 
 from space.core.options import ReadOptions
 from space.core.fs.array_record import read_record_file
@@ -30,6 +31,7 @@ from space.core.proto import runtime_pb2 as rt
 from space.core.schema import arrow
 from space.core.schema.constants import FILE_PATH_FIELD, ROW_ID_FIELD
 from space.core.schema import utils as schema_utils
+from space.core.utils import errors
 from space.core.utils.paths import StoragePathsMixin
 
 _RECORD_KEY_FIELD = "__RECORD_KEY"
@@ -52,10 +54,12 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
   Not thread safe.
   """
 
+  # pylint: disable=too-many-arguments
   def __init__(self,
                location: str,
                metadata: meta.StorageMetadata,
                file_set: rt.FileSet,
+               row_bitmap: Optional[bytes] = None,
                options: Optional[ReadOptions] = None):
     StoragePathsMixin.__init__(self, location)
 
@@ -63,6 +67,7 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
 
     self._metadata = metadata
     self._file_set = file_set
+    self._row_bitmap = row_bitmap
 
     # TODO: to validate options, e.g., fields are valid.
     self._options = options or ReadOptions()
@@ -92,12 +97,22 @@ class FileSetReadOp(BaseReadOp, StoragePathsMixin):
     for file in self._file_set.index_files:
       row_range_read = file.selected_rows.end > 0
 
+      # row_range_read is used by Ray SpaceDataSource. row_bitmap is used by Ray
+      # diff/refresh, which does not use Ray SpaceDataSource.
+      if row_range_read and self._row_bitmap is not None:
+        raise errors.SpaceRuntimeError(
+            "Row mask is not supported when row range read is enabled")
+
       # TODO: always loading the whole table is inefficient, to only load the
       # required row groups.
       index_data = pq.read_table(
           self.full_path(file.path),
           columns=self._selected_fields,
           filters=self._options.filter_)  # type: ignore[arg-type]
+
+      if self._row_bitmap is not None:
+        index_data = index_data.filter(
+            mask=_bitmap_mask(self._row_bitmap, index_data.num_rows))
 
       if row_range_read:
         length = file.selected_rows.end - file.selected_rows.start
@@ -197,3 +212,13 @@ def read_record_column(paths: StoragePathsMixin,
       sorted_values[key.as_py()] = value
 
   return pa.array(sorted_values, pa.binary())  # type: ignore[return-value]
+
+
+def _bitmap_mask(serialized_bitmap: bytes, num_rows: int) -> List[bool]:
+  bitmap = BitMap.deserialize(serialized_bitmap)
+
+  mask = [False] * num_rows
+  for row_id in bitmap.to_array():
+    mask[row_id] = True
+
+  return mask

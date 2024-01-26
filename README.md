@@ -239,7 +239,8 @@ mv = view.materialize("/path/to/<mybucket>/example_mv")
 
 mv_runner = mv.ray()
 # Refresh the MV up to version tag `after_add` of the source.
-mv_runner.refresh("after_add")  # mv_runner.refresh() refresh to the latest version
+mv_runner.refresh("after_add", batch_size=64)  # Reading batch size
+# Or, mv_runner.refresh() refresh to the latest version
 
 # Use the MV runner instead of view runner to directly read from materialized
 # view files, no data processing any more.

@@ -63,6 +63,12 @@ def _sample_partition_fn(range_: Range) -> List[Range]:
   ]
 
 
+# A sample UDF for testing.
+def _sample_map_udf(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+  batch["float64"] = batch["float64"] + 1
+  return batch
+
+
 class TestRayReadWriteRunner:
 
   @pytest.mark.parametrize("enable_row_range_block,batch_size", [
@@ -122,11 +128,6 @@ class TestRayReadWriteRunner:
         pa.concat_tables([generate_data([10, 11, 12])]).sort_by("int64"))
 
     # Test reading views.
-    # A sample UDF for testing.
-    def _sample_map_udf(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-      batch["float64"] = batch["float64"] + 1
-      return batch
-
     view = sample_dataset.map_batches(fn=_sample_map_udf,
                                       output_schema=sample_dataset.schema,
                                       output_record_fields=["binary"])
@@ -173,13 +174,9 @@ class TestRayReadWriteRunner:
     for d in runner.read(batch_size=10):
       assert d.num_rows == 10
 
-  def test_diff_map_batches(self, tmp_path, sample_dataset):
+  @pytest.mark.parametrize("refresh_batch_size", [None, 2])
+  def test_diff_map_batches(self, tmp_path, sample_dataset, refresh_batch_size):
     ds = sample_dataset
-
-    # A sample UDF for testing.
-    def _sample_map_udf(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-      batch["float64"] = batch["float64"] + 1
-      return batch
 
     view_schema = pa.schema(
         [pa.field("int64", pa.int64()),
@@ -231,19 +228,21 @@ class TestRayReadWriteRunner:
     ray_runner = mv.ray()
     local_runner = mv.local()
 
-    assert len(ray_runner.refresh(1)) == 1
+    assert len(ray_runner.refresh("tag1", batch_size=refresh_batch_size)) == 1
     assert local_runner.read_all() == expected_change0.data
     assert ray_runner.read_all() == expected_change0.data
 
-    assert len(ray_runner.refresh()) == 1
-    assert local_runner.read_all() == pa.Table.from_pydict({
-        "int64": [1, 3],
-        "float64": [1.1, 1.3],
-    })
-    assert ray_runner.read_all() == pa.Table.from_pydict({
-        "int64": [1, 3],
-        "float64": [1.1, 1.3],
-    })
+    assert len(ray_runner.refresh(batch_size=refresh_batch_size)) == 1
+    assert local_runner.read_all().combine_chunks().sort_by(
+        "int64") == pa.Table.from_pydict({
+            "int64": [1, 3],
+            "float64": [1.1, 1.3],
+        }).sort_by("int64")
+    assert ray_runner.read_all().combine_chunks().sort_by(
+        "int64") == pa.Table.from_pydict({
+            "int64": [1, 3],
+            "float64": [1.1, 1.3],
+        }).sort_by("int64")
 
     with pytest.raises(
         errors.VersionNotFoundError,
@@ -275,11 +274,55 @@ class TestRayReadWriteRunner:
 
     # Test refresh multiple snapshots.
     ray_runner = mv1.ray()
-    assert len(ray_runner.refresh()) == 3
+    assert len(ray_runner.refresh(batch_size=refresh_batch_size)) == 3
     assert ray_runner.read_all() == pa.Table.from_pydict({
         "int64": [1, 3, 4],
         "float64": [1.1, 1.33, 1.4],
     })
+
+  def test_diff_batch_size(self, tmp_path, sample_dataset):
+    ds = sample_dataset
+
+    view_schema = pa.schema(
+        [pa.field("int64", pa.int64()),
+         pa.field("float64", pa.float64())])
+    view = ds.map_batches(fn=_sample_map_udf,
+                          input_fields=["int64", "float64"],
+                          output_schema=view_schema)
+
+    ds.local().append({
+        "int64": [1, 2, 3],
+        "float64": [0.1, 0.2, 0.3],
+        "binary": [b"b1", b"b2", b"b3"]
+    })
+
+    assert list(view.ray().diff(0, 1, batch_size=2)) == [
+        ChangeData(
+            ds.storage.metadata.current_snapshot_id, ChangeType.ADD,
+            pa.Table.from_pydict({
+                "int64": [1, 2],
+                "float64": [1.1, 1.2],
+            })),
+        ChangeData(ds.storage.metadata.current_snapshot_id, ChangeType.ADD,
+                   pa.Table.from_pydict({
+                       "int64": [3],
+                       "float64": [1.3],
+                   }))
+    ]
+
+    mv = view.materialize(str(tmp_path / "mv"))
+    ray_runner = mv.ray(RayOptions(max_parallelism=1))
+    ray_runner.refresh(batch_size=2)
+    assert list(ray_runner.read()) == [
+        pa.Table.from_pydict({
+            "int64": [1, 2],
+            "float64": [1.1, 1.2],
+        }),
+        pa.Table.from_pydict({
+            "int64": [3],
+            "float64": [1.3],
+        })
+    ]
 
   def test_filter_transform(self, sample_dataset):
     # A sample UDF for testing.
