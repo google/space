@@ -4,7 +4,7 @@ Unify data in your entire machine learning lifecycle with **Space**, a comprehen
 
 **Key Features:**
 - **Ground Truth Database**
-  - Store and manage data in open source file formats, locally or in the cloud.
+  - Store and manage multimodal data in open source file formats, row or columnar, local or in cloud.
   - Ingest from various sources, including ML datasets, files, and labeling tools.
   - Support data manipulation (append, insert, update, delete) and version control.
 - **OLAP Database and Lakehouse**
