@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +15,13 @@
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from space import Dataset
-from space.core.ops.change_data import ChangeData, ChangeType
+import pytest
+
+from space.core.datasets import Dataset
+from space.core.ops.change_data import (ChangeData, ChangeType,
+                                        ordered_snapshot_ids)
+from space.core.utils import errors
+from space.core.utils.uuids import random_id
 
 
 def test_read_change_data(tmp_path, all_types_schema, all_types_input_data):
@@ -79,3 +84,28 @@ def test_read_change_data(tmp_path, all_types_schema, all_types_input_data):
   assert changes == [
       expected_change0, expected_change1, expected_change2, expected_change3
   ]
+
+
+def test_ordered_snapshot_ids(tmp_path):
+  schema = pa.schema([
+      pa.field("int64", pa.int64()),
+      pa.field("float64", pa.float64()),
+      pa.field("binary", pa.binary())
+  ])
+  ds = Dataset.create(str(tmp_path / f"dataset_{random_id()}"),
+                      schema,
+                      primary_keys=["int64"],
+                      record_fields=["binary"])
+
+  runner = ds.local()
+  runner.append({"int64": [1], "float64": [0.1], "binary": [b"b1"]})
+  runner.append({"int64": [2], "float64": [0.2], "binary": [b"b2"]})
+  runner.append({"int64": [3], "float64": [0.3], "binary": [b"b3"]})
+
+  with pytest.raises(
+      errors.UserInputError,
+      match=r".*End snapshot ID 0 should be higher than start snapshot ID 0.*"):
+    ordered_snapshot_ids(ds.storage, 0, 0)
+
+  assert ordered_snapshot_ids(ds.storage, 0, 1) == [1]
+  assert ordered_snapshot_ids(ds.storage, 0, 3) == [1, 2, 3]

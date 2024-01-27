@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+//
 // Proto messages used by Space metadata persistence.
 
 syntax = "proto3";
@@ -160,6 +160,9 @@ message StorageStatistics {
 // Change log stores changes made by a snapshot.
 // NEXT_ID: 3
 message ChangeLog {
+  // TODO: to replace RowBitmap list by runtime.FileSet (not backward
+  // compatible).
+
   // Rows deleted in this snapshot.
   repeated RowBitmap deleted_rows = 1;
 
@@ -169,7 +172,8 @@ message ChangeLog {
 
 
 // Mark rows in a file by bitmap.
-// NEXT_ID: 4
+// TODO: to replace it by runtime.DataFile (not backward compatible).
+// NEXT_ID: 5
 message RowBitmap {
   // File path that the bit map applies to.
   string file = 1;
@@ -181,6 +185,9 @@ message RowBitmap {
     // Roaring bitmap.
     bytes roaring_bitmap = 3;
   }
+
+  // Total number of rows in the file.
+  int64 num_rows = 4;
 }
 
 // Store the logical plan of a transform.

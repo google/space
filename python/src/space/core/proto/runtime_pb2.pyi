@@ -14,6 +14,16 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+Proto messages used by Space runtime.
+
+Different from metadata.proto, protos here are not persisted in metadata
+files. We use proto instead of Python classes for the capabilities of
+serialization to bytes for cross machines/languages messaging. For example,
+`FileSet` is sent to worker machine for processing, and `Patch` is sent back
+for the coordinator machine to commit to storage. Pickling Python classses
+may work but it may have more restrictions, especially when crossing
+languages.
 """
 import builtins
 import collections.abc
@@ -33,7 +43,7 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 @typing_extensions.final
 class DataFile(google.protobuf.message.Message):
     """Information of a data file.
-    NEXT_ID: 5
+    NEXT_ID: 6
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -59,7 +69,8 @@ class DataFile(google.protobuf.message.Message):
     PATH_FIELD_NUMBER: builtins.int
     STORAGE_STATISTICS_FIELD_NUMBER: builtins.int
     MANIFEST_FILE_ID_FIELD_NUMBER: builtins.int
-    SELECTED_ROWS_FIELD_NUMBER: builtins.int
+    ROW_SLICE_FIELD_NUMBER: builtins.int
+    ROW_BITMAP_FIELD_NUMBER: builtins.int
     path: builtins.str
     """Data file path."""
     @property
@@ -68,9 +79,14 @@ class DataFile(google.protobuf.message.Message):
     manifest_file_id: builtins.int
     """Locally assigned manifest file IDs."""
     @property
-    def selected_rows(self) -> global___DataFile.Range:
-        """A range of selected rows in the data file.
+    def row_slice(self) -> global___DataFile.Range:
+        """Optional, a range of selected rows in the data file.
         Used for partially reading an index file and its records.
+        """
+    @property
+    def row_bitmap(self) -> space.core.proto.metadata_pb2.RowBitmap:
+        """Optional, bitmap masking rows to read; can be used together with
+        `row_slice`. `path` in RowBitmap is not used.
         """
     def __init__(
         self,
@@ -78,10 +94,11 @@ class DataFile(google.protobuf.message.Message):
         path: builtins.str = ...,
         storage_statistics: space.core.proto.metadata_pb2.StorageStatistics | None = ...,
         manifest_file_id: builtins.int = ...,
-        selected_rows: global___DataFile.Range | None = ...,
+        row_slice: global___DataFile.Range | None = ...,
+        row_bitmap: space.core.proto.metadata_pb2.RowBitmap | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["selected_rows", b"selected_rows", "storage_statistics", b"storage_statistics"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["manifest_file_id", b"manifest_file_id", "path", b"path", "selected_rows", b"selected_rows", "storage_statistics", b"storage_statistics"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["row_bitmap", b"row_bitmap", "row_slice", b"row_slice", "storage_statistics", b"storage_statistics"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["manifest_file_id", b"manifest_file_id", "path", b"path", "row_bitmap", b"row_bitmap", "row_slice", b"row_slice", "storage_statistics", b"storage_statistics"]) -> None: ...
 
 global___DataFile = DataFile
 

@@ -16,11 +16,10 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterator, List
+from typing import Any, Iterable, Iterator, List
 
 import pyarrow as pa
 
-from space.core.fs.base import BaseFileSystem
 from space.core.fs.factory import create_fs
 from space.core.ops.read import FileSetReadOp
 from space.core.options import ReadOptions
@@ -51,20 +50,20 @@ class ChangeData:
   # The change type.
   type_: ChangeType
 
-  # The change data.
-  data: pa.Table
+  # The change data (pa.Table or ray.data.Dataset).
+  # NOTE: type annotation not used, because of Ray lazy import.
+  data: Any
 
 
-def read_change_data(storage: Storage, start_snapshot_id: int,
-                     end_snapshot_id: int,
-                     read_options: ReadOptions) -> Iterator[ChangeData]:
-  """Read change data from a start to an end snapshot.
+def ordered_snapshot_ids(storage: Storage, start_snapshot_id: int,
+                         end_snapshot_id: int) -> List[int]:
+  """Return a list of ordered snapshot IDs between two snapshots.
   
   start_snapshot_id is excluded; end_snapshot_id is included.
   """
   if start_snapshot_id >= end_snapshot_id:
     raise errors.UserInputError(
-        f"End snapshot ID {end_snapshot_id} should not be lower than start "
+        f"End snapshot ID {end_snapshot_id} should be higher than start "
         f"snapshot ID {start_snapshot_id}")
 
   all_snapshot_ids: List[int] = []
@@ -81,13 +80,23 @@ def read_change_data(storage: Storage, start_snapshot_id: int,
         f"Start snapshot {start_snapshot_id} is not the ancestor of end "
         f"snapshot {end_snapshot_id}")
 
-  for snapshot_id in all_snapshot_ids[1:]:
-    for result in iter(
-        _LocalChangeDataReadOp(storage, snapshot_id, read_options)):
-      yield result
+  return all_snapshot_ids[1:]
 
 
-class _LocalChangeDataReadOp(StoragePathsMixin):
+def read_change_data(storage: Storage, start_snapshot_id: int,
+                     end_snapshot_id: int,
+                     read_options: ReadOptions) -> Iterator[ChangeData]:
+  """Read change data from a start to an end snapshot.
+  
+  start_snapshot_id is excluded; end_snapshot_id is included.
+  """
+  for snapshot_id in ordered_snapshot_ids(storage, start_snapshot_id,
+                                          end_snapshot_id):
+    for change in LocalChangeDataReadOp(storage, snapshot_id, read_options):
+      yield change
+
+
+class LocalChangeDataReadOp(StoragePathsMixin):
   """Read changes of data from a given snapshot of a dataset."""
 
   def __init__(self, storage: Storage, snapshot_id: int,
@@ -103,39 +112,45 @@ class _LocalChangeDataReadOp(StoragePathsMixin):
       raise errors.VersionNotFoundError(
           f"Change data read can't find snapshot ID {snapshot_id}")
 
-    snapshot = self._metadata.snapshots[snapshot_id]
-
-    fs = create_fs(self._location)
-    change_log_file = self._storage.full_path(snapshot.change_log_file)
-    self._change_log = _read_change_log_proto(fs, change_log_file)
+    self._snapshot = self._metadata.snapshots[snapshot_id]
+    self._change_log = _read_change_log_proto(
+        self._storage.full_path(self._snapshot.change_log_file))
 
   def __iter__(self) -> Iterator[ChangeData]:
     # Must return deletion first, otherwise when the upstream re-apply
     # deletions and additions, it may delete newly added data.
     # TODO: to enforce this check upstream, or merge deletion+addition as a
     # update.
-    for bitmap in self._change_log.deleted_rows:
-      for change in self._read_bitmap_rows(ChangeType.DELETE, bitmap):
-        yield change
+    for data in self._read_op(self._change_log.deleted_rows):
+      yield ChangeData(self._snapshot_id, ChangeType.DELETE, data)
 
-    for bitmap in self._change_log.added_rows:
-      for change in self._read_bitmap_rows(ChangeType.ADD, bitmap):
-        yield change
+    for data in self._read_op(self._change_log.added_rows):
+      yield ChangeData(self._snapshot_id, ChangeType.ADD, data)
 
-  def _read_bitmap_rows(self, change_type: ChangeType,
-                        bitmap: meta.RowBitmap) -> Iterator[ChangeData]:
-    file_set = rt.FileSet(index_files=[rt.DataFile(path=bitmap.file)])
-    read_op = FileSetReadOp(
-        self._storage.location,
-        self._metadata,
-        file_set,
-        row_bitmap=(None if bitmap.all_rows else bitmap.roaring_bitmap),
-        options=self._read_options)
+  def _read_op(self, bitmaps: Iterable[meta.RowBitmap]) -> Iterator[pa.Table]:
+    return iter(
+        FileSetReadOp(self._storage.location,
+                      self._metadata,
+                      self._bitmaps_to_file_set(bitmaps),
+                      options=self._read_options))
 
-    for data in read_op:
-      yield ChangeData(self._snapshot_id, change_type, data)
+  @classmethod
+  def _bitmaps_to_file_set(cls,
+                           bitmaps: Iterable[meta.RowBitmap]) -> rt.FileSet:
+    return rt.FileSet(
+        index_files=[_bitmap_to_index_file(bitmap) for bitmap in bitmaps])
 
 
-def _read_change_log_proto(fs: BaseFileSystem,
-                           file_path: str) -> meta.ChangeLog:
+def _bitmap_to_index_file(bitmap: meta.RowBitmap) -> rt.DataFile:
+  index_file = rt.DataFile(
+      path=bitmap.file,
+      storage_statistics=meta.StorageStatistics(num_rows=bitmap.num_rows))
+  if not bitmap.all_rows:
+    index_file.row_bitmap.CopyFrom(bitmap)
+
+  return index_file
+
+
+def _read_change_log_proto(file_path: str) -> meta.ChangeLog:
+  fs = create_fs(file_path)
   return fs.read_proto(file_path, meta.ChangeLog())

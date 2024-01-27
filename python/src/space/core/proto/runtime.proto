@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+//
 // Proto messages used by Space runtime.
 //
 // Different from metadata.proto, protos here are not persisted in metadata
@@ -29,7 +29,7 @@ import "space/core/proto/metadata.proto";
 package space.proto;
 
 // Information of a data file.
-// NEXT_ID: 5
+// NEXT_ID: 6
 message DataFile {
   // Data file path.
   string path = 1;
@@ -47,9 +47,13 @@ message DataFile {
     int64 end = 2;
   }
 
-  // A range of selected rows in the data file.
+  // Optional, a range of selected rows in the data file.
   // Used for partially reading an index file and its records.
-  Range selected_rows = 4;
+  Range row_slice = 4;
+
+  // Optional, bitmap masking rows to read; can be used together with
+  // `row_slice`. `path` in RowBitmap is not used.
+  RowBitmap row_bitmap = 5;
 }
 
 // A set of associated data and manifest files.

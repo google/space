@@ -367,7 +367,7 @@ class Storage(paths.StoragePathsMixin):
                                   join_type="left outer").sort_by(sort_args)
 
   def ray_dataset(self, ray_options: RayOptions,
-                  read_options: ReadOptions) -> ray.Dataset:
+                  read_options: ReadOptions) -> ray.data.Dataset:
     """Return a Ray dataset for a Space storage."""
     ds = ray.data.read_datasource(ray_data_sources.SpaceDataSource(),
                                   storage=self,

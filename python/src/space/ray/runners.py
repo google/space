@@ -31,13 +31,14 @@ from space.core.ops import utils
 from space.core.ops.utils import FileOptions
 from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import InputData, InputIteratorFn
-from space.core.ops.change_data import ChangeData, ChangeType, read_change_data
+from space.core.ops.change_data import ChangeData, ChangeType
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions
 from space.core.options import JoinOptions, ReadOptions
 import space.core.proto.runtime_pb2 as rt
 from space.core.utils import errors
 from space.ray.ops.append import RayAppendOp
+from space.ray.ops.change_data import read_change_data
 from space.ray.ops.delete import RayDeleteOp
 from space.ray.ops.insert import RayInsertOp
 from space.ray.ops.utils import singleton_storage
@@ -95,16 +96,17 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
         self._source_storage,
         self._source_storage.version_to_snapshot_id(start_version),
         self._source_storage.version_to_snapshot_id(end_version),
-        ReadOptions(batch_size=batch_size))
+        self._ray_options, ReadOptions(batch_size=batch_size))
 
     for change in source_changes:
       # TODO: skip processing the data for deletions; the caller is usually
       # only interested at deleted primary keys.
       # TODO: to split change data into chunks for parallel processing.
       processed_remote_data = self._view.process_source(change.data)
-      processed_data = ray.get(processed_remote_data.to_arrow_refs())
-      yield ChangeData(change.snapshot_id, change.type_,
-                       pa.concat_tables(processed_data))
+      for ref in processed_remote_data.to_arrow_refs():
+        data = ray.get(ref)
+        if data.num_rows > 0:
+          yield ChangeData(change.snapshot_id, change.type_, data)
 
   @property
   def _source_storage(self) -> Storage:
@@ -191,6 +193,8 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
         txn = self._start_txn()
 
       try:
+        # TODO: to avoid creating a new delete/append op for each batch. The
+        # output file size will be smaller than configured.
         if change.type_ == ChangeType.DELETE:
           patches.append(self._process_delete(change.data))
         elif change.type_ == ChangeType.ADD:
@@ -220,6 +224,7 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
     return op.delete()
 
   def _process_append(self, data: pa.Table) -> Optional[rt.Patch]:
+    # TODO: to use RayAppendOp.
     op = LocalAppendOp(self._storage.location, self._storage.metadata,
                        self._file_options)
     op.write(data)

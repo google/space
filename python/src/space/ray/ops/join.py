@@ -64,7 +64,7 @@ class RayJoinOp:
     self._left_record_fields = _selected_record_fields(left)
     self._right_record_fields = _selected_record_fields(right)
 
-  def ray_dataset(self) -> ray.Dataset:
+  def ray_dataset(self) -> ray.data.Dataset:
     """Return join result as a Ray dataset."""
     left_range = _join_key_range(self._left, self._join_key)
     right_range = _join_key_range(self._right, self._join_key)
@@ -103,7 +103,7 @@ class RayJoinOp:
 
 @dataclass
 class _JoinInputInternal:
-  ds: ray.Dataset
+  ds: ray.data.Dataset
   reference_read: bool
   record_fields: List[str]
 
@@ -137,7 +137,7 @@ def _join(left: _JoinInputInternal, right: _JoinInputInternal, join_key: str,
   return result.select(output_fields)
 
 
-def _read_all(ds: ray.Dataset) -> Optional[pa.Table]:
+def _read_all(ds: ray.data.Dataset) -> Optional[pa.Table]:
   results = []
   for ref in ds.to_arrow_refs():
     data = ray.get(ref)

@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 def ray_dataset(view: View, ray_options: RayOptions,
-                read_options: ReadOptions) -> ray.Dataset:
+                read_options: ReadOptions) -> ray.data.Dataset:
   """A wrapper for creating Ray dataset for datasets and views."""
   empty_join_options = JoinOptions()
 
@@ -38,5 +38,6 @@ def ray_dataset(view: View, ray_options: RayOptions,
   # For non-dataset views, fields can't be pushed down to storage.
   fields = read_options.fields
   read_options.fields = None
-  return view.ray_dataset(ray_options, read_options,
-                          empty_join_options).select_columns(fields)
+  ds = view.ray_dataset(ray_options, read_options, empty_join_options)
+
+  return ds if fields is None else ds.select_columns(fields)

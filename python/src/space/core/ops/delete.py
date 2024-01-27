@@ -161,12 +161,12 @@ class FileSetDeleteOp(BaseDeleteOp, StoragePathsMixin):
 
     # Compute storage statistics update.
     survivor_stats = _read_index_statistics(survivor_index_manifests)
-    reinsert_stats = (reinsert_patch.storage_statistics_update if
-                      reinsert_patch is not None else meta.StorageStatistics())
+    reinsert_stats = (reinsert_patch.storage_statistics_update if reinsert_patch
+                      is not None else meta.StorageStatistics())
 
     deleted_compressed_bytes = (reinsert_stats.index_compressed_bytes +
                                 survivor_stats.index_compressed_bytes
-                                ) - stats_before_delete.index_compressed_bytes
+                               ) - stats_before_delete.index_compressed_bytes
     deleted_uncompressed_bytes = (
         reinsert_stats.index_uncompressed_bytes +
         survivor_stats.index_uncompressed_bytes
@@ -205,8 +205,8 @@ def _validate_files(file_set: rt.FileSet) -> bool:
   deletion.
   """
   for f in file_set.index_files:
-    if (not f.path or f.storage_statistics.num_rows == 0
-        or f.manifest_file_id == 0):
+    if (not f.path or f.storage_statistics.num_rows == 0 or
+        f.manifest_file_id == 0):
       return False
 
   return len(file_set.index_manifest_files) > 0
@@ -214,7 +214,8 @@ def _validate_files(file_set: rt.FileSet) -> bool:
 
 def _build_bitmap(file: rt.DataFile, index_data: pa.Table,
                   all_deleted: bool) -> meta.RowBitmap:
-  row_bitmap = meta.RowBitmap(file=file.path)
+  row_bitmap = meta.RowBitmap(file=file.path,
+                              num_rows=file.storage_statistics.num_rows)
   if all_deleted:
     row_bitmap.all_rows = True
   else:

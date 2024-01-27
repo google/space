@@ -105,11 +105,11 @@ class JoinTransform(View):
         set(self.right.fields or self.right.view.schema.names))
     return list(left_record_fields) + list(right_record_fields)
 
-  def process_source(self, data: pa.Table) -> ray.Dataset:
+  def process_source(self, data: ray.data.Dataset) -> ray.data.Dataset:
     raise NotImplementedError("Processing change data in join is not supported")
 
   def ray_dataset(self, ray_options: RayOptions, read_options: ReadOptions,
-                  join_options: JoinOptions) -> ray.Dataset:
+                  join_options: JoinOptions) -> ray.data.Dataset:
     # TODO: to use paralelism specified by ray_options. Today parallelism is
     # controlled by join_options.partition_fn.
     if read_options.fields is not None:

@@ -14,6 +14,8 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+Proto messages used by Space metadata persistence.
 """
 import builtins
 import collections.abc
@@ -389,7 +391,7 @@ global___ChangeLog = ChangeLog
 @typing_extensions.final
 class RowBitmap(google.protobuf.message.Message):
     """Mark rows in a file by bitmap.
-    NEXT_ID: 4
+    NEXT_ID: 5
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -397,21 +399,25 @@ class RowBitmap(google.protobuf.message.Message):
     FILE_FIELD_NUMBER: builtins.int
     ALL_ROWS_FIELD_NUMBER: builtins.int
     ROARING_BITMAP_FIELD_NUMBER: builtins.int
+    NUM_ROWS_FIELD_NUMBER: builtins.int
     file: builtins.str
     """File path that the bit map applies to."""
     all_rows: builtins.bool
     """All rows are selected. Bitmap is empty in this case."""
     roaring_bitmap: builtins.bytes
     """Roaring bitmap."""
+    num_rows: builtins.int
+    """Total number of rows in the file."""
     def __init__(
         self,
         *,
         file: builtins.str = ...,
         all_rows: builtins.bool = ...,
         roaring_bitmap: builtins.bytes = ...,
+        num_rows: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["bitmap", b"bitmap", "roaring_bitmap", b"roaring_bitmap"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["all_rows", b"all_rows", "bitmap", b"bitmap", "file", b"file", "roaring_bitmap", b"roaring_bitmap"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["all_rows", b"all_rows", "bitmap", b"bitmap", "file", b"file", "num_rows", b"num_rows", "roaring_bitmap", b"roaring_bitmap"]) -> None: ...
     def WhichOneof(self, oneof_group: typing_extensions.Literal["bitmap", b"bitmap"]) -> typing_extensions.Literal["roaring_bitmap"] | None: ...
 
 global___RowBitmap = RowBitmap

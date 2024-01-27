@@ -25,7 +25,7 @@ from space.core.options import JoinOptions, ReadOptions
 from space.core.runners import LocalRunner
 from space.core.storage import Storage
 from space.core.transform.plans import LogicalPlanBuilder
-from space.core.utils.lazy_imports_utils import ray, ray_runners
+from space.core.utils.lazy_imports_utils import ray, ray_runners  # pylint: disable=unused-import
 from space.core.views import View
 from space.ray.options import RayOptions
 
@@ -107,16 +107,16 @@ class Dataset(View):
     return Rel(read=ReadRel(named_table=ReadRel.NamedTable(names=[location]),
                             base_schema=self._storage.metadata.schema.fields))
 
-  def process_source(self, data: pa.Table) -> ray.Dataset:
+  def process_source(self, data: ray.data.Dataset) -> ray.data.Dataset:
     # Dataset is the source, there is no transform, so simply return the data.
-    return ray.data.from_arrow(data)
+    return data
 
   def ray_dataset(
       self,
       ray_options: RayOptions,
       read_options: ReadOptions = ReadOptions(),
       join_options: JoinOptions = JoinOptions()
-  ) -> ray.Dataset:
+  ) -> ray.data.Dataset:
     """Return a Ray dataset for a Space dataset."""
     return self._storage.ray_dataset(ray_options, read_options)
 

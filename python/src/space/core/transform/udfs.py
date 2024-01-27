@@ -99,12 +99,12 @@ class BaseUdfTransform(View):
     field_id_dict = arrow.field_name_to_id_dict(self.input_.schema)
     return [_fn_arg(field_id_dict[name]) for name in self.input_fields]
 
-  def process_source(self, data: pa.Table) -> ray.Dataset:
+  def process_source(self, data: ray.data.Dataset) -> ray.data.Dataset:
     return self._transform(
         self.input_.process_source(data).select_columns(self.input_fields))
 
   def ray_dataset(self, ray_options: RayOptions, read_options: ReadOptions,
-                  join_options: JoinOptions) -> ray.Dataset:
+                  join_options: JoinOptions) -> ray.data.Dataset:
     if read_options.fields is not None:
       raise errors.UserInputError(
           "`fields` is not supported for views, use `input_fields` of "
@@ -115,7 +115,7 @@ class BaseUdfTransform(View):
         transform_utils.ray_dataset(self.input_, ray_options, read_options))
 
   @abstractmethod
-  def _transform(self, ds: ray.Dataset) -> ray.Dataset:
+  def _transform(self, ds: ray.data.Dataset) -> ray.data.Dataset:
     """Transform a Ray dataset using the UDF."""
 
 
@@ -148,10 +148,11 @@ class MapTransform(BaseUdfTransform):
     return MapTransform(*_load_udf(location, metadata, rel.project.
                                    expressions[0], rel.project.input, plan))
 
-  def _transform(self, ds: ray.Dataset) -> ray.Dataset:
+  def _transform(self, ds: ray.data.Dataset) -> ray.data.Dataset:
     batch_size = ("default"
                   if self.udf.batch_size is None else self.udf.batch_size)
-    return ds.map_batches(self.udf.fn, batch_size=batch_size)
+    return ds.map_batches(self.udf.fn,
+                          batch_size=batch_size)  # type: ignore[arg-type]
 
 
 @dataclass
@@ -183,7 +184,7 @@ class FilterTransform(BaseUdfTransform):
     return FilterTransform(*_load_udf(location, metadata, rel.filter.condition,
                                       rel.filter.input, plan))
 
-  def _transform(self, ds: ray.Dataset) -> ray.Dataset:
+  def _transform(self, ds: ray.data.Dataset) -> ray.data.Dataset:
     return ds.filter(self.udf.fn)
 
 
