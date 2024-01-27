@@ -19,7 +19,7 @@ import numpy as np
 import pyarrow as pa
 import pytest
 
-from space import DatasetInfo, DirCatalog
+from space import DatasetInfo, DirCatalog, RayOptions
 from space.core.utils import errors
 
 
@@ -88,7 +88,7 @@ class TestDirectoryCatalog:
     mv1 = cat.materialize("mv1", view)
 
     ds.local().append({"f": [1, 2, 3], "float64": [0.1, 0.2, 0.3]})
-    mv1.ray().refresh()
+    mv1.ray(RayOptions(max_parallelism=1)).refresh()
     expected_data = {"f": [1, 2, 3], "float64": [1.1, 1.2, 1.3]}
     assert mv1.local().read_all().to_pydict() == expected_data
 

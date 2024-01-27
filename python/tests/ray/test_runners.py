@@ -178,6 +178,7 @@ class TestRayReadWriteRunner:
   def test_diff_map_batches(self, tmp_path, sample_dataset, refresh_batch_size):
     ds = sample_dataset
 
+    ray_options = RayOptions(max_parallelism=1)
     view_schema = pa.schema(
         [pa.field("int64", pa.int64()),
          pa.field("float64", pa.float64())])
@@ -188,7 +189,7 @@ class TestRayReadWriteRunner:
     mv1 = view.materialize(str(tmp_path / "mv1"))
 
     ds_runner = ds.local()
-    view_runner = view.ray()
+    view_runner = view.ray(ray_options)
 
     # Test append.
     ds_runner.append({
@@ -225,7 +226,7 @@ class TestRayReadWriteRunner:
     assert list(view_runner.diff(0, 2)) == [expected_change0, expected_change1]
 
     # Test materialized views.
-    ray_runner = mv.ray()
+    ray_runner = mv.ray(ray_options)
     local_runner = mv.local()
 
     assert len(ray_runner.refresh("tag1", batch_size=refresh_batch_size)) == 1
@@ -273,7 +274,7 @@ class TestRayReadWriteRunner:
     ]
 
     # Test refresh multiple snapshots.
-    ray_runner = mv1.ray()
+    ray_runner = mv1.ray(ray_options)
     assert len(ray_runner.refresh(batch_size=refresh_batch_size)) == 3
     assert ray_runner.read_all() == pa.Table.from_pydict({
         "int64": [1, 3, 4],
@@ -281,6 +282,7 @@ class TestRayReadWriteRunner:
     })
 
   def test_diff_batch_size(self, tmp_path, sample_dataset):
+    ray_options = RayOptions(max_parallelism=1)
     ds = sample_dataset
 
     view_schema = pa.schema(
@@ -296,7 +298,7 @@ class TestRayReadWriteRunner:
         "binary": [b"b1", b"b2", b"b3"]
     })
 
-    assert list(view.ray().diff(0, 1, batch_size=2)) == [
+    assert list(view.ray(ray_options).diff(0, 1, batch_size=2)) == [
         ChangeData(
             ds.storage.metadata.current_snapshot_id, ChangeType.ADD,
             pa.Table.from_pydict({
@@ -311,7 +313,7 @@ class TestRayReadWriteRunner:
     ]
 
     mv = view.materialize(str(tmp_path / "mv"))
-    ray_runner = mv.ray(RayOptions(max_parallelism=1))
+    ray_runner = mv.ray(ray_options)
     ray_runner.refresh(batch_size=2)
     assert list(ray_runner.read()) == [
         pa.Table.from_pydict({
@@ -333,7 +335,7 @@ class TestRayReadWriteRunner:
                                  input_fields=["int64", "float64"])
 
     ds_runner = sample_dataset.local()
-    view_runner = view.ray()
+    view_runner = view.ray(RayOptions(max_parallelism=1))
 
     # Test append.
     ds_runner.append({

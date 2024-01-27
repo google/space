@@ -238,7 +238,7 @@ class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
                                      update=stats)
 
     self._patch.change_log.added_rows.append(
-        meta.RowBitmap(file=file_path, all_rows=True))
+        meta.RowBitmap(file=file_path, all_rows=True, num_rows=stats.num_rows))
 
     self._index_writer_info = None
     self._cached_index_file_bytes = 0

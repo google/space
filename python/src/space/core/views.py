@@ -88,12 +88,12 @@ class View(ABC):
     """
 
   @abstractmethod
-  def process_source(self, data: pa.Table) -> ray.Dataset:
+  def process_source(self, data: ray.data.Dataset) -> ray.data.Dataset:
     """Process input data using the transform defined by the view."""
 
   @abstractmethod
   def ray_dataset(self, ray_options: RayOptions, read_options: ReadOptions,
-                  join_options: JoinOptions) -> ray.Dataset:
+                  join_options: JoinOptions) -> ray.data.Dataset:
     """Return a Ray dataset for a Space view."""
 
   def ray(

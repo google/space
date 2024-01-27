@@ -20,6 +20,7 @@ import math
 from typing import (Any, Callable, Dict, Iterator, List, Optional,
                     TYPE_CHECKING)
 
+from absl import logging  # type: ignore[import-untyped]
 from ray.data.block import Block, BlockMetadata
 from ray.data.datasource.datasource import Datasource, Reader, ReadTask
 from ray.data.datasource.datasource import WriteResult
@@ -39,9 +40,13 @@ class SpaceDataSource(Datasource):
 
   # pylint: disable=arguments-differ,too-many-arguments
   def create_reader(  # type: ignore[override]
-      self, storage: Storage, ray_options: RayOptions,
-      read_options: ReadOptions) -> Reader:
-    return _SpaceDataSourceReader(storage, ray_options, read_options)
+      self,
+      storage: Storage,
+      ray_options: RayOptions,
+      read_options: ReadOptions,
+      file_set: Optional[rt.FileSet] = None,
+  ) -> Reader:
+    return _SpaceDataSourceReader(storage, ray_options, read_options, file_set)
 
   def do_write(self, blocks: List[ObjectRef[Block]],
                metadata: List[BlockMetadata],
@@ -58,10 +63,11 @@ class SpaceDataSource(Datasource):
 class _SpaceDataSourceReader(Reader):
 
   def __init__(self, storage: Storage, ray_options: RayOptions,
-               read_options: ReadOptions):
+               read_options: ReadOptions, file_set: Optional[rt.FileSet]):
     self._storage = storage
     self._ray_options = ray_options
     self._read_options = read_options
+    self._file_set = file_set
 
   def estimate_inmemory_data_size(self) -> Optional[int]:
     # TODO: to implement this method.
@@ -75,11 +81,26 @@ class _SpaceDataSourceReader(Reader):
   # TODO: to use parallelism when generating blocks.
   def get_read_tasks(self, parallelism: int) -> List[ReadTask]:
     read_tasks: List[ReadTask] = []
-    file_set = self._storage.data_files(self._read_options.filter_,
-                                        self._read_options.snapshot_id)
 
-    for index_file in file_set.index_files:
+    if self._file_set is None:
+      self._file_set = self._storage.data_files(self._read_options.filter_,
+                                                self._read_options.snapshot_id)
+
+    for index_file in self._file_set.index_files:
       num_rows = index_file.storage_statistics.num_rows
+
+      if num_rows == 0:
+        # For old Space datasets that num_rows in change logs is not populated.
+        logging.warning(
+            f"Statistics of index file {index_file.path} is unavailable, "
+            "index file slicing in Ray datasource is disabled")
+        read_tasks.append(
+            ReadTask(self._read_fn(index_file), _block_metadata(None)))
+        continue
+
+      # TODO: to compute num rows from bitmap.
+      has_bitmap = (index_file.HasField("row_bitmap") and
+                    not index_file.row_bitmap.all_rows)
 
       if (self._ray_options.enable_row_range_block and
           self._read_options.batch_size):
@@ -87,30 +108,36 @@ class _SpaceDataSourceReader(Reader):
         num_blocks = math.ceil(num_rows / batch_size)
 
         for i in range(num_blocks):
+          # Ignore row bitmaps in slicing. The benefit of considering bitmaps
+          # should be small because we use bitmap to mark deleted rows in
+          # change logs. In most compute intense cases (e.g., refreshing MVs),
+          # we only need the primary keys of deleted rows and don't need to
+          # read records (it is a TODO).
           index_file_slice = rt.DataFile()
           index_file_slice.CopyFrom(index_file)
 
-          rows = index_file_slice.selected_rows
+          rows = index_file_slice.row_slice
           rows.start = i * batch_size
           rows.end = min((i + 1) * batch_size, num_rows)
 
+          slice_num_rows = None if has_bitmap else (rows.end - rows.start)
           read_tasks.append(
               ReadTask(self._read_fn(index_file_slice),
-                       _block_metadata(rows.end - rows.start)))
+                       _block_metadata(slice_num_rows)))
       else:
         read_tasks.append(
-            ReadTask(self._read_fn(index_file), _block_metadata(num_rows)))
+            ReadTask(self._read_fn(index_file),
+                     _block_metadata(None if has_bitmap else num_rows)))
 
     return read_tasks
 
   def _read_fn(self, index_file: rt.DataFile) -> Callable[..., Iterator[Block]]:
-    return partial(FileSetReadOp,
-                   self._storage.location, self._storage.metadata,
-                   rt.FileSet(index_files=[index_file]), None,
+    return partial(FileSetReadOp, self._storage.location,
+                   self._storage.metadata, rt.FileSet(index_files=[index_file]),
                    self._read_options)  # type: ignore[return-value]
 
 
-def _block_metadata(num_rows: int) -> BlockMetadata:
+def _block_metadata(num_rows: Optional[int]) -> BlockMetadata:
   """The metadata about the block that we know prior to actually executing the
   read task.
   """
