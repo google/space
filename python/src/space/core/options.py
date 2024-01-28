@@ -19,6 +19,9 @@ from typing import Any, Callable, List, Optional
 
 import pyarrow.compute as pc
 
+# Default number of rows per batch in read result.
+DEFAULT_READ_BATCH_SIZE = 16
+
 
 @dataclass
 class ReadOptions:
@@ -50,7 +53,7 @@ class ReadOptions:
   batch_size: Optional[int] = None
 
   def __post_init__(self):
-    self.batch_size = self.batch_size or 16
+    self.batch_size = self.batch_size or DEFAULT_READ_BATCH_SIZE
 
 
 @dataclass

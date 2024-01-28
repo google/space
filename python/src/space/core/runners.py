@@ -81,8 +81,19 @@ class BaseReadOnlyRunner(ABC):
   def diff(self, start_version: Union[int],
            end_version: Union[int]) -> Iterator[ChangeData]:
     """Read the change data between two versions.
-    
-    start_version is excluded; end_version is included. 
+
+    NOTE: it has limitations:
+    - For DELETE change type, only primary keys are returned
+    - DELETE changes are not processed by the UDF in transforms. For `filter`
+      transform, it may return additional rows that are deleted in source but
+      should be filtered in target. It does not affect correctness of sync.
+
+    Args:
+      start_version: start version, not included in result
+      end_version: end version, included in result
+
+    Return:
+      An iterator of change data
     """
 
 

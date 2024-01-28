@@ -14,6 +14,7 @@
 #
 """Change data feed that computes delta between two snapshots by Ray."""
 
+import math
 from typing import Iterable, Iterator
 
 import ray
@@ -55,16 +56,42 @@ class _RayChangeDataReadOp(LocalChangeDataReadOp):
     # deletions and additions, it may delete newly added data.
     # TODO: to enforce this check upstream, or merge deletion+addition as a
     # update.
-    yield ChangeData(self._snapshot_id, ChangeType.DELETE,
-                     self._ray_dataset(self._change_log.deleted_rows))
-    yield ChangeData(self._snapshot_id, ChangeType.ADD,
-                     self._ray_dataset(self._change_log.added_rows))
+    if self._change_log.deleted_rows:
+      # Only read primary keys for deletions. The data to read is relatively
+      # small. In addition, currently deletion has to aggregate primary keys
+      # to delete (can't parallelize two sets of keys to delete). So we don't
+      # spit it to parallel read streams.
+      ds = self._ray_dataset(self._change_log.deleted_rows,
+                             self._pk_only_read_option,
+                             self._ray_options.max_parallelism)
+      yield ChangeData(self._snapshot_id, ChangeType.DELETE, [ds])
 
-  def _ray_dataset(self, bitmaps: Iterable[meta.RowBitmap]) -> ray.data.Dataset:
-    return ray.data.read_datasource(
-        ray_data_sources.SpaceDataSource(),
-        storage=self._storage,
-        ray_options=self._ray_options,
-        read_options=self._read_options,
-        file_set=self._bitmaps_to_file_set(bitmaps),
-        parallelism=self._ray_options.max_parallelism)
+    if self._change_log.added_rows:
+      # Split added data into parallel read streams.
+      num_files = len(self._change_log.added_rows)
+      num_streams = self._ray_options.max_parallelism
+      shard_size = math.ceil(num_files / num_streams)
+
+      shards = []
+      for i in range(num_streams):
+        start = i * shard_size
+        end = min((i + 1) * shard_size, num_files)
+        shards.append(self._change_log.added_rows[start:end])
+
+      # Parallelism 1 means one reader for each read stream.
+      # There are `ray_options.max_parallelism` read streams.
+      # TODO: to measure performance and adjust.
+      yield ChangeData(self._snapshot_id, ChangeType.ADD, [
+          self._ray_dataset(s, self._read_options, parallelism=1)
+          for s in shards
+      ])
+
+  def _ray_dataset(self, bitmaps: Iterable[meta.RowBitmap],
+                   read_options: ReadOptions,
+                   parallelism: int) -> ray.data.Dataset:
+    return ray.data.read_datasource(ray_data_sources.SpaceDataSource(),
+                                    storage=self._storage,
+                                    ray_options=self._ray_options,
+                                    read_options=read_options,
+                                    file_set=self._bitmaps_to_file_set(bitmaps),
+                                    parallelism=parallelism)

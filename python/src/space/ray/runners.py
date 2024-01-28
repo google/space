@@ -16,11 +16,13 @@
 
 from __future__ import annotations
 import copy
+from functools import partial
 from typing import TYPE_CHECKING
 from typing import Iterator, List, Optional, Union
 
 import pyarrow as pa
 import pyarrow.compute as pc
+import ray
 
 from space.core.jobs import JobResult
 from space.core.loaders.array_record import ArrayRecordIndexFn
@@ -28,7 +30,6 @@ from space.core.runners import BaseReadOnlyRunner, BaseReadWriteRunner
 from space.core.runners import StorageMixin
 from space.core.ops import utils
 from space.core.ops.utils import FileOptions
-from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import InputData, InputIteratorFn
 from space.core.ops.change_data import ChangeData, ChangeType
 from space.core.ops.delete import FileSetDeleteOp
@@ -89,6 +90,18 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
            start_version: Union[Version],
            end_version: Union[Version],
            batch_size: Optional[int] = None) -> Iterator[ChangeData]:
+    for change in self.diff_ray(start_version, end_version, batch_size):
+      assert isinstance(change.data, list)
+      for ds in change.data:
+        assert isinstance(ds, ray.data.Dataset)
+        for data in iter_batches(ds):
+          yield ChangeData(change.snapshot_id, change.type_, data)
+
+  def diff_ray(self,
+               start_version: Union[Version],
+               end_version: Union[Version],
+               batch_size: Optional[int] = None) -> Iterator[ChangeData]:
+    """Return diff data in form of a list of Ray datasets."""
     self._source_storage.reload()
     source_changes = read_change_data(
         self._source_storage,
@@ -97,11 +110,22 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
         self._ray_options, ReadOptions(batch_size=batch_size))
 
     for change in source_changes:
-      # TODO: skip processing the data for deletions; the caller is usually
-      # only interested at deleted primary keys.
-      # TODO: to split change data into chunks for parallel processing.
-      for data in iter_batches(self._view.process_source(change.data)):
-        yield ChangeData(change.snapshot_id, change.type_, data)
+      if change.type_ == ChangeType.DELETE:
+        yield change
+
+      elif change.type_ == ChangeType.ADD:
+        # Change data is a list of Ray datasets, because of parallel read
+        # streams. It allows us to do parallel transforms here.
+        assert isinstance(change.data, list)
+        processed_data: List[ray.data.Dataset] = []
+        for ds in change.data:
+          assert isinstance(ds, ray.data.Dataset)
+          processed_data.append(self._view.process_source(ds))
+
+        yield ChangeData(change.snapshot_id, change.type_, processed_data)
+
+      else:
+        raise NotImplementedError(f"Change type {change.type_} not supported")
 
   @property
   def _source_storage(self) -> Storage:
@@ -151,7 +175,11 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
   def refresh(self,
               target_version: Optional[Version] = None,
               batch_size: Optional[int] = None) -> List[JobResult]:
-    """Refresh the materialized view by synchronizing from source dataset."""
+    """Refresh the materialized view by synchronizing from source dataset.
+    
+    TODO: refreshing from a large source is slow, to save refresh state and
+    resume from saved state, if any failure happens.
+    """
     source_snapshot_id = self._source_storage.metadata.current_snapshot_id
     if target_version is None:
       end_snapshot_id = source_snapshot_id
@@ -170,7 +198,9 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
     previous_snapshot_id: Optional[int] = None
 
     txn = self._start_txn()
-    for change in self.diff(start_snapshot_id, end_snapshot_id, batch_size):
+    for change in self.diff_ray(start_snapshot_id, end_snapshot_id, batch_size):
+      assert isinstance(change.data, list)
+
       # Commit when changes from the same snapshot end.
       if (previous_snapshot_id is not None and
           change.snapshot_id != previous_snapshot_id):
@@ -206,8 +236,13 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
 
     return job_results
 
-  def _process_delete(self, data: pa.Table) -> Optional[rt.Patch]:
-    filter_ = utils.primary_key_filter(self._storage.primary_keys, data)
+  def _process_delete(self, data: List[ray.data.Dataset]) -> Optional[rt.Patch]:
+    # Deletion does not use parallel read streams.
+    assert len(data) == 1
+    arrow_data = pa.concat_tables(iter_batches(
+        data[0]))  # type: ignore[arg-type]
+
+    filter_ = utils.primary_key_filter(self._storage.primary_keys, arrow_data)
     if filter_ is None:
       return None
 
@@ -216,12 +251,10 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
                          self._file_options)
     return op.delete()
 
-  def _process_append(self, data: pa.Table) -> Optional[rt.Patch]:
-    # TODO: to use RayAppendOp.
-    op = LocalAppendOp(self._storage.location, self._storage.metadata,
-                       self._file_options)
-    op.write(data)
-    return op.finish()
+  def _process_append(self, data: List[ray.data.Dataset]) -> Optional[rt.Patch]:
+    return _append_from(self._storage,
+                        [partial(iter_batches, ds) for ds in data],
+                        self._ray_options, self._file_options)
 
   def _start_txn(self) -> Transaction:
     with self._storage.transaction() as txn:
@@ -257,11 +290,8 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
     ray_options.max_parallelism = min(len(source_fns),
                                       ray_options.max_parallelism)
 
-    op = RayAppendOp(self._storage.location, self._storage.metadata,
-                     ray_options, self._file_options)
-    op.write_from(source_fns)
-
-    return op.finish()
+    return _append_from(self._storage, source_fns, ray_options,
+                        self._file_options)
 
   @StorageMixin.transactional
   def append_array_record(self, pattern: str,
@@ -284,3 +314,12 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
   def delete(self, filter_: pc.Expression) -> Optional[rt.Patch]:
     op = RayDeleteOp(self._storage, filter_, self._file_options)
     return op.delete()
+
+
+def _append_from(storage: Storage, source_fns: Union[List[InputIteratorFn]],
+                 ray_options: RayOptions,
+                 file_options: FileOptions) -> Optional[rt.Patch]:
+  op = RayAppendOp(storage.location, storage.metadata, ray_options,
+                   file_options)
+  op.write_from(source_fns)
+  return op.finish()

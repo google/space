@@ -155,6 +155,10 @@ class View(ABC):
              fn: Callable,
              input_fields: Optional[List[str]] = None) -> View:
     """Filter rows by the provided user defined function.
+
+    TODO: this filter is not applied to the deleted rows returned by diff(), it
+    thus returns more rows than expected. It does not affect correctness when
+    syncing the deletion to target MV, because the additional rows don't exist.
     
     Args:
       fn: a user defined function on batches.
