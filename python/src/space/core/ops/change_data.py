@@ -14,9 +14,10 @@
 #
 """Change data feed that computes delta between two snapshots."""
 
+import copy
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, Iterator, List
+from typing import Iterable, Iterator, List, Union
 
 import pyarrow as pa
 
@@ -27,6 +28,7 @@ import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
 from space.core.utils import errors
+from space.core.utils.lazy_imports_utils import ray
 from space.core.utils.paths import StoragePathsMixin
 
 
@@ -50,9 +52,8 @@ class ChangeData:
   # The change type.
   type_: ChangeType
 
-  # The change data (pa.Table or ray.data.Dataset).
-  # NOTE: type annotation not used, because of Ray lazy import.
-  data: Any
+  # The change data.
+  data: Union[pa.Table, List["ray.data.Dataset"]]
 
 
 def ordered_snapshot_ids(storage: Storage, start_snapshot_id: int,
@@ -108,6 +109,9 @@ class LocalChangeDataReadOp(StoragePathsMixin):
     self._snapshot_id = snapshot_id
     self._read_options = read_options
 
+    self._pk_only_read_option = copy.deepcopy(read_options)
+    self._pk_only_read_option.fields = self._storage.primary_keys
+
     if snapshot_id not in self._metadata.snapshots:
       raise errors.VersionNotFoundError(
           f"Change data read can't find snapshot ID {snapshot_id}")
@@ -121,18 +125,20 @@ class LocalChangeDataReadOp(StoragePathsMixin):
     # deletions and additions, it may delete newly added data.
     # TODO: to enforce this check upstream, or merge deletion+addition as a
     # update.
-    for data in self._read_op(self._change_log.deleted_rows):
+    for data in self._read_op(self._change_log.deleted_rows,
+                              self._pk_only_read_option):
       yield ChangeData(self._snapshot_id, ChangeType.DELETE, data)
 
-    for data in self._read_op(self._change_log.added_rows):
+    for data in self._read_op(self._change_log.added_rows, self._read_options):
       yield ChangeData(self._snapshot_id, ChangeType.ADD, data)
 
-  def _read_op(self, bitmaps: Iterable[meta.RowBitmap]) -> Iterator[pa.Table]:
+  def _read_op(self, bitmaps: Iterable[meta.RowBitmap],
+               read_options: ReadOptions) -> Iterator[pa.Table]:
     return iter(
         FileSetReadOp(self._storage.location,
                       self._metadata,
                       self._bitmaps_to_file_set(bitmaps),
-                      options=self._read_options))
+                      options=read_options))
 
   @classmethod
   def _bitmaps_to_file_set(cls,

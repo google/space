@@ -29,9 +29,11 @@ from space.core.ops.read import read_record_column
 from space.core.utils import errors
 from space.core.utils.uuids import random_id
 
+DEFAULT_RAY_OPTIONS = RayOptions(max_parallelism=1)
+
 
 def setup_module():
-  ray.init(ignore_reinit_error=True, num_cpus=1)
+  ray.init(ignore_reinit_error=True, num_cpus=2)
 
 
 @pytest.fixture
@@ -132,7 +134,8 @@ class TestRayReadWriteRunner:
                                       output_schema=sample_dataset.schema,
                                       output_record_fields=["binary"])
     assert_equal(
-        view.ray().read_all(batch_size=batch_size).sort_by("int64"),
+        view.ray(DEFAULT_RAY_OPTIONS).read_all(
+            batch_size=batch_size).sort_by("int64"),
         pa.concat_tables([
             pa.Table.from_pydict({
                 "int64": [10, 11, 12],
@@ -146,7 +149,7 @@ class TestRayReadWriteRunner:
                                          output_schema=view.schema,
                                          output_record_fields=["binary"])
     assert_equal(
-        transform_on_view.ray().read_all(
+        transform_on_view.ray(DEFAULT_RAY_OPTIONS).read_all(
             batch_size=batch_size).sort_by("int64"),
         pa.concat_tables([
             pa.Table.from_pydict({
@@ -178,7 +181,6 @@ class TestRayReadWriteRunner:
   def test_diff_map_batches(self, tmp_path, sample_dataset, refresh_batch_size):
     ds = sample_dataset
 
-    ray_options = RayOptions(max_parallelism=1)
     view_schema = pa.schema(
         [pa.field("int64", pa.int64()),
          pa.field("float64", pa.float64())])
@@ -189,7 +191,7 @@ class TestRayReadWriteRunner:
     mv1 = view.materialize(str(tmp_path / "mv1"))
 
     ds_runner = ds.local()
-    view_runner = view.ray(ray_options)
+    view_runner = view.ray(DEFAULT_RAY_OPTIONS)
 
     # Test append.
     ds_runner.append({
@@ -208,12 +210,9 @@ class TestRayReadWriteRunner:
 
     # Test deletion.
     ds_runner.delete(pc.field("int64") == 2)
-    expected_change1 = ChangeData(
-        ds.storage.metadata.current_snapshot_id, ChangeType.DELETE,
-        pa.Table.from_pydict({
-            "int64": [2],
-            "float64": [1.2]
-        }))
+    expected_change1 = ChangeData(ds.storage.metadata.current_snapshot_id,
+                                  ChangeType.DELETE,
+                                  pa.Table.from_pydict({"int64": [2]}))
     assert list(view_runner.diff(1, 2)) == [expected_change1]
 
     # Test that diff supports tags.
@@ -226,7 +225,7 @@ class TestRayReadWriteRunner:
     assert list(view_runner.diff(0, 2)) == [expected_change0, expected_change1]
 
     # Test materialized views.
-    ray_runner = mv.ray(ray_options)
+    ray_runner = mv.ray(DEFAULT_RAY_OPTIONS)
     local_runner = mv.local()
 
     assert len(ray_runner.refresh("tag1", batch_size=refresh_batch_size)) == 1
@@ -257,13 +256,7 @@ class TestRayReadWriteRunner:
         "binary": [b"b3", b"b4"]
     })
     assert list(ds_runner.diff(2, 3)) == [
-        ChangeData(
-            3, ChangeType.DELETE,
-            pa.Table.from_pydict({
-                "int64": [3],
-                "float64": [0.3],
-                "binary": [b"b3"]
-            })),
+        ChangeData(3, ChangeType.DELETE, pa.Table.from_pydict({"int64": [3]})),
         ChangeData(
             3, ChangeType.ADD,
             pa.Table.from_pydict({
@@ -274,7 +267,7 @@ class TestRayReadWriteRunner:
     ]
 
     # Test refresh multiple snapshots.
-    ray_runner = mv1.ray(ray_options)
+    ray_runner = mv1.ray(DEFAULT_RAY_OPTIONS)
     assert len(ray_runner.refresh(batch_size=refresh_batch_size)) == 3
     assert ray_runner.read_all() == pa.Table.from_pydict({
         "int64": [1, 3, 4],
@@ -282,7 +275,6 @@ class TestRayReadWriteRunner:
     })
 
   def test_diff_batch_size(self, tmp_path, sample_dataset):
-    ray_options = RayOptions(max_parallelism=1)
     ds = sample_dataset
 
     view_schema = pa.schema(
@@ -298,7 +290,7 @@ class TestRayReadWriteRunner:
         "binary": [b"b1", b"b2", b"b3"]
     })
 
-    assert list(view.ray(ray_options).diff(0, 1, batch_size=2)) == [
+    assert list(view.ray(DEFAULT_RAY_OPTIONS).diff(0, 1, batch_size=2)) == [
         ChangeData(
             ds.storage.metadata.current_snapshot_id, ChangeType.ADD,
             pa.Table.from_pydict({
@@ -313,16 +305,12 @@ class TestRayReadWriteRunner:
     ]
 
     mv = view.materialize(str(tmp_path / "mv"))
-    ray_runner = mv.ray(ray_options)
+    ray_runner = mv.ray(DEFAULT_RAY_OPTIONS)
     ray_runner.refresh(batch_size=2)
     assert list(ray_runner.read()) == [
         pa.Table.from_pydict({
-            "int64": [1, 2],
-            "float64": [1.1, 1.2],
-        }),
-        pa.Table.from_pydict({
-            "int64": [3],
-            "float64": [1.3],
+            "int64": [1, 2, 3],
+            "float64": [1.1, 1.2, 1.3],
         })
     ]
 
@@ -335,7 +323,7 @@ class TestRayReadWriteRunner:
                                  input_fields=["int64", "float64"])
 
     ds_runner = sample_dataset.local()
-    view_runner = view.ray(RayOptions(max_parallelism=1))
+    view_runner = view.ray(DEFAULT_RAY_OPTIONS)
 
     # Test append.
     ds_runner.append({
@@ -356,10 +344,7 @@ class TestRayReadWriteRunner:
     ds_runner.delete(pc.field("int64") == 2)
     expected_change1 = ChangeData(
         sample_dataset.storage.metadata.current_snapshot_id, ChangeType.DELETE,
-        pa.Table.from_pydict({
-            "int64": [2],
-            "float64": [0.2]
-        }))
+        pa.Table.from_pydict({"int64": [2]}))
     assert list(view_runner.diff(1, 2)) == [expected_change1]
 
     # Test several changes.
@@ -444,11 +429,11 @@ class TestRayReadWriteRunner:
           "string": [f"s{v}" for v in values]
       })
 
-    join_values = view.ray().read_all(JoinOptions(partition_fn=partition_fn))
+    join_values = view.ray(RayOptions(max_parallelism=8)).read_all(
+        JoinOptions(partition_fn=partition_fn))
     indexes = list(range(0, 5)) + list(range(40, 60)) + list(range(90, 100))
     expected_values = generate_expected(indexes).select(view.schema.names)
 
-    # TODO: reference_read support is not completed yet.
     if left_reference_read:
       assert join_values.schema == expected_schema
 
