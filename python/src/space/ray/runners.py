@@ -21,7 +21,6 @@ from typing import Iterator, List, Optional, Union
 
 import pyarrow as pa
 import pyarrow.compute as pc
-import ray
 
 from space.core.jobs import JobResult
 from space.core.loaders.array_record import ArrayRecordIndexFn
@@ -41,7 +40,7 @@ from space.ray.ops.append import RayAppendOp
 from space.ray.ops.change_data import read_change_data
 from space.ray.ops.delete import RayDeleteOp
 from space.ray.ops.insert import RayInsertOp
-from space.ray.ops.utils import singleton_storage
+from space.ray.ops.utils import iter_batches, singleton_storage
 from space.ray.options import RayOptions
 
 if TYPE_CHECKING:
@@ -83,9 +82,8 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
     read_options = ReadOptions(filter_, fields, snapshot_id, reference_read,
                                batch_size)
 
-    for ref in self._view.ray_dataset(self._ray_options, read_options,
-                                      join_options).to_arrow_refs():
-      yield ray.get(ref)
+    return iter_batches(
+        self._view.ray_dataset(self._ray_options, read_options, join_options))
 
   def diff(self,
            start_version: Union[Version],
@@ -102,11 +100,8 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
       # TODO: skip processing the data for deletions; the caller is usually
       # only interested at deleted primary keys.
       # TODO: to split change data into chunks for parallel processing.
-      processed_remote_data = self._view.process_source(change.data)
-      for ref in processed_remote_data.to_arrow_refs():
-        data = ray.get(ref)
-        if data.num_rows > 0:
-          yield ChangeData(change.snapshot_id, change.type_, data)
+      for data in iter_batches(self._view.process_source(change.data)):
+        yield ChangeData(change.snapshot_id, change.type_, data)
 
   @property
   def _source_storage(self) -> Storage:
@@ -150,10 +145,8 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
                    self._storage.version_to_snapshot_id(version))
     read_options = ReadOptions(filter_, fields, snapshot_id, reference_read,
                                batch_size)
-
-    for ref in self._storage.ray_dataset(self._ray_options,
-                                         read_options).to_arrow_refs():
-      yield ray.get(ref)
+    return iter_batches(
+        self._storage.ray_dataset(self._ray_options, read_options))
 
   def refresh(self,
               target_version: Optional[Version] = None,
