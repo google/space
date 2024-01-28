@@ -15,7 +15,10 @@
 """Utilities for Ray operations."""
 
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import Iterator, TYPE_CHECKING
+
+import ray
+import pyarrow as pa
 
 from space.core.storage import Storage
 from space.core.utils import errors
@@ -35,3 +38,13 @@ def singleton_storage(view: View) -> Storage:
     raise errors.UserInputError("Joining results of joins is not supported")
 
   return list(view.sources.values())[0].storage
+
+
+def iter_batches(ds: ray.data.Dataset) -> Iterator[pa.Table]:
+  """Return an iterator of PyArrow tables from a Ray dataset."""
+  # batch_size is None to use entire Ray blocks.
+  for data in ds.iter_batches(batch_size=None,
+                              batch_format="pyarrow",
+                              drop_last=False):
+    if data.num_rows > 0:
+      yield data

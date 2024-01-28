@@ -29,7 +29,7 @@ from space.core.schema.utils import (file_path_field_name, stats_field_name,
                                      row_id_field_name)
 import space.core.transform.utils as transform_utils
 from space.core.utils import errors
-from space.ray.ops.utils import singleton_storage
+from space.ray.ops.utils import iter_batches, singleton_storage
 from space.ray.options import RayOptions
 
 if TYPE_CHECKING:
@@ -138,14 +138,7 @@ def _join(left: _JoinInputInternal, right: _JoinInputInternal, join_key: str,
 
 
 def _read_all(ds: ray.data.Dataset) -> Optional[pa.Table]:
-  results = []
-  for ref in ds.to_arrow_refs():
-    data = ray.get(ref)
-    if data is None or data.num_rows == 0:
-      continue
-
-    results.append(data)
-
+  results = list(iter_batches(ds))
   if not results:
     return None
 
