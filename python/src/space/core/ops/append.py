@@ -79,6 +79,7 @@ class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
                location: str,
                metadata: meta.StorageMetadata,
                file_options: FileOptions,
+               branch: Optional[str] = None,
                record_address_input: bool = False):
     """
     Args:
@@ -114,6 +115,9 @@ class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
     self._record_manifest_writer = RecordManifestWriter(self._metadata_dir)
 
     self._patch = rt.Patch()
+    if branch:
+      self._patch.branch = branch
+
 
   def write(self, data: InputData) -> None:
     if not isinstance(data, pa.Table):

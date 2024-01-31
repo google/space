@@ -366,6 +366,8 @@ global___StorageStatistics = StorageStatistics
 class ChangeLog(google.protobuf.message.Message):
     """Change log stores changes made by a snapshot.
     NEXT_ID: 3
+    TODO: to replace RowBitmap list by runtime.FileSet (not backward
+    compatible).
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -391,6 +393,7 @@ global___ChangeLog = ChangeLog
 @typing_extensions.final
 class RowBitmap(google.protobuf.message.Message):
     """Mark rows in a file by bitmap.
+    TODO: to replace it by runtime.DataFile (not backward compatible).
     NEXT_ID: 5
     """
 

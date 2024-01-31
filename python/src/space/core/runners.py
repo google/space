@@ -143,13 +143,13 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
     self._file_options = file_options or FileOptions()
 
   @abstractmethod
-  def append(self, data: InputData) -> JobResult:
+  def append(self, data: InputData, branch: Optional[str] = None) -> JobResult:
     """Append data into the dataset."""
 
   @abstractmethod
   def append_from(
       self, source_fns: Union[InputIteratorFn,
-                              List[InputIteratorFn]]) -> JobResult:
+                              List[InputIteratorFn]], branch: Optional[str] = None) -> JobResult:
     """Append data into the dataset from an iterator source.
     
     source_fns contains a list of no args functions that return iterators. It
@@ -159,7 +159,7 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
 
   @abstractmethod
   def append_array_record(self, pattern: str,
-                          index_fn: ArrayRecordIndexFn) -> JobResult:
+                          index_fn: ArrayRecordIndexFn, branch: Optional[str] = None ) -> JobResult:
     """Append data from ArrayRecord files without copying data.
 
     Args:
@@ -170,7 +170,7 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
     """
 
   @abstractmethod
-  def append_parquet(self, pattern: str) -> JobResult:
+  def append_parquet(self, pattern: str, branch: Optional[str] = None) -> JobResult:
     """Append data from Parquet files without copying data.
 
     Args:
@@ -238,18 +238,18 @@ class LocalRunner(BaseReadWriteRunner):
                             ReadOptions(batch_size=batch_size))
 
   @StorageMixin.transactional
-  def append(self, data: InputData) -> Optional[rt.Patch]:
+  def append(self, data: InputData, branch: Optional[str] = None) -> Optional[rt.Patch]:
     op = LocalAppendOp(self._storage.location, self._storage.metadata,
-                       self._file_options)
+                       self._file_options, branch)
     op.write(data)
     return op.finish()
 
   @StorageMixin.transactional
   def append_from(
-      self, source_fns: Union[InputIteratorFn, List[InputIteratorFn]]
+      self, source_fns: Union[InputIteratorFn, List[InputIteratorFn]], branch: Optional[str] = None
   ) -> Optional[rt.Patch]:
     op = LocalAppendOp(self._storage.location, self._storage.metadata,
-                       self._file_options)
+                       self._file_options, branch)
     if not isinstance(source_fns, list):
       source_fns = [source_fns]
 
