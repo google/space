@@ -273,16 +273,15 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
     self._ray_options = ray_options or RayOptions()
 
   @StorageMixin.transactional
-  def append(self, data: InputData) -> Optional[rt.Patch]:
+  def append(self, data: InputData, branch: Optional[str] = None) -> Optional[rt.Patch]:
     op = RayAppendOp(self._storage.location, self._storage.metadata,
-                     self._ray_options, self._file_options)
+                     self._ray_options, self._file_options, branch)
     op.write(data)
     return op.finish()
 
   @StorageMixin.transactional
   def append_from(
-      self, source_fns: Union[InputIteratorFn, List[InputIteratorFn]]
-  ) -> Optional[rt.Patch]:
+      self, source_fns: Union[InputIteratorFn, List[InputIteratorFn]], branch: Optional[str] = None) -> Optional[rt.Patch]:
     if not isinstance(source_fns, list):
       source_fns = [source_fns]
 
@@ -290,8 +289,11 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
     ray_options.max_parallelism = min(len(source_fns),
                                       ray_options.max_parallelism)
 
-    return _append_from(self._storage, source_fns, ray_options,
-                        self._file_options)
+    op = RayAppendOp(self._storage.location, self._storage.metadata,
+                     ray_options, self._file_options, branch)
+    op.write_from(source_fns)
+
+    return op.finish()
 
   @StorageMixin.transactional
   def append_array_record(self, pattern: str,

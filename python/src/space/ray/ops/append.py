@@ -38,6 +38,7 @@ class RayAppendOp(BaseAppendOp):
                metadata: meta.StorageMetadata,
                ray_options: RayOptions,
                file_options: FileOptions,
+               branch: Optional[str] = None,
                record_address_input: bool = False):
     """
     Args:
@@ -46,7 +47,7 @@ class RayAppendOp(BaseAppendOp):
     self._ray_options = ray_options
     self._actors = [
         _AppendActor.remote(  # type: ignore[attr-defined] # pylint: disable=no-member
-            location, metadata, file_options, record_address_input)
+            location, metadata, file_options, branch, record_address_input)
         for _ in range(self._ray_options.max_parallelism)
     ]
 
@@ -101,8 +102,9 @@ class _AppendActor:
                location: str,
                metadata: meta.StorageMetadata,
                file_options: FileOptions,
+               branch: Optional[str] = None,
                record_address_input: bool = False):
-    self._op = LocalAppendOp(location, metadata, file_options,
+    self._op = LocalAppendOp(location, metadata, file_options, branch,
                              record_address_input)
 
   def write_from(self, source_fn: InputIteratorFn) -> None:
