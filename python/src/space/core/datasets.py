@@ -22,6 +22,7 @@ from substrait.algebra_pb2 import ReadRel, Rel
 
 from space.core.ops.utils import FileOptions
 from space.core.options import JoinOptions, ReadOptions
+from space.core.utils import errors
 from space.core.runners import LocalRunner
 from space.core.storage import Storage
 from space.core.transform.plans import LogicalPlanBuilder
@@ -35,6 +36,7 @@ class Dataset(View):
 
   def __init__(self, storage: Storage):
     self._storage = storage
+    self._current_branche = "main"
 
   @property
   def storage(self) -> Storage:
@@ -80,6 +82,22 @@ class Dataset(View):
   def remove_tag(self, tag: str):
     """Remove tag from a snapshot."""
     self._storage.remove_tag(tag)
+
+  @property
+  def current_branch(self) -> str:
+    """Return the current branch."""
+    return self._current_branch
+
+  def add_branch(self, branch: str):
+    """Add branch to a snapshot."""
+    self._storage.add_branch(branch=branch)
+
+  def remove_branch(self, branch: str):
+    """Remove tag from a snapshot."""
+    self._storage.remove_branch(branch)
+
+  def set_current_branch(self, branch: str):
+    self.storage.set_current_branch(branch)
 
   def local(self, file_options: Optional[FileOptions] = None) -> LocalRunner:
     """Get a runner that runs operations locally."""

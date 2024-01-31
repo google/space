@@ -50,8 +50,8 @@ Version: TypeAlias = Union[str, int]
 
 # Initial snapshot ID.
 _INIT_SNAPSHOT_ID = 0
-
-_RESERVED_REFERENCE = ["main"]
+_MAIN_BRANCH = "main"
+_RESERVED_REFERENCE = [_MAIN_BRANCH]
 
 
 # pylint: disable=too-many-public-methods
@@ -62,7 +62,7 @@ class Storage(paths.StoragePathsMixin):
   """
 
   def __init__(self, location: str, metadata_file: str,
-               metadata: meta.StorageMetadata):
+               metadata: meta.StorageMetadata, current_branch: Optional[str] = None):
     super().__init__(location)
     self._fs = create_fs(location)
     self._metadata = metadata
@@ -78,12 +78,21 @@ class Storage(paths.StoragePathsMixin):
     self._field_name_ids: Dict[str, int] = arrow.field_name_to_id_dict(
         self._physical_schema)
 
-    self._primary_keys = set(self._metadata.schema.primary_keys)
+    self._primary_keys = set(self._metadata.schema.primary_keys) 
+    self._current_branch = current_branch
+    self._max_snapshot_id = max([ref[1].snapshot_id for ref in self._metadata.refs.items()] + [self._metadata.current_snapshot_id]) 
 
   @property
   def metadata(self) -> meta.StorageMetadata:
     """Return the storage metadata."""
     return self._metadata
+
+  @property
+  def current_branch(self) -> str:
+    """Return the current branch."""
+    if not self._current_branch:
+      return _MAIN_BRANCH
+    return self._current_branch
 
   @property
   def primary_keys(self) -> List[str]:
@@ -187,7 +196,7 @@ class Storage(paths.StoragePathsMixin):
       return False
 
     metadata = _read_metadata(self._fs, self._location, entry_point)
-    self.__init__(self.location, entry_point.metadata_file, metadata)  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
+    self.__init__(self.location, entry_point.metadata_file, metadata, self.current_branch)  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
     logging.info(
         f"Storage reloaded to snapshot: {self._metadata.current_snapshot_id}")
     return True
@@ -214,9 +223,17 @@ class Storage(paths.StoragePathsMixin):
     """Add tag to a snapshot"""
     self._add_reference(tag, meta.SnapshotReference.TAG, snapshot_id)
   
-  def add_branch(self, branch: str, snapshot_id: Optional[int] = None) -> None:
+  def add_branch(self, branch: str) -> None:
     """Add branch to a snapshot"""
-    self._add_reference(branch, meta.SnapshotReference.BRANCH, snapshot_id)
+    self._add_reference(branch, meta.SnapshotReference.BRANCH, None)
+
+  def set_current_branch(self, branch: str):
+    """Set current branch for the snapshot."""
+    if branch != "main":
+      snapshot_ref = self._lookup_reference(branch)
+      if snapshot_ref.type != meta.SnapshotReference.BRANCH:
+        raise errors.UserInputError("{branch} is not a branch.")
+    self._current_branch = branch
 
   def _add_reference(self,
                      reference_name: str,
@@ -255,6 +272,8 @@ class Storage(paths.StoragePathsMixin):
   
   def remove_branch(self, branch: str) -> None:
     """Remove tag from metadata"""
+    if branch == self._current_branch:
+      raise errors.UserInputError("Cannot remove the current branch.")
     self._remove_reference(branch, meta.SnapshotReference.BRANCH)
 
   def _remove_reference(self, reference_name:str, reference_type: meta.SnapshotReference.ReferenceType)-> None:
@@ -270,7 +289,7 @@ class Storage(paths.StoragePathsMixin):
     self._metadata = new_metadata
     self._metadata_file = new_metadata_path
 
-  def commit(self, patch: rt.Patch) -> None:
+  def commit(self, patch: rt.Patch, branch:str) -> None:
     """Commit changes to the storage.
 
     TODO: only support a single writer; to ensure atomicity in commit by
@@ -278,14 +297,19 @@ class Storage(paths.StoragePathsMixin):
 
     Args:
       patch: a patch describing changes made to the storage.
+      branch: the branch this commit is writing to.
     """
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
     new_snapshot_id = self._next_snapshot_id()
-    if patch.branch:
-      branch_snapshot_id = self._lookup_reference(patch.branch)
-      current_snapshot = self.snapshot(branch_snapshot_id)
-      new_metadata.refs[patch.branch].snapshot_id = new_snapshot_id
+    if branch and branch != _MAIN_BRANCH:
+      branch_snapshot = self._lookup_reference(branch)
+      # To block the case delete branch and add a tag during commit
+      # TODO: move this check out of commit()
+      if branch_snapshot.type != meta.SnapshotReference.BRANCH:
+        raise errors.UserInputError("Branch {branch} is no longer exists.")
+      current_snapshot = self.snapshot(branch_snapshot.snapshot_id)
+      new_metadata.refs[branch].snapshot_id = new_snapshot_id
     else:
       new_metadata.current_snapshot_id = new_snapshot_id
       current_snapshot = self.snapshot()
@@ -316,6 +340,7 @@ class Storage(paths.StoragePathsMixin):
     self._write_metadata(new_metadata_path, new_metadata)
     self._metadata = new_metadata
     self._metadata_file = new_metadata_path
+    print(self._metadata)
 
   def data_files(self,
                  filter_: Optional[pc.Expression] = None,
@@ -444,7 +469,8 @@ class Storage(paths.StoragePathsMixin):
       raise errors.StorageExistError(str(e)) from None
 
   def _next_snapshot_id(self) -> int:
-    return self._metadata.current_snapshot_id + 1
+    self._max_snapshot_id = self._max_snapshot_id + 1
+    return self._max_snapshot_id
 
   def _write_metadata(
       self,
@@ -500,7 +526,7 @@ class Transaction:
     self._txn_id = uuid_()
     # The storage snapshot ID when the transaction starts.
     self._snapshot_id: Optional[int] = None
-
+    self._branch = storage.current_branch
     self._result: Optional[JobResult] = None
 
   def commit(self, patch: Optional[rt.Patch]) -> None:
@@ -510,7 +536,10 @@ class Transaction:
     # Check that no other commit has taken place.
     assert self._snapshot_id is not None
     self._storage.reload()
-    if self._snapshot_id != self._storage.metadata.current_snapshot_id:
+    current_snapshot_id = self._storage.metadata.current_snapshot_id
+    if self._branch != _MAIN_BRANCH:
+      current_snapshot_id = self._storage.version_to_snapshot_id(self._branch)
+    if self._snapshot_id != current_snapshot_id:
       self._result = JobResult(
           JobResult.State.FAILED, None,
           "Abort commit because the storage has been modified.")
@@ -520,7 +549,7 @@ class Transaction:
       self._result = JobResult(JobResult.State.SKIPPED)
       return
 
-    self._storage.commit(patch)
+    self._storage.commit(patch, self._branch)
     self._result = JobResult(JobResult.State.SUCCEEDED,
                              patch.storage_statistics_update)
 
@@ -537,6 +566,8 @@ class Transaction:
     # mutations.
     self._storage.reload()
     self._snapshot_id = self._storage.metadata.current_snapshot_id
+    if self._branch != _MAIN_BRANCH:
+      self._snapshot_id = self._storage._lookup_reference(self._branch).snapshot_id
     logging.info(f"Start transaction {self._txn_id}")
     return self
 

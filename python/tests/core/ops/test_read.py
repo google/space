@@ -42,7 +42,7 @@ class TestFileSetReadOp:
     for batch in input_data:
       append_op.write(batch)
 
-    storage.commit(append_op.finish())
+    storage.commit(append_op.finish(), "main")
 
     read_op = FileSetReadOp(str(location), storage.metadata,
                             storage.data_files())
@@ -80,7 +80,7 @@ class TestFileSetReadOp:
     for batch in input_data:
       append_op.write(batch)
 
-    storage.commit(append_op.finish())
+    storage.commit(append_op.finish(), "main")
     data_files = storage.data_files()
 
     read_op = FileSetReadOp(str(location), storage.metadata, data_files)

@@ -200,6 +200,79 @@ class TestLocalRunner:
 
     assert "Version insert1 is not found" in str(excinfo.value)
 
+  def test_concurrent_write_to_different_branch(self, sample_dataset):
+    ds = sample_dataset
+    ds.add_branch("exp1")
+    local_runner = ds.local()
+    lock1 = threading.Lock()
+    lock2 = threading.Lock()
+    lock1.acquire()
+    lock2.acquire()
+
+    sample_data = _generate_data([1, 2])
+
+    def make_iter():
+      yield sample_data
+      lock2.release()
+      lock1.acquire()
+      yield sample_data
+      lock1.release()
+
+    job_result = [None]
+
+    def append_data():
+      job_result[0] = local_runner.append_from(make_iter)
+
+    t = threading.Thread(target=append_data)
+    t.start()
+    lock2.acquire()
+    ds.set_current_branch("exp1")
+    local_runner.append(sample_data)
+    lock2.release()
+    lock1.release()
+    t.join()
+
+    assert local_runner.read_all() == pa.concat_tables(
+        [sample_data, sample_data])
+    assert local_runner.read_all(version="exp1") == pa.concat_tables(
+        [sample_data])
+
+  def test_add_read_with_branch(self, sample_dataset):
+    ds = sample_dataset
+    local_runner = ds.local()
+
+    sample_data1 = _generate_data([1, 2])
+    local_runner.append(sample_data1)
+
+    ds.add_branch("exp1")
+    
+    assert local_runner.read_all() == sample_data1
+
+    create_time0 = datetime.utcfromtimestamp(
+        ds.storage.metadata.snapshots[0].create_time.seconds).replace(
+            tzinfo=pytz.utc)
+    create_time1 = datetime.utcfromtimestamp(
+        ds.storage.metadata.snapshots[1].create_time.seconds).replace(
+            tzinfo=pytz.utc)
+    assert ds.versions().to_pydict() == {
+        "snapshot_id": [1, 0],
+        "tag_or_branch": ["exp1", None],
+        "create_time": [create_time1, create_time0]
+    }
+
+    sample_data2 = _generate_data([3, 4])
+    local_runner.append(sample_data2)
+
+    ds.set_current_branch("exp1")
+
+    sample_data3 = _generate_data([5, 6])
+    local_runner.append(sample_data3)
+
+    assert local_runner.read_all() == pa.concat_tables(
+        [sample_data1, sample_data2])
+    assert local_runner.read_all(version="exp1") == pa.concat_tables(
+        [sample_data1, sample_data3])
+
   def test_dataset_with_file_type(self, tmp_path):
     schema = pa.schema([("id", pa.int64()), ("name", pa.string()),
                         ("file", File(directory="test_folder"))])

@@ -159,6 +159,27 @@ class TestRayReadWriteRunner:
             })
         ]).sort_by("int64"))
 
+     # Test insert.
+    sample_dataset.add_branch("branch")
+    sample_dataset.set_current_branch("branch")
+    result = runner.insert(generate_data([7, 12]))
+    assert result.state == JobResult.State.FAILED
+    assert "Primary key to insert already exist" in result.error_message
+
+    runner.upsert(generate_data([7, 12]))
+    assert_equal(
+        runner.read_all(version="branch").sort_by("int64"),
+        pa.concat_tables([
+            input_data0, input_data1, input_data2, input_data3, input_data4,
+            generate_data([12])
+        ]).sort_by("int64"))
+
+    # Test delete.
+    runner.delete(pc.field("int64") < 10)
+    assert_equal(
+        runner.read_all(version="branch").sort_by("int64"),
+        pa.concat_tables([generate_data([10, 11, 12])]).sort_by("int64"))
+
   @pytest.mark.parametrize("enable_row_range_block", [(True,), (False,)])
   def test_read_batch_size(self, tmp_path, sample_schema,
                            enable_row_range_block):
