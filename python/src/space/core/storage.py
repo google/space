@@ -123,7 +123,10 @@ class Storage(paths.StoragePathsMixin):
     if not specified.
     """
     if snapshot_id is None:
-      snapshot_id = self._metadata.current_snapshot_id
+      if self.current_branch == _MAIN_BRANCH:
+        snapshot_id = self._metadata.current_snapshot_id
+      else:
+        snapshot_id = self.version_to_snapshot_id(self.current_branch)
 
     if snapshot_id in self._metadata.snapshots:
       return self._metadata.snapshots[snapshot_id]
@@ -340,7 +343,6 @@ class Storage(paths.StoragePathsMixin):
     self._write_metadata(new_metadata_path, new_metadata)
     self._metadata = new_metadata
     self._metadata_file = new_metadata_path
-    print(self._metadata)
 
   def data_files(self,
                  filter_: Optional[pc.Expression] = None,
