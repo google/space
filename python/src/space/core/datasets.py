@@ -111,12 +111,8 @@ class Dataset(View):
     # Dataset is the source, there is no transform, so simply return the data.
     return data
 
-  def ray_dataset(
-      self,
-      ray_options: RayOptions,
-      read_options: ReadOptions = ReadOptions(),
-      join_options: JoinOptions = JoinOptions()
-  ) -> ray.data.Dataset:
+  def _ray_dataset(self, ray_options: RayOptions, read_options: ReadOptions,
+                   join_options: JoinOptions) -> ray.data.Dataset:
     """Return a Ray dataset for a Space dataset."""
     return self._storage.ray_dataset(ray_options, read_options)
 

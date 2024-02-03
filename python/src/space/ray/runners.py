@@ -84,7 +84,7 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
                                batch_size)
 
     return iter_batches(
-        self._view.ray_dataset(self._ray_options, read_options, join_options))
+        self._view._ray_dataset(self._ray_options, read_options, join_options))  # pylint: disable=protected-access
 
   def diff(self,
            start_version: Union[Version],

@@ -33,11 +33,11 @@ def ray_dataset(view: View, ray_options: RayOptions,
 
   if isinstance(view, Dataset):
     # Push input_fields down to the dataset to read less data.
-    return view.ray_dataset(ray_options, read_options, empty_join_options)
+    return view._ray_dataset(ray_options, read_options, empty_join_options)  # pylint: disable=protected-access
 
   # For non-dataset views, fields can't be pushed down to storage.
   fields = read_options.fields
   read_options.fields = None
-  ds = view.ray_dataset(ray_options, read_options, empty_join_options)
+  ds = view._ray_dataset(ray_options, read_options, empty_join_options)  # pylint: disable=protected-access
 
   return ds if fields is None else ds.select_columns(fields)
