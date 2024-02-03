@@ -25,8 +25,8 @@ import pyarrow.parquet as pq
 from space.core.manifests import IndexManifestWriter
 from space.core.manifests import RecordManifestWriter
 from space.core.ops import utils
-from space.core.ops.utils import FileOptions
 from space.core.ops.base import BaseOp, InputData
+from space.core.options import FileOptions
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
 from space.core.schema import arrow

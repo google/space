@@ -21,9 +21,9 @@ import pyarrow as pa
 import ray
 
 from space.core.ops import utils
-from space.core.ops.utils import FileOptions
 from space.core.ops.append import BaseAppendOp, LocalAppendOp
 from space.core.ops.base import InputData, InputIteratorFn
+from space.core.options import FileOptions
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
 from space.ray.options import RayOptions

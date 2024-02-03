@@ -14,7 +14,7 @@
 #
 """Options of Space core lib."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field
 from typing import Any, Callable, List, Optional
 
 import pyarrow.compute as pc
@@ -54,6 +54,48 @@ class ReadOptions:
 
   def __post_init__(self):
     self.batch_size = self.batch_size or DEFAULT_READ_BATCH_SIZE
+
+
+@dataclass
+class ParquetWriterOptions:
+  """Options of Parquet file writer."""
+  # Max uncompressed bytes per row group.
+  max_uncompressed_row_group_bytes: int = 100 * 1024
+
+  # Max uncompressed bytes per file.
+  max_uncompressed_file_bytes: int = 1 * 1024 * 1024
+
+
+# pylint: disable=line-too-long
+@dataclass
+class ArrayRecordOptions:
+  """Options of ArrayRecord file writer."""
+  # Max uncompressed bytes per file.
+  max_uncompressed_file_bytes: int = 100 * 1024 * 1024
+
+  # ArrayRecord lib options.
+  #
+  # See https://github.com/google/array_record/blob/2ac1d904f6be31e5aa2f09549774af65d84bff5a/cpp/array_record_writer.h#L83
+  # Default group size 1 maximizes random read performance.
+  # It matches the options of TFDS:
+  # https://github.com/tensorflow/datasets/blob/92ebd18102b62cf85557ba4b905c970203d8914d/tensorflow_datasets/core/sequential_writer.py#L108
+  #
+  # A larger group size improves read throughput from Cloud Storage, because
+  # each RPC reads a larger chunk of data, which performs better on Cloud
+  # Storage.
+  options: str = "group_size:1"
+
+
+@dataclass
+class FileOptions:
+  """Options of file IO."""
+  # Parquet file options.
+  parquet_options: ParquetWriterOptions = dataclass_field(
+      default_factory=ParquetWriterOptions)
+
+  # ArrayRecord file options.
+  array_record_options: ArrayRecordOptions = dataclass_field(
+      default_factory=ArrayRecordOptions)
 
 
 @dataclass

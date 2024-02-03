@@ -22,10 +22,8 @@ from typing import Callable, Dict, List, Optional, TYPE_CHECKING
 import pyarrow as pa
 from substrait.algebra_pb2 import Rel
 
-from space.core.options import JoinOptions
 from space.core.fs.factory import create_fs
-from space.core.ops.utils import FileOptions
-from space.core.options import ReadOptions
+from space.core.options import FileOptions, JoinOptions, ReadOptions
 import space.core.proto.metadata_pb2 as meta
 from space.core.schema import FieldIdManager
 from space.core.storage import Storage

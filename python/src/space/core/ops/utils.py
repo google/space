@@ -14,28 +14,16 @@
 #
 """Utilities for operation classes."""
 
-from dataclasses import dataclass, field as dataclass_field
 from typing import List, Optional, Set
 
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from space.core.fs.array_record import ArrayRecordOptions
-from space.core.fs.parquet import ParquetWriterOptions
 from space.core.schema import arrow
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
 from space.core.utils import errors
-
-
-@dataclass
-class FileOptions:
-  """Options of file IO."""
-  parquet_options: ParquetWriterOptions = dataclass_field(
-      default_factory=ParquetWriterOptions)
-  array_record_options: ArrayRecordOptions = dataclass_field(
-      default_factory=ArrayRecordOptions)
 
 
 def update_index_storage_stats(

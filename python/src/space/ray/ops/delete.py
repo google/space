@@ -21,8 +21,8 @@ import pyarrow.compute as pc
 import ray
 
 from space.core.ops import utils
-from space.core.ops.utils import FileOptions
 from space.core.ops.delete import BaseDeleteOp, FileSetDeleteOp
+from space.core.options import FileOptions
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
 from space.core.storage import Storage

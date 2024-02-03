@@ -14,20 +14,10 @@
 #
 """Parquet file utilities."""
 
-from dataclasses import dataclass
 from typing import List
 
 import pyarrow as pa
 import pyarrow.parquet as pq
-
-
-@dataclass
-class ParquetWriterOptions:
-  """Options of Parquet file writer."""
-  # Max uncompressed bytes per row group.
-  max_uncompressed_row_group_bytes = 100 * 1024
-  # Max uncompressed bytes per file.
-  max_uncompressed_file_bytes: int = 1 * 1024 * 1024
 
 
 def write_parquet_file(file_path: str, schema: pa.Schema,
