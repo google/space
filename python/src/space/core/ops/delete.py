@@ -24,9 +24,9 @@ import pyarrow.compute as pc
 from pyroaring import BitMap  # type: ignore[import-not-found]
 
 from space.core.ops import utils
-from space.core.ops.utils import FileOptions
 from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import BaseOp
+from space.core.options import FileOptions
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
 from space.core.utils import errors

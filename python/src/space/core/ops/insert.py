@@ -27,8 +27,7 @@ from space.core.ops.append import LocalAppendOp
 from space.core.ops.base import BaseOp, InputData
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.read import FileSetReadOp
-from space.core.ops.utils import FileOptions
-from space.core.options import ReadOptions
+from space.core.options import FileOptions, ReadOptions
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage

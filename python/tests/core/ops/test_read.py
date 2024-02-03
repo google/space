@@ -16,9 +16,8 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from space.core.ops.append import LocalAppendOp
-from space.core.ops.utils import FileOptions
 from space.core.ops.read import FileSetReadOp
-from space.core.options import ReadOptions
+from space.core.options import FileOptions, ReadOptions
 from space.core.storage import Storage
 
 _default_file_options = FileOptions()

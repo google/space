@@ -27,13 +27,12 @@ from space.core.loaders.array_record import ArrayRecordIndexFn
 from space.core.loaders.array_record import LocalArrayRecordLoadOp
 from space.core.loaders.parquet import LocalParquetLoadOp
 from space.core.ops.append import LocalAppendOp
-from space.core.ops.append import FileOptions
 from space.core.ops.base import InputData, InputIteratorFn
 from space.core.ops.change_data import ChangeData, read_change_data
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions, LocalInsertOp
 from space.core.ops.read import FileSetReadOp
-from space.core.options import JoinOptions, ReadOptions
+from space.core.options import FileOptions, JoinOptions, ReadOptions
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage, Version
 from space.core.utils import errors
