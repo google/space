@@ -30,6 +30,7 @@ Unify data in your entire machine learning lifecycle with **Space**, a comprehen
 - [Ground truth database of LabelStudio](notebooks/label_studio_tutorial.ipynb)
 - [Transforms and materialized views: Segment Anything as example](notebooks/segment_anything_tutorial.ipynb)
 - [Incrementally build embedding vector indexes](notebooks/incremental_embedding_index.ipynb)
+- [Parallel ingestion from WebDataset](notebooks/webdataset_ingestion.ipynb)
 
 ## Space 101
 
@@ -37,13 +38,12 @@ Unify data in your entire machine learning lifecycle with **Space**, a comprehen
 - All file paths in Space are [relative](./docs/design.md#relative-paths); datasets are immediately usable after downloading or moving.
 - Space stores data itself, or a reference of data, in Parquet files. The reference can be the address of a row in ArrayRecord file, or the path of a standalone file (limitted support, see `space.core.schema.types.files`).
 - `space.TfFeatures` is a built-in field type providing serializers for nested dicts of numpy arrays, based on [TFDS FeaturesDict](https://www.tensorflow.org/datasets/api_docs/python/tfds/features/FeaturesDict).
-- Please find more information in [the design page](docs/design.md).
+- Please find more information in the [design](docs/design.md) and [performance](docs/performance.md) docs.
 
 ## Quick Start
 
 - [Install](#install)
-- [Cloud Storage](#cloud-storage)
-- [Cluster setup](#cluster-setup)
+- [Cluster Setup and Performance Tuning](#cluster-setup-and-performance-tuning)
 - [Create and Load Datasets](#create-and-load-datasets)
 - [Write and Read](#write-and-read)
 - [Transform and Materialized Views](#transform-and-materialized-views)
@@ -63,33 +63,9 @@ cd python
 pip install .[dev]
 ```
 
-### Cloud Storage
+### Cluster Setup and Performance Tuning
 
-Optionally, setup [GCS FUSE](https://cloud.google.com/storage/docs/gcs-fuse) to use files on Google Cloud Storage (GCS) (or [S3](https://github.com/s3fs-fuse/s3fs-fuse), [Azure](https://github.com/Azure/azure-storage-fuse)):
-
-```bash
-gcsfuse <mybucket> "/path/to/<mybucket>"
-```
-
-Space has not yet implemented Cloud Storage file systems. FUSE is the current suggested approach.
-
-### Cluster Setup
-
-Optionally, setup a cluster to run Space operations distributedly. We support Ray clusters, on the Ray cluster head/worker nodes:
-```bash
-# Start a Ray head node (IP 123.45.67.89, for example).
-# See https://docs.ray.io/en/latest/ray-core/starting-ray.html for details.
-ray start --head --port=6379
-```
-
-Using [Cloud Storage + FUSE](#cloud-storage) is required in the distributed mode, because the Ray cluster and the client machine should operate on the same directory of files. Run `gcsfuse` on all machines and the mapped local directory paths **must be the same**.
-
-Run the following code on the client machine to connect to the Ray cluster:
-```py
-import ray
-# Connect to the Ray cluster.
-ray.init(address="ray://123.45.67.89:10001")
-```
+See the [setup and performance doc](/docs/performance.md#ray-runner-setup).
 
 ### Create and Load Datasets
 

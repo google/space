@@ -17,7 +17,8 @@
 from space.catalogs.base import DatasetInfo
 from space.catalogs.directory import DirCatalog
 from space.core.datasets import Dataset
-from space.core.options import JoinOptions, Range, ReadOptions
+from space.core.options import (ArrayRecordOptions, FileOptions, JoinOptions,
+                                ParquetWriterOptions, Range, ReadOptions)
 from space.core.runners import LocalRunner
 from space.core.random_access import RandomAccessDataSource
 from space.core.schema.types import File, TfFeatures

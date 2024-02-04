@@ -1,6 +1,6 @@
 [project]
 name = "space-datasets"
-version = "0.0.8"
+version = "0.0.9"
 authors = [{ name = "Space team", email = "no-reply@google.com" }]
 description = "Unified storage framework for machine learning datasets"
 readme = "README.md"
