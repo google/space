@@ -31,6 +31,7 @@ Unify data in your entire machine learning lifecycle with **Space**, a comprehen
 - [Transforms and materialized views: Segment Anything as example](notebooks/segment_anything_tutorial.ipynb)
 - [Incrementally build embedding vector indexes](notebooks/incremental_embedding_index.ipynb)
 - [Parallel ingestion from WebDataset](notebooks/webdataset_ingestion.ipynb)
+- [Convert from/to HuggingFace datasets](notebooks/huggingface_conversion.ipynb)
 
 ## Space 101
 
