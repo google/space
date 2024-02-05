@@ -33,6 +33,7 @@ class ReadOptions:
   fields: Optional[List[str]] = None
 
   # The snapshot to read.
+  # TODO: to change it to version.
   snapshot_id: Optional[int] = None
 
   # If true, read the references (e.g., address) of read record fields instead

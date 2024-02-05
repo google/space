@@ -32,6 +32,7 @@ class TestLocalParquetLoadOp:
                         schema,
                         primary_keys=["int64"],
                         record_fields=[])
+    ds.add_tag("empty")
 
     input_data = [{
         "int64": [1, 2, 3],
@@ -48,13 +49,15 @@ class TestLocalParquetLoadOp:
     # Create dummy Parquet files.
     input_dir = tmp_path / "parquet"
     input_dir.mkdir(parents=True)
-    write_parquet_file(str(input_dir / "file0.parquet"), schema,
-                       [pa.Table.from_pydict(input_data[0])])
-    write_parquet_file(str(input_dir / "file1.parquet"), schema,
-                       [pa.Table.from_pydict(input_data[1])])
+
+    file0 = str(input_dir / "file0.parquet")
+    file1 = str(input_dir / "file1.parquet")
+    write_parquet_file(file0, schema, [pa.Table.from_pydict(input_data[0])])
+    write_parquet_file(file1, schema, [pa.Table.from_pydict(input_data[1])])
 
     runner = ds.local()
     response = runner.append_parquet(f"{input_dir}/*.parquet")
+    ds.add_tag("after_append")
     assert response.storage_statistics_update == meta.StorageStatistics(
         num_rows=5,
         index_compressed_bytes=214,
@@ -66,3 +69,6 @@ class TestLocalParquetLoadOp:
     assert index_data == pa.concat_tables([
         pa.Table.from_pydict(d) for d in input_data
     ]).combine_chunks().sort_by("int64")
+
+    assert not ds.index_files(version="empty")
+    assert ds.index_files(version="after_append") == [file0, file1]

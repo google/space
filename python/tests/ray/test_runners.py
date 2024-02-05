@@ -290,19 +290,20 @@ class TestRayReadWriteRunner:
         "binary": [b"b1", b"b2", b"b3"]
     })
 
-    assert list(view.ray(DEFAULT_RAY_OPTIONS).diff(0, 1, batch_size=2)) == [
-        ChangeData(
-            ds.storage.metadata.current_snapshot_id, ChangeType.ADD,
-            pa.Table.from_pydict({
-                "int64": [1, 2],
-                "float64": [1.1, 1.2],
-            })),
-        ChangeData(ds.storage.metadata.current_snapshot_id, ChangeType.ADD,
-                   pa.Table.from_pydict({
-                       "int64": [3],
-                       "float64": [1.3],
-                   }))
-    ]
+    change0 = ChangeData(
+        ds.storage.metadata.current_snapshot_id, ChangeType.ADD,
+        pa.Table.from_pydict({
+            "int64": [1, 2],
+            "float64": [1.1, 1.2],
+        }))
+    change1 = ChangeData(
+        ds.storage.metadata.current_snapshot_id, ChangeType.ADD,
+        pa.Table.from_pydict({
+            "int64": [3],
+            "float64": [1.3],
+        }))
+    result = list(view.ray(DEFAULT_RAY_OPTIONS).diff(0, 1, batch_size=2))
+    assert result in ([change0, change1], [change1, change0])
 
     mv = view.materialize(str(tmp_path / "mv"))
     ray_runner = mv.ray(DEFAULT_RAY_OPTIONS)
