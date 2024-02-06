@@ -62,7 +62,8 @@ class Storage(paths.StoragePathsMixin):
   """
 
   def __init__(self, location: str, metadata_file: str,
-               metadata: meta.StorageMetadata, current_branch: Optional[str] = None):
+               metadata: meta.StorageMetadata, 
+               current_branch: Optional[str] = None):
     super().__init__(location)
     self._fs = create_fs(location)
     self._metadata = metadata
@@ -78,9 +79,11 @@ class Storage(paths.StoragePathsMixin):
     self._field_name_ids: Dict[str, int] = arrow.field_name_to_id_dict(
         self._physical_schema)
 
-    self._primary_keys = set(self._metadata.schema.primary_keys) 
+    self._primary_keys = set(self._metadata.schema.primary_keys)
     self._current_branch = current_branch
-    self._max_snapshot_id = max([ref[1].snapshot_id for ref in self._metadata.refs.items()] + [self._metadata.current_snapshot_id]) 
+    self._max_snapshot_id = max(
+      [ref[1].snapshot_id for ref in self._metadata.refs.items()] +
+      [self._metadata.current_snapshot_id])
 
   @property
   def metadata(self) -> meta.StorageMetadata:
@@ -225,7 +228,7 @@ class Storage(paths.StoragePathsMixin):
   def add_tag(self, tag: str, snapshot_id: Optional[int] = None) -> None:
     """Add tag to a snapshot"""
     self._add_reference(tag, meta.SnapshotReference.TAG, snapshot_id)
-  
+
   def add_branch(self, branch: str) -> None:
     """Add branch to a snapshot"""
     self._add_reference(branch, meta.SnapshotReference.BRANCH, None)
@@ -256,7 +259,8 @@ class Storage(paths.StoragePathsMixin):
       raise errors.UserInputError("{reference_name} is reserved")
 
     if reference_name in self._metadata.refs:
-      raise errors.VersionAlreadyExistError(f"Reference {reference_name} already exist")
+      raise errors.VersionAlreadyExistError(
+        f"Reference {reference_name} already exist")
 
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
@@ -272,7 +276,7 @@ class Storage(paths.StoragePathsMixin):
   def remove_tag(self, tag: str) -> None:
     """Remove tag from metadata"""
     self._remove_reference(tag, meta.SnapshotReference.TAG)
-  
+
   def remove_branch(self, branch: str) -> None:
     """Remove tag from metadata"""
     if branch == self._current_branch:
@@ -315,7 +319,7 @@ class Storage(paths.StoragePathsMixin):
       new_metadata.refs[branch].snapshot_id = new_snapshot_id
     else:
       new_metadata.current_snapshot_id = new_snapshot_id
-      current_snapshot = self.snapshot()
+      current_snapshot = self.snapshot(self._metadata.current_snapshot_id)
     new_metadata.last_update_time.CopyFrom(proto_now())
     new_metadata_path = self.new_metadata_path()
 

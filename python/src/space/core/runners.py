@@ -170,7 +170,7 @@ class BaseReadWriteRunner(StorageMixin, BaseReadOnlyRunner):
     """
 
   @abstractmethod
-  def append_parquet(self, pattern: str, branch: Optional[str] = None) -> JobResult:
+  def append_parquet(self, pattern: str) -> JobResult:
     """Append data from Parquet files without copying data.
 
     Args:

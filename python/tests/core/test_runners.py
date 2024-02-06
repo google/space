@@ -232,6 +232,7 @@ class TestLocalRunner:
     lock1.release()
     t.join()
 
+    ds.set_current_branch("main")
     assert local_runner.read_all() == pa.concat_tables(
         [sample_data, sample_data])
     assert local_runner.read_all(version="exp1") == pa.concat_tables(
@@ -268,6 +269,7 @@ class TestLocalRunner:
     sample_data3 = _generate_data([5, 6])
     local_runner.append(sample_data3)
 
+    ds.set_current_branch("main")
     assert local_runner.read_all() == pa.concat_tables(
         [sample_data1, sample_data2])
     assert local_runner.read_all(version="exp1") == pa.concat_tables(

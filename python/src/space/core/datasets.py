@@ -36,7 +36,6 @@ class Dataset(View):
 
   def __init__(self, storage: Storage):
     self._storage = storage
-    self._current_branche = "main"
 
   @property
   def storage(self) -> Storage:
@@ -83,11 +82,6 @@ class Dataset(View):
     """Remove tag from a snapshot."""
     self._storage.remove_tag(tag)
 
-  @property
-  def current_branch(self) -> str:
-    """Return the current branch."""
-    return self._current_branch
-
   def add_branch(self, branch: str):
     """Add branch to a snapshot."""
     self._storage.add_branch(branch=branch)
@@ -97,6 +91,7 @@ class Dataset(View):
     self._storage.remove_branch(branch)
 
   def set_current_branch(self, branch: str):
+    """Set current branch for the dataset."""
     self.storage.set_current_branch(branch)
 
   def local(self, file_options: Optional[FileOptions] = None) -> LocalRunner:
