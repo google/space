@@ -228,11 +228,13 @@ class Storage(paths.StoragePathsMixin):
 
   def add_tag(self, tag: str, snapshot_id: Optional[int] = None) -> None:
     """Add tag to a snapshot"""
-    self._add_reference(tag, meta.SnapshotReference.TAG, snapshot_id)
+    self._add_reference(
+      tag, meta.SnapshotReference.TAG, snapshot_id)
 
   def add_branch(self, branch: str) -> None:
     """Add branch to a snapshot"""
-    self._add_reference(branch, meta.SnapshotReference.BRANCH, None)
+    self._add_reference(
+      branch, meta.SnapshotReference.BRANCH, None)
 
   def set_current_branch(self, branch: str):
     """Set current branch for the snapshot."""
@@ -242,10 +244,9 @@ class Storage(paths.StoragePathsMixin):
         raise errors.UserInputError("{branch} is not a branch.")
     self._current_branch = branch
 
-  def _add_reference(self,
-                     reference_name: str,
-                     reference_type: meta.SnapshotReference.ReferenceType,
-                     snapshot_id: Optional[int] = None) -> None:
+  def _add_reference(self,reference_name: str,
+      reference_type: meta.SnapshotReference.ReferenceType.ValueType,
+      snapshot_id: Optional[int] = None) -> None:
     """Add reference to a snapshot"""
     if snapshot_id is None:
       snapshot_id = self._metadata.current_snapshot_id
@@ -254,7 +255,7 @@ class Storage(paths.StoragePathsMixin):
       raise errors.VersionNotFoundError(f"Snapshot {snapshot_id} is not found")
 
     if len(reference_name) == 0:
-      raise errors.UserInputError("{reference_type} cannot be empty")
+      raise errors.UserInputError("reference name cannot be empty")
 
     if reference_name in _RESERVED_REFERENCE:
       raise errors.UserInputError("{reference_name} is reserved")
@@ -267,7 +268,7 @@ class Storage(paths.StoragePathsMixin):
     new_metadata.CopyFrom(self._metadata)
     ref = meta.SnapshotReference(reference_name=reference_name,
                                  snapshot_id=snapshot_id,
-                                  type=reference_type)
+                                 type=reference_type)
     new_metadata.refs[reference_name].CopyFrom(ref)
     new_metadata_path = self.new_metadata_path()
     self._write_metadata(new_metadata_path, new_metadata)
@@ -284,9 +285,8 @@ class Storage(paths.StoragePathsMixin):
       raise errors.UserInputError("Cannot remove the current branch.")
     self._remove_reference(branch, meta.SnapshotReference.BRANCH)
 
-  def _remove_reference(self,
-                        ref_name: str,
-                        ref_type: meta.SnapshotReference.ReferenceType)-> None:
+  def _remove_reference(self, ref_name: str,
+    ref_type: meta.SnapshotReference.ReferenceType.ValueType)-> None:
     if (ref_name not in self._metadata.refs or
         self._metadata.refs[ref_name].type != ref_type):
       raise errors.VersionNotFoundError(f"Reference {ref_name} is not found")
