@@ -246,7 +246,7 @@ class TestLocalRunner:
     local_runner.append(sample_data1)
 
     ds.add_branch("exp1")
-    
+
     assert local_runner.read_all() == sample_data1
 
     create_time0 = datetime.utcfromtimestamp(
