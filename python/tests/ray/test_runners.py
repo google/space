@@ -128,7 +128,7 @@ class TestRayReadWriteRunner:
       # Test delete.
       runner.delete(pc.field("int64") < 10)
       assert_equal(
-        runner.read_all(batch_size=batch_size,version=branch if branch !="main" else None).sort_by("int64"),
+        runner.read_all(batch_size=batch_size).sort_by("int64"),
         pa.concat_tables([generate_data([10, 11, 12])]).sort_by("int64"))
 
       # Test reading views.
