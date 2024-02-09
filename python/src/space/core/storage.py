@@ -204,11 +204,11 @@ class Storage(paths.StoragePathsMixin):
       return False
 
     metadata = _read_metadata(self._fs, self._location, entry_point)
-    self.__init__(
+    self.__init__( # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
         self.location,
         entry_point.metadata_file,
-        metadata,  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
-        self.current_branch)  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
+        metadata,
+        self.current_branch)
     logging.info(
         f"Storage reloaded to snapshot: {self._metadata.current_snapshot_id}")
     return True
