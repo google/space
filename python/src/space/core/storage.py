@@ -202,9 +202,7 @@ class Storage(paths.StoragePathsMixin):
       return False
 
     metadata = _read_metadata(self._fs, self._location, entry_point)
-    self.__init__(self.location, 
-                  entry_point.metadata_file,
-                  metadata,
+    self.__init__(self.location, entry_point.metadata_file, metadata, # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
                   self.current_branch)  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
     logging.info(
         f"Storage reloaded to snapshot: {self._metadata.current_snapshot_id}")
@@ -219,9 +217,9 @@ class Storage(paths.StoragePathsMixin):
     if isinstance(version, int):
       return version
 
-    return self._lookup_reference(version).snapshot_id
+    return self.lookup_reference(version).snapshot_id
 
-  def _lookup_reference(self, tag_or_branch: str) -> meta.SnapshotReference:
+  def lookup_reference(self, tag_or_branch: str) -> meta.SnapshotReference:
     """Lookup a snapshot reference."""
     if tag_or_branch in self._metadata.refs:
       return self._metadata.refs[tag_or_branch]
@@ -239,7 +237,7 @@ class Storage(paths.StoragePathsMixin):
   def set_current_branch(self, branch: str):
     """Set current branch for the snapshot."""
     if branch != "main":
-      snapshot_ref = self._lookup_reference(branch)
+      snapshot_ref = self.lookup_reference(branch)
       if snapshot_ref.type != meta.SnapshotReference.BRANCH:
         raise errors.UserInputError("{branch} is not a branch.")
     self._current_branch = branch
@@ -286,7 +284,7 @@ class Storage(paths.StoragePathsMixin):
       raise errors.UserInputError("Cannot remove the current branch.")
     self._remove_reference(branch, meta.SnapshotReference.BRANCH)
 
-  def _remove_reference(self, 
+  def _remove_reference(self,
                         ref_name: str,
                         ref_type: meta.SnapshotReference.ReferenceType)-> None:
     if (ref_name not in self._metadata.refs or
@@ -315,7 +313,7 @@ class Storage(paths.StoragePathsMixin):
     new_metadata.CopyFrom(self._metadata)
     new_snapshot_id = self._next_snapshot_id()
     if branch and branch != _MAIN_BRANCH:
-      branch_snapshot = self._lookup_reference(branch)
+      branch_snapshot = self.lookup_reference(branch)
       # To block the case delete branch and add a tag during commit
       # TODO: move this check out of commit()
       if branch_snapshot.type != meta.SnapshotReference.BRANCH:
@@ -578,7 +576,8 @@ class Transaction:
     self._storage.reload()
     self._snapshot_id = self._storage.metadata.current_snapshot_id
     if self._branch != _MAIN_BRANCH:
-      self._snapshot_id = self._storage._lookup_reference(self._branch).snapshot_id
+      self._snapshot_id = self._storage.lookup_reference(
+        self._branch).snapshot_id
     logging.info(f"Start transaction {self._txn_id}")
     return self
 

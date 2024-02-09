@@ -20,8 +20,8 @@ from typing import Dict, List, Optional
 import pyarrow as pa
 from substrait.algebra_pb2 import ReadRel, Rel
 
-from space.core.ops.utils import FileOptions
-from space.core.options import JoinOptions, ReadOptions
+
+from space.core.options import FileOptions, JoinOptions, ReadOptions
 
 from space.core.runners import LocalRunner
 from space.core.storage import Storage, Version
