@@ -20,11 +20,12 @@ from typing import Dict, List, Optional
 import pyarrow as pa
 from substrait.algebra_pb2 import ReadRel, Rel
 
-from space.core.ops.utils import FileOptions
+from space.core.ops.utils import FileOptions, JoinOptions, ReadOptions
 from space.core.options import JoinOptions, ReadOptions
 from space.core.utils import errors
+
 from space.core.runners import LocalRunner
-from space.core.storage import Storage
+from space.core.storage import Storage, Version
 from space.core.transform.plans import LogicalPlanBuilder
 from space.core.utils.lazy_imports_utils import ray, ray_runners  # pylint: disable=unused-import
 from space.core.views import View
@@ -98,9 +99,11 @@ class Dataset(View):
     """Get a runner that runs operations locally."""
     return LocalRunner(self._storage, file_options)
 
-  def index_files(self) -> List[str]:
+  def index_files(self, version: Optional[Version] = None) -> List[str]:
     """A list of full path of index files."""
-    data_files = self._storage.data_files()
+    snapshot_id = (None if version is None else
+                   self._storage.version_to_snapshot_id(version))
+    data_files = self._storage.data_files(snapshot_id=snapshot_id)
     return [self._storage.full_path(f.path) for f in data_files.index_files]
 
   def versions(self) -> pa.Table:
@@ -124,12 +127,8 @@ class Dataset(View):
     # Dataset is the source, there is no transform, so simply return the data.
     return data
 
-  def ray_dataset(
-      self,
-      ray_options: RayOptions,
-      read_options: ReadOptions = ReadOptions(),
-      join_options: JoinOptions = JoinOptions()
-  ) -> ray.data.Dataset:
+  def _ray_dataset(self, ray_options: RayOptions, read_options: ReadOptions,
+                   join_options: JoinOptions) -> ray.data.Dataset:
     """Return a Ray dataset for a Space dataset."""
     return self._storage.ray_dataset(ray_options, read_options)
 

@@ -22,10 +22,8 @@ from typing import Callable, Dict, List, Optional, TYPE_CHECKING
 import pyarrow as pa
 from substrait.algebra_pb2 import Rel
 
-from space.core.options import JoinOptions
 from space.core.fs.factory import create_fs
-from space.core.ops.utils import FileOptions
-from space.core.options import ReadOptions
+from space.core.options import FileOptions, JoinOptions, ReadOptions
 import space.core.proto.metadata_pb2 as meta
 from space.core.schema import FieldIdManager
 from space.core.storage import Storage
@@ -91,10 +89,19 @@ class View(ABC):
   def process_source(self, data: ray.data.Dataset) -> ray.data.Dataset:
     """Process input data using the transform defined by the view."""
 
-  @abstractmethod
-  def ray_dataset(self, ray_options: RayOptions, read_options: ReadOptions,
-                  join_options: JoinOptions) -> ray.data.Dataset:
+  def ray_dataset(
+      self,
+      ray_options: Optional[RayOptions] = None,
+      read_options: Optional[ReadOptions] = None,
+      join_options: Optional[JoinOptions] = None) -> ray.data.Dataset:
     """Return a Ray dataset for a Space view."""
+    return self._ray_dataset(ray_options or RayOptions(), read_options or
+                             ReadOptions(), join_options or JoinOptions())
+
+  @abstractmethod
+  def _ray_dataset(self, ray_options: RayOptions, read_options: ReadOptions,
+                   join_options: JoinOptions) -> ray.data.Dataset:
+    """Return a Ray dataset for a Space view. Internal implementation."""
 
   def ray(
       self,

@@ -103,8 +103,8 @@ class BaseUdfTransform(View):
     return self._transform(
         self.input_.process_source(data).select_columns(self.input_fields))
 
-  def ray_dataset(self, ray_options: RayOptions, read_options: ReadOptions,
-                  join_options: JoinOptions) -> ray.data.Dataset:
+  def _ray_dataset(self, ray_options: RayOptions, read_options: ReadOptions,
+                   join_options: JoinOptions) -> ray.data.Dataset:
     if read_options.fields is not None:
       raise errors.UserInputError(
           "`fields` is not supported for views, use `input_fields` of "

@@ -24,8 +24,8 @@ from space.core.fs.array_record import read_record_file
 from space.core.proto import metadata_pb2 as meta
 from space.core.proto import runtime_pb2 as rt
 from space.core.ops import utils
-from space.core.ops.utils import FileOptions
 from space.core.ops.append import LocalAppendOp
+from space.core.options import FileOptions
 from space.core.schema import arrow
 from space.core.serializers import DictSerializer
 from space.core.utils.paths import StoragePathsMixin

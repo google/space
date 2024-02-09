@@ -29,12 +29,11 @@ from space.core.loaders.array_record import ArrayRecordIndexFn
 from space.core.runners import BaseReadOnlyRunner, BaseReadWriteRunner
 from space.core.runners import StorageMixin
 from space.core.ops import utils
-from space.core.ops.utils import FileOptions
 from space.core.ops.base import InputData, InputIteratorFn
 from space.core.ops.change_data import ChangeData, ChangeType
 from space.core.ops.delete import FileSetDeleteOp
 from space.core.ops.insert import InsertOptions
-from space.core.options import JoinOptions, ReadOptions
+from space.core.options import FileOptions, JoinOptions, ReadOptions
 import space.core.proto.runtime_pb2 as rt
 from space.core.utils import errors
 from space.ray.ops.append import RayAppendOp
@@ -84,7 +83,7 @@ class RayReadOnlyRunner(BaseReadOnlyRunner):
                                batch_size)
 
     return iter_batches(
-        self._view.ray_dataset(self._ray_options, read_options, join_options))
+        self._view._ray_dataset(self._ray_options, read_options, join_options))  # pylint: disable=protected-access
 
   def diff(self,
            start_version: Union[Version],

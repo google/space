@@ -17,7 +17,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from space.core.ops.append import LocalAppendOp
-from space.core.ops.utils import FileOptions
+from space.core.options import FileOptions
 import space.core.proto.metadata_pb2 as meta
 from space.core.storage import Storage
 
@@ -64,8 +64,7 @@ class TestLocalAppendOp:
     assert patch.storage_statistics_update == meta.StorageStatistics(
         num_rows=5, index_compressed_bytes=114, index_uncompressed_bytes=126)
 
-  def test_write_pydict_with_record_fields(self, tmp_path,
-                                           record_fields_schema,
+  def test_write_pydict_with_record_fields(self, tmp_path, record_fields_schema,
                                            record_fields_input_data):
     location = tmp_path / "dataset"
     storage = Storage.create(location=str(location),

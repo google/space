@@ -23,7 +23,7 @@ import ray
 from space.ray.ops.append import RayAppendOp
 from space.core.ops.insert import InsertOptions, LocalInsertOp
 from space.core.ops.insert import filter_matched
-from space.core.ops.utils import FileOptions
+from space.core.options import FileOptions
 import space.core.proto.metadata_pb2 as meta
 import space.core.proto.runtime_pb2 as rt
 from space.core.storage import Storage
