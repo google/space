@@ -62,7 +62,7 @@ class Storage(paths.StoragePathsMixin):
   """
 
   def __init__(self, location: str, metadata_file: str,
-               metadata: meta.StorageMetadata, 
+               metadata: meta.StorageMetadata,
                current_branch: Optional[str] = None):
     super().__init__(location)
     self._fs = create_fs(location)
@@ -202,7 +202,10 @@ class Storage(paths.StoragePathsMixin):
       return False
 
     metadata = _read_metadata(self._fs, self._location, entry_point)
-    self.__init__(self.location, entry_point.metadata_file, metadata, self.current_branch)  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
+    self.__init__(self.location, 
+                  entry_point.metadata_file,
+                  metadata,
+                  self.current_branch)  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
     logging.info(
         f"Storage reloaded to snapshot: {self._metadata.current_snapshot_id}")
     return True
@@ -283,14 +286,16 @@ class Storage(paths.StoragePathsMixin):
       raise errors.UserInputError("Cannot remove the current branch.")
     self._remove_reference(branch, meta.SnapshotReference.BRANCH)
 
-  def _remove_reference(self, reference_name:str, reference_type: meta.SnapshotReference.ReferenceType)-> None:
-    if (reference_name not in self._metadata.refs or
-        self._metadata.refs[reference_name].type != reference_type):
-      raise errors.VersionNotFoundError(f"{reference_type} {reference_name} is not found")
+  def _remove_reference(self, 
+                        ref_name: str,
+                        ref_type: meta.SnapshotReference.ReferenceType)-> None:
+    if (ref_name not in self._metadata.refs or
+        self._metadata.refs[ref_name].type != ref_type):
+      raise errors.VersionNotFoundError(f"Reference {ref_name} is not found")
 
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
-    del new_metadata.refs[reference_name]
+    del new_metadata.refs[ref_name]
     new_metadata_path = self.new_metadata_path()
     self._write_metadata(new_metadata_path, new_metadata)
     self._metadata = new_metadata

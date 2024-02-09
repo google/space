@@ -38,7 +38,6 @@ class RayAppendOp(BaseAppendOp):
                metadata: meta.StorageMetadata,
                ray_options: RayOptions,
                file_options: FileOptions,
-               branch: Optional[str] = None,
                record_address_input: bool = False):
     """
     Args:

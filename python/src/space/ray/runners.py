@@ -280,8 +280,8 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
 
   @StorageMixin.transactional
   def append_from(
-      self, 
-      source_fns: Union[InputIteratorFn, List[InputIteratorFn]]) -> Optional[rt.Patch]:
+      self,
+      source_fns: Union[InputIteratorFn, List[InputIteratorFn]]) -> Optional[rt.Patch]: # pylint: disable=line-too-long
     if not isinstance(source_fns, list):
       source_fns = [source_fns]
 
