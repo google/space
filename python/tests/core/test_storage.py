@@ -137,7 +137,7 @@ class TestStorage:
         record_uncompressed_bytes=30)
     patch = rt.Patch(addition=added_manifest_files,
                      storage_statistics_update=added_storage_statistics)
-    storage.commit(patch,"main")
+    storage.commit(patch, "main")
 
     assert storage.snapshot(0) is not None
     new_snapshot = storage.snapshot(1)
@@ -155,7 +155,7 @@ class TestStorage:
         index_manifest_files=["data/index_manifest1"],
         record_manifest_files=["data/record_manifest1"]),
                      storage_statistics_update=added_storage_statistics2)
-    storage.commit(patch,"main")
+    storage.commit(patch, "main")
 
     new_snapshot = storage.snapshot(2)
     assert new_snapshot.manifest_files == meta.ManifestFiles(
@@ -274,7 +274,8 @@ class TestStorage:
     # Test data_files() with filters.
     index_file1.manifest_file_id = 1
     assert storage.data_files(filter_=pc.field("int64") > 1000) == rt.FileSet(
-        index_files=[index_file1], index_manifest_files={1: manifests_dict2[2]})
+        index_files=[index_file1],
+        index_manifest_files={1: manifests_dict2[2]})
 
   def test_create_storage_schema_validation(self, tmp_path):
     location = tmp_path / "dataset"
@@ -293,15 +294,17 @@ class TestStorage:
                      primary_keys=["not_exist"],
                      record_fields=[])
 
-    with pytest.raises(errors.UserInputError,
-                       match=r".*Record field int64 cannot be a primary key.*"):
+    with pytest.raises(
+        errors.UserInputError,
+        match=r".*Record field int64 cannot be a primary key.*"):
       Storage.create(location=str(location),
                      schema=pa.schema([pa.field("int64", pa.int64())]),
                      primary_keys=["int64"],
                      record_fields=["int64"])
 
-    with pytest.raises(errors.UserInputError,
-                       match=r".*Record field not_exist not found in schema.*"):
+    with pytest.raises(
+        errors.UserInputError,
+        match=r".*Record field not_exist not found in schema.*"):
       Storage.create(location=str(location),
                      schema=pa.schema([pa.field("int64", pa.int64())]),
                      primary_keys=["int64"],
@@ -310,8 +313,8 @@ class TestStorage:
     with pytest.raises(errors.UserInputError,
                        match=r".*Primary key type not supported.*"):
       Storage.create(location=str(location),
-                     schema=pa.schema([pa.field("list",
-                                                pa.list_(pa.string()))]),
+                     schema=pa.schema(
+                         [pa.field("list", pa.list_(pa.string()))]),
                      primary_keys=["list"],
                      record_fields=["list"])
 
@@ -424,11 +427,11 @@ class TestStorage:
     patch = rt.Patch(addition=meta.ManifestFiles(
         index_manifest_files=["data/index_manifest1"],
         record_manifest_files=["data/record_manifest1"]),
-        storage_statistics_update=meta.StorageStatistics(
-            num_rows=100,
-            index_compressed_bytes=100,
-            index_uncompressed_bytes=200,
-            record_uncompressed_bytes=300))
+                     storage_statistics_update=meta.StorageStatistics(
+                         num_rows=100,
+                         index_compressed_bytes=100,
+                         index_uncompressed_bytes=200,
+                         record_uncompressed_bytes=300))
     storage.commit(patch, "branch2")
 
     create_time2 = datetime.utcfromtimestamp(
@@ -438,5 +441,5 @@ class TestStorage:
     assert storage.versions().to_pydict() == {
         "snapshot_id": [1, 0],
         "tag_or_branch": ["branch2", None],
-        "create_time": [create_time2,create_time1]
+        "create_time": [create_time2, create_time1]
     }

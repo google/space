@@ -20,7 +20,6 @@ from typing import Dict, List, Optional
 import pyarrow as pa
 from substrait.algebra_pb2 import ReadRel, Rel
 
-
 from space.core.options import FileOptions, JoinOptions, ReadOptions
 
 from space.core.runners import LocalRunner
@@ -53,8 +52,8 @@ class Dataset(View):
       primary_keys: un-enforced primary keys.
       record_fields: fields stored in row format (ArrayRecord).
     """
-    return Dataset(Storage.create(location, schema, primary_keys,
-                                  record_fields))
+    return Dataset(
+        Storage.create(location, schema, primary_keys, record_fields))
 
   @classmethod
   def load(cls, location: str) -> Dataset:

@@ -231,10 +231,10 @@ class LocalRunner(BaseReadWriteRunner):
            start_version: Version,
            end_version: Version,
            batch_size: Optional[int] = None) -> Iterator[ChangeData]:
-    return read_change_data(self._storage,
-                            self._storage.version_to_snapshot_id(start_version),
-                            self._storage.version_to_snapshot_id(end_version),
-                            ReadOptions(batch_size=batch_size))
+    return read_change_data(
+        self._storage, self._storage.version_to_snapshot_id(start_version),
+        self._storage.version_to_snapshot_id(end_version),
+        ReadOptions(batch_size=batch_size))
 
   @StorageMixin.transactional
   def append(self, data: InputData) -> Optional[rt.Patch]:

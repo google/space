@@ -197,12 +197,13 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
     previous_snapshot_id: Optional[int] = None
 
     txn = self._start_txn()
-    for change in self.diff_ray(start_snapshot_id, end_snapshot_id, batch_size):
+    for change in self.diff_ray(start_snapshot_id, end_snapshot_id,
+                                batch_size):
       assert isinstance(change.data, list)
 
       # Commit when changes from the same snapshot end.
-      if (previous_snapshot_id is not None and
-          change.snapshot_id != previous_snapshot_id):
+      if (previous_snapshot_id is not None
+          and change.snapshot_id != previous_snapshot_id):
         txn.commit(utils.merge_patches(patches))
         patches.clear()
 
@@ -222,7 +223,8 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
         elif change.type_ == ChangeType.ADD:
           patches.append(self._process_append(change.data))
         else:
-          raise NotImplementedError(f"Change type {change.type_} not supported")
+          raise NotImplementedError(
+              f"Change type {change.type_} not supported")
       except (errors.SpaceRuntimeError, errors.UserInputError) as e:
         r = JobResult(JobResult.State.FAILED, None, repr(e))
         return job_results + [r]
@@ -235,7 +237,8 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
 
     return job_results
 
-  def _process_delete(self, data: List[ray.data.Dataset]) -> Optional[rt.Patch]:
+  def _process_delete(self,
+                      data: List[ray.data.Dataset]) -> Optional[rt.Patch]:
     # Deletion does not use parallel read streams.
     assert len(data) == 1
     arrow_data = pa.concat_tables(iter_batches(
@@ -250,7 +253,8 @@ class RayMaterializedViewRunner(RayReadOnlyRunner, StorageMixin):
                          self._file_options)
     return op.delete()
 
-  def _process_append(self, data: List[ray.data.Dataset]) -> Optional[rt.Patch]:
+  def _process_append(self,
+                      data: List[ray.data.Dataset]) -> Optional[rt.Patch]:
     return _append_from(self._storage,
                         [partial(iter_batches, ds) for ds in data],
                         self._ray_options, self._file_options)
@@ -281,7 +285,7 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
   @StorageMixin.transactional
   def append_from(
       self,
-      source_fns: Union[InputIteratorFn, List[InputIteratorFn]]) -> Optional[rt.Patch]: # pylint: disable=line-too-long
+      source_fns: Union[InputIteratorFn, List[InputIteratorFn]]) -> Optional[rt.Patch]:  # pylint: disable=line-too-long
     if not isinstance(source_fns, list):
       source_fns = [source_fns]
 
@@ -308,8 +312,8 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
   @StorageMixin.transactional
   def _insert(self, data: InputData,
               mode: InsertOptions.Mode) -> Optional[rt.Patch]:
-    op = RayInsertOp(self._storage, InsertOptions(mode=mode), self._ray_options,
-                     self._file_options)
+    op = RayInsertOp(self._storage, InsertOptions(mode=mode),
+                     self._ray_options, self._file_options)
     return op.write(data)
 
   @StorageMixin.transactional

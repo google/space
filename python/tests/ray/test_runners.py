@@ -97,72 +97,71 @@ class TestRayReadWriteRunner:
       runner.append(input_data0)
 
       assert_equal(
-        runner.read_all(batch_size=batch_size).sort_by("int64"),
-        input_data0.sort_by("int64"))
-
+          runner.read_all(batch_size=batch_size).sort_by("int64"),
+          input_data0.sort_by("int64"))
 
       runner.append_from([
-        lambda: iter([input_data1, input_data2]), lambda: iter([input_data3]),
-        lambda: iter([input_data4])
-        ])
+          lambda: iter([input_data1, input_data2]),
+          lambda: iter([input_data3]), lambda: iter([input_data4])
+      ])
 
       assert_equal(
-            runner.read_all(batch_size=batch_size).sort_by("int64"),
-            pa.concat_tables(
-                [input_data0, input_data1, input_data2, input_data3,
-                input_data4]).sort_by("int64"))
+          runner.read_all(batch_size=batch_size).sort_by("int64"),
+          pa.concat_tables([
+              input_data0, input_data1, input_data2, input_data3, input_data4
+          ]).sort_by("int64"))
 
-        # Test insert.
+      # Test insert.
       result = runner.insert(generate_data([7, 12]))
       assert result.state == JobResult.State.FAILED
       assert "Primary key to insert already exist" in result.error_message
 
       runner.upsert(generate_data([7, 12]))
       assert_equal(
-        runner.read_all(batch_size=batch_size).sort_by("int64"),
+          runner.read_all(batch_size=batch_size).sort_by("int64"),
           pa.concat_tables([
-            input_data0, input_data1, input_data2, input_data3, input_data4,
-            generate_data([12])
+              input_data0, input_data1, input_data2, input_data3, input_data4,
+              generate_data([12])
           ]).sort_by("int64"))
 
       # Test delete.
       runner.delete(pc.field("int64") < 10)
       assert_equal(
-        runner.read_all(batch_size=batch_size).sort_by("int64"),
-        pa.concat_tables([generate_data([10, 11, 12])]).sort_by("int64"))
+          runner.read_all(batch_size=batch_size).sort_by("int64"),
+          pa.concat_tables([generate_data([10, 11, 12])]).sort_by("int64"))
 
       # Test reading views.
       view = sample_dataset.map_batches(fn=_sample_map_udf,
-        output_schema=sample_dataset.schema,
-        output_record_fields=["binary"])
+                                        output_schema=sample_dataset.schema,
+                                        output_record_fields=["binary"])
 
       assert_equal(
-        view.ray(DEFAULT_RAY_OPTIONS).read_all(
-          batch_size=batch_size).sort_by("int64"),
+          view.ray(DEFAULT_RAY_OPTIONS).read_all(
+              batch_size=batch_size).sort_by("int64"),
           pa.concat_tables([
-            pa.Table.from_pydict({
-              "int64": [10, 11, 12],
-              "float64": [v / 10 + 1 for v in [10, 11, 12]],
-              "binary": [f"b{v}".encode("utf-8") for v in [10, 11, 12]]
-            })
-        ]).sort_by("int64"))
+              pa.Table.from_pydict({
+                  "int64": [10, 11, 12],
+                  "float64": [v / 10 + 1 for v in [10, 11, 12]],
+                  "binary": [f"b{v}".encode("utf-8") for v in [10, 11, 12]]
+              })
+          ]).sort_by("int64"))
 
       # Test a transform on a view.
       transform_on_view = view.map_batches(fn=_sample_map_udf,
-                                            output_schema=view.schema,
-                                            output_record_fields=["binary"])
+                                           output_schema=view.schema,
+                                           output_record_fields=["binary"])
       assert_equal(
           transform_on_view.ray(DEFAULT_RAY_OPTIONS).read_all(
-            batch_size=batch_size).sort_by("int64"),
-            pa.concat_tables([
+              batch_size=batch_size).sort_by("int64"),
+          pa.concat_tables([
               pa.Table.from_pydict({
-                "int64": [10, 11, 12],
-                "float64": [v / 10 + 2 for v in [10, 11, 12]],
-                "binary": [f"b{v}".encode("utf-8") for v in [10, 11, 12]]
-                })
-        ]).sort_by("int64"))
+                  "int64": [10, 11, 12],
+                  "float64": [v / 10 + 2 for v in [10, 11, 12]],
+                  "binary": [f"b{v}".encode("utf-8") for v in [10, 11, 12]]
+              })
+          ]).sort_by("int64"))
 
-  @pytest.mark.parametrize("enable_row_range_block", [(True,), (False,)])
+  @pytest.mark.parametrize("enable_row_range_block", [(True, ), (False, )])
   def test_read_batch_size(self, tmp_path, sample_schema,
                            enable_row_range_block):
     ds = Dataset.create(str(tmp_path / f"dataset_{random_id()}"),
@@ -181,7 +180,8 @@ class TestRayReadWriteRunner:
       assert d.num_rows == 10
 
   @pytest.mark.parametrize("refresh_batch_size", [None, 2])
-  def test_diff_map_batches(self, tmp_path, sample_dataset, refresh_batch_size):
+  def test_diff_map_batches(self, tmp_path, sample_dataset,
+                            refresh_batch_size):
     ds = sample_dataset
 
     view_schema = pa.schema(
@@ -249,7 +249,8 @@ class TestRayReadWriteRunner:
 
     with pytest.raises(
         errors.VersionNotFoundError,
-        match=r".*Target snapshot ID 3 higher than source dataset version 2.*"):
+        match=r".*Target snapshot ID 3 higher than source dataset version 2.*"
+    ):
       ray_runner.refresh(3)
 
     # Test upsert's diff.
@@ -405,13 +406,11 @@ class TestRayReadWriteRunner:
 
     left_fields_ = [
         ds1_schema.field(f).remove_metadata()
-        for f in left_fields or ds1.schema.names
-        if f != "int64"
+        for f in left_fields or ds1.schema.names if f != "int64"
     ]
     right_fields_ = [
         ds2.schema.field(f).remove_metadata()
-        for f in right_fields or ds2.schema.names
-        if f != "int64"
+        for f in right_fields or ds2.schema.names if f != "int64"
     ]
 
     if not swap:
@@ -427,7 +426,8 @@ class TestRayReadWriteRunner:
 
     def generate_expected(values: Iterable[int]) -> pa.Table:
       return pa.Table.from_pydict({
-          "int64": values,
+          "int64":
+          values,
           "float64": [v / 10 for v in values],
           "binary": [f"b{v}".encode("utf-8") for v in values],
           "string": [f"s{v}" for v in values]
@@ -443,7 +443,8 @@ class TestRayReadWriteRunner:
 
       # Sanity checks of addresses.
       address_column = join_values.column("binary").combine_chunks()
-      assert address_column.field("_FILE")[0].as_py().startswith("data/binary_")
+      assert address_column.field("_FILE")[0].as_py().startswith(
+          "data/binary_")
       assert len(address_column.field("_ROW_ID")) == len(indexes)
 
       # Test reading addresses.
@@ -494,8 +495,9 @@ class TestRayReadWriteRunner:
                left_fields=["float64"],
                right_fields=["string"])
 
-    with pytest.raises(errors.UserInputError,
-                       match=r".*Join key must be primary key on both sides.*"):
+    with pytest.raises(
+        errors.UserInputError,
+        match=r".*Join key must be primary key on both sides.*"):
       ds1.join(ds2,
                keys=["string"],
                left_fields=["float64"],
@@ -504,7 +506,8 @@ class TestRayReadWriteRunner:
 
 def generate_data(values: Iterable[int]) -> pa.Table:
   return pa.Table.from_pydict({
-      "int64": values,
+      "int64":
+      values,
       "float64": [v / 10 for v in values],
       "binary": [f"b{v}".encode("utf-8") for v in values]
   })
