@@ -258,22 +258,22 @@ class Storage(paths.StoragePathsMixin):
     if snapshot_id not in self._metadata.snapshots:
       raise errors.VersionNotFoundError(f"Snapshot {snapshot_id} is not found")
 
-    if len(reference_name) == 0:
+    if len(ref_name) == 0:
       raise errors.UserInputError("reference name cannot be empty")
 
-    if reference_name in _RESERVED_REFERENCE:
-      raise errors.UserInputError("{reference_name} is reserved")
+    if ref_name in _RESERVED_REFERENCE:
+      raise errors.UserInputError("{ref_name} is reserved")
 
-    if reference_name in self._metadata.refs:
+    if ref_name in self._metadata.refs:
       raise errors.VersionAlreadyExistError(
-          f"Reference {reference_name} already exist")
+          f"Reference {ref_name} already exist")
 
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
-    ref = meta.SnapshotReference(reference_name=reference_name,
+    ref = meta.SnapshotReference(ref_name=ref_name,
                                  snapshot_id=snapshot_id,
-                                 type=reference_type)
-    new_metadata.refs[reference_name].CopyFrom(ref)
+                                 type=ref_name)
+    new_metadata.refs[ref_name].CopyFrom(ref)
     new_metadata_path = self.new_metadata_path()
     self._write_metadata(new_metadata_path, new_metadata)
     self._metadata = new_metadata
@@ -328,6 +328,7 @@ class Storage(paths.StoragePathsMixin):
     else:
       new_metadata.current_snapshot_id = new_snapshot_id
       current_snapshot = self.snapshot(self._metadata.current_snapshot_id)
+
     new_metadata.last_update_time.CopyFrom(proto_now())
     new_metadata_path = self.new_metadata_path()
 
