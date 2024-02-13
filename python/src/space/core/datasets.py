@@ -73,24 +73,24 @@ class Dataset(View):
     return self._storage.record_fields
 
   def add_tag(self, tag: str, snapshot_id: Optional[int] = None):
-    """Add yag to a snapshot."""
+    """Add tag to a dataset."""
     self._storage.add_tag(tag, snapshot_id)
 
   def remove_tag(self, tag: str):
-    """Remove tag from a snapshot."""
+    """Remove tag from a dataset."""
     self._storage.remove_tag(tag)
 
   def add_branch(self, branch: str):
-    """Add branch to a snapshot."""
-    self._storage.add_branch(branch=branch)
+    """Add branch to a dataset."""
+    self._storage.add_branch(branch)
 
   def remove_branch(self, branch: str):
-    """Remove tag from a snapshot."""
+    """Remove tag branch a dataset."""
     self._storage.remove_branch(branch)
 
   def set_current_branch(self, branch: str):
     """Set current branch for the dataset."""
-    self.storage.set_current_branch(branch)
+    self._storage.set_current_branch(branch)
 
   def local(self, file_options: Optional[FileOptions] = None) -> LocalRunner:
     """Get a runner that runs operations locally."""
