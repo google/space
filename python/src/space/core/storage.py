@@ -50,6 +50,7 @@ Version: TypeAlias = Union[str, int]
 
 # Initial snapshot ID.
 _INIT_SNAPSHOT_ID = 0
+# Name for the main branch, by default the read write are using this branch.
 _MAIN_BRANCH = "main"
 _RESERVED_REFERENCE = [_MAIN_BRANCH]
 
@@ -97,6 +98,7 @@ class Storage(paths.StoragePathsMixin):
     """Return the current branch."""
     if not self._current_branch:
       return _MAIN_BRANCH
+
     return self._current_branch
 
   @property
@@ -204,10 +206,8 @@ class Storage(paths.StoragePathsMixin):
       return False
 
     metadata = _read_metadata(self._fs, self._location, entry_point)
-    self.__init__( # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
-        self.location,
-        entry_point.metadata_file,
-        metadata,
+    self.__init__(  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
+        self.location, entry_point.metadata_file, metadata,
         self.current_branch)
     logging.info(
         f"Storage reloaded to snapshot: {self._metadata.current_snapshot_id}")
@@ -247,11 +247,10 @@ class Storage(paths.StoragePathsMixin):
         raise errors.UserInputError("{branch} is not a branch.")
     self._current_branch = branch
 
-  def _add_reference(
-      self,
-      reference_name: str,
-      reference_type: meta.SnapshotReference.ReferenceType.ValueType,
-      snapshot_id: Optional[int] = None) -> None:
+  def _add_reference(self,
+                     ref_name: str,
+                     ref_type: meta.SnapshotReference.ReferenceType.ValueType,
+                     snapshot_id: Optional[int] = None) -> None:
     """Add reference to a snapshot"""
     if snapshot_id is None:
       snapshot_id = self._metadata.current_snapshot_id

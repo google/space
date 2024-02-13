@@ -21,7 +21,6 @@ import pyarrow as pa
 from substrait.algebra_pb2 import ReadRel, Rel
 
 from space.core.options import FileOptions, JoinOptions, ReadOptions
-
 from space.core.runners import LocalRunner
 from space.core.storage import Storage, Version
 from space.core.transform.plans import LogicalPlanBuilder
