@@ -270,7 +270,7 @@ class Storage(paths.StoragePathsMixin):
 
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
-    ref = meta.SnapshotReference(ref_name=ref_name,
+    ref = meta.SnapshotReference(reference_name=ref_name,
                                  snapshot_id=snapshot_id,
                                  type=ref_type)
     new_metadata.refs[ref_name].CopyFrom(ref)
