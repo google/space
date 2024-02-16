@@ -85,7 +85,7 @@ class Dataset(View):
     self._storage.add_branch(branch)
 
   def remove_branch(self, branch: str):
-    """Remove tag branch a dataset."""
+    """Remove branch for a dataset."""
     self._storage.remove_branch(branch)
 
   def set_current_branch(self, branch: str):

@@ -52,6 +52,7 @@ Version: TypeAlias = Union[str, int]
 _INIT_SNAPSHOT_ID = 0
 # Name for the main branch, by default the read write are using this branch.
 _MAIN_BRANCH = "main"
+# Sets of reference that could not be added as branches or tags by user.
 _RESERVED_REFERENCE = [_MAIN_BRANCH]
 
 
@@ -83,9 +84,9 @@ class Storage(paths.StoragePathsMixin):
         self._physical_schema)
 
     self._primary_keys = set(self._metadata.schema.primary_keys)
-    self._current_branch = current_branch
+    self._current_branch = current_branch if current_branch else _MAIN_BRANCH
     self._max_snapshot_id = max(
-        [ref[1].snapshot_id for ref in self._metadata.refs.items()] +
+        [ref.snapshot_id for ref in self._metadata.refs.values()] +
         [self._metadata.current_snapshot_id])
 
   @property
@@ -96,9 +97,6 @@ class Storage(paths.StoragePathsMixin):
   @property
   def current_branch(self) -> str:
     """Return the current branch."""
-    if not self._current_branch:
-      return _MAIN_BRANCH
-
     return self._current_branch
 
   @property
@@ -241,15 +239,16 @@ class Storage(paths.StoragePathsMixin):
 
   def set_current_branch(self, branch: str):
     """Set current branch for the snapshot."""
-    if branch != "main":
+    if branch != _MAIN_BRANCH:
       snapshot_ref = self.lookup_reference(branch)
       if snapshot_ref.type != meta.SnapshotReference.BRANCH:
         raise errors.UserInputError("{branch} is not a branch.")
+
     self._current_branch = branch
 
   def _add_reference(self,
                      ref_name: str,
-                     ref_type: meta.SnapshotReference.ReferenceType.ValueType,
+                     ref_type: meta.SnapshotReference.ReferenceType,
                      snapshot_id: Optional[int] = None) -> None:
     """Add reference to a snapshot"""
     if snapshot_id is None:
