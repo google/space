@@ -248,7 +248,7 @@ class Storage(paths.StoragePathsMixin):
 
   def _add_reference(self,
                      ref_name: str,
-                     ref_type: meta.SnapshotReference.ReferenceType,
+                     ref_type: meta.SnapshotReference.ReferenceType.ValueType,
                      snapshot_id: Optional[int] = None) -> None:
     """Add reference to a snapshot"""
     if snapshot_id is None:
