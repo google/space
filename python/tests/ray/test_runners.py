@@ -451,8 +451,7 @@ class TestRayReadWriteRunner:
       values = read_record_column(ds1.storage,
                                   join_values.select(["binary"]),
                                   field="binary")
-      assert sorted(values) == sorted(
-          expected_values.column("binary").combine_chunks())
+      assert values == expected_values.column("binary").combine_chunks()
 
       join_values = join_values.drop("binary")
       expected_values = expected_values.drop("binary")
