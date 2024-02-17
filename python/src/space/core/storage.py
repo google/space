@@ -302,8 +302,8 @@ class Storage(paths.StoragePathsMixin):
     if (ref_name not in self._metadata.refs
         or self._metadata.refs[ref_name].type != ref_type):
       raise errors.VersionNotFoundError(
-          f"Reference {ref_name} is not found or has a wrong type (tag vs branch)"
-      )
+          f"Reference {ref_name} is not found or has a wrong type "
+          "(tag vs branch)")
 
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
@@ -566,7 +566,7 @@ class Transaction:
       self._result = JobResult(
           JobResult.State.FAILED, None,
           "Abort commit because the storage has been modified.")
-      return
+      returnS
 
     if patch is None:
       self._result = JobResult(JobResult.State.SKIPPED)
