@@ -566,7 +566,7 @@ class Transaction:
       self._result = JobResult(
           JobResult.State.FAILED, None,
           "Abort commit because the storage has been modified.")
-      returnS
+      return
 
     if patch is None:
       self._result = JobResult(JobResult.State.SKIPPED)
