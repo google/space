@@ -301,7 +301,9 @@ class Storage(paths.StoragePathsMixin):
       ref_type: meta.SnapshotReference.ReferenceType.ValueType) -> None:
     if (ref_name not in self._metadata.refs
         or self._metadata.refs[ref_name].type != ref_type):
-      raise errors.VersionNotFoundError(f"Reference {ref_name} is not found")
+      raise errors.VersionNotFoundError(
+          f"Reference {ref_name} is not found or has a wrong type (tag vs branch)"
+      )
 
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
@@ -558,7 +560,7 @@ class Transaction:
     # Check that no other commit has taken place.
     assert self._snapshot_id is not None
     self._storage.reload()
-    current_snapshot_id = self.storage.get_current_snapshot_id(self._branch)
+    current_snapshot_id = self._storage.get_current_snapshot_id(self._branch)
 
     if self._snapshot_id != current_snapshot_id:
       self._result = JobResult(
