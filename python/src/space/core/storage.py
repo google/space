@@ -119,10 +119,9 @@ class Storage(paths.StoragePathsMixin):
     """Return the physcal schema that uses reference for record fields."""
     return self._physical_schema
 
-  @property
-  def current_snapshot_id(self) -> int:
-    if self._branch != _MAIN_BRANCH:
-      return self._storage.lookup_reference(self._branch).snapshot_id
+  def get_current_snapshot_id(self, branch: str) -> int:
+    if branch != _MAIN_BRANCH:
+      return self.lookup_reference(branch).snapshot_id
 
     return self.metadata.current_snapshot_id
 
@@ -558,7 +557,7 @@ class Transaction:
     # Check that no other commit has taken place.
     assert self._snapshot_id is not None
     self._storage.reload()
-    current_snapshot_id = self.current_snapshot_id
+    current_snapshot_id = self.get_current_snapshot_id(self._branch)
 
     if self._snapshot_id != current_snapshot_id:
       self._result = JobResult(
@@ -586,7 +585,7 @@ class Transaction:
     # All mutations start with a transaction, so storage is always reloaded for
     # mutations.
     self._storage.reload()
-    self._snapshot_id = self._storage.current_snapshot_id
+    self._snapshot_id = self._storage.get_current_snapshot_id(self._branch)
     logging.info(f"Start transaction {self._txn_id}")
     return self
 
