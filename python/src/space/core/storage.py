@@ -120,6 +120,7 @@ class Storage(paths.StoragePathsMixin):
     return self._physical_schema
 
   def get_current_snapshot_id(self, branch: str) -> int:
+    """Returns the snapshot id for the current branch."""
     if branch != _MAIN_BRANCH:
       return self.lookup_reference(branch).snapshot_id
 
@@ -557,7 +558,7 @@ class Transaction:
     # Check that no other commit has taken place.
     assert self._snapshot_id is not None
     self._storage.reload()
-    current_snapshot_id = self.get_current_snapshot_id(self._branch)
+    current_snapshot_id = self.storage.get_current_snapshot_id(self._branch)
 
     if self._snapshot_id != current_snapshot_id:
       self._result = JobResult(
