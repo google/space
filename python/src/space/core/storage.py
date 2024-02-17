@@ -84,7 +84,7 @@ class Storage(paths.StoragePathsMixin):
         self._physical_schema)
 
     self._primary_keys = set(self._metadata.schema.primary_keys)
-    self._current_branch = current_branch if current_branch else _MAIN_BRANCH
+    self._current_branch = current_branch or _MAIN_BRANCH
     self._max_snapshot_id = max(
         [ref.snapshot_id for ref in self._metadata.refs.values()] +
         [self._metadata.current_snapshot_id])
@@ -118,6 +118,13 @@ class Storage(paths.StoragePathsMixin):
   def physical_schema(self) -> pa.Schema:
     """Return the physcal schema that uses reference for record fields."""
     return self._physical_schema
+
+  @property
+  def current_snapshot_id(self) -> int:
+    if self._branch != _MAIN_BRANCH:
+      return self._storage.lookup_reference(self._branch).snapshot_id
+
+    return self.metadata.current_snapshot_id
 
   def serializer(self) -> DictSerializer:
     """Return a serializer (deserializer) for the dataset."""
@@ -237,7 +244,7 @@ class Storage(paths.StoragePathsMixin):
     """Add branch to a snapshot"""
     self._add_reference(branch, meta.SnapshotReference.BRANCH, None)
 
-  def set_current_branch(self, branch: str):
+  def set_current_branch(self, branch: str) -> None:
     """Set current branch for the snapshot."""
     if branch != _MAIN_BRANCH:
       snapshot_ref = self.lookup_reference(branch)
@@ -257,11 +264,11 @@ class Storage(paths.StoragePathsMixin):
     if snapshot_id not in self._metadata.snapshots:
       raise errors.VersionNotFoundError(f"Snapshot {snapshot_id} is not found")
 
-    if len(ref_name) == 0:
-      raise errors.UserInputError("reference name cannot be empty")
+    if not ref_name:
+      raise errors.UserInputError("Reference name cannot be empty.")
 
     if ref_name in _RESERVED_REFERENCE:
-      raise errors.UserInputError("{ref_name} is reserved")
+      raise errors.UserInputError("{ref_name} is reserved.")
 
     if ref_name in self._metadata.refs:
       raise errors.VersionAlreadyExistError(
@@ -286,6 +293,7 @@ class Storage(paths.StoragePathsMixin):
     """Remove branch from metadata"""
     if branch == self._current_branch:
       raise errors.UserInputError("Cannot remove the current branch.")
+
     self._remove_reference(branch, meta.SnapshotReference.BRANCH)
 
   def _remove_reference(
@@ -550,9 +558,8 @@ class Transaction:
     # Check that no other commit has taken place.
     assert self._snapshot_id is not None
     self._storage.reload()
-    current_snapshot_id = self._storage.metadata.current_snapshot_id
-    if self._branch != _MAIN_BRANCH:
-      current_snapshot_id = self._storage.version_to_snapshot_id(self._branch)
+    current_snapshot_id = self.current_snapshot_id
+
     if self._snapshot_id != current_snapshot_id:
       self._result = JobResult(
           JobResult.State.FAILED, None,
@@ -579,10 +586,7 @@ class Transaction:
     # All mutations start with a transaction, so storage is always reloaded for
     # mutations.
     self._storage.reload()
-    self._snapshot_id = self._storage.metadata.current_snapshot_id
-    if self._branch != _MAIN_BRANCH:
-      self._snapshot_id = self._storage.lookup_reference(
-          self._branch).snapshot_id
+    self._snapshot_id = self._storage.current_snapshot_id
     logging.info(f"Start transaction {self._txn_id}")
     return self
 
