@@ -234,8 +234,8 @@ class LocalAppendOp(BaseAppendOp, StoragePathsMixin):
     file_path = self._index_writer_info.file_path
     stats = self._index_manifest_writer.write(
         file_path, self._index_writer_info.writer.writer.metadata)
-    utils.update_index_storage_stats(
-        base=self._patch.storage_statistics_update, update=stats)
+    utils.update_index_storage_stats(base=self._patch.storage_statistics_update,
+                                     update=stats)
 
     self._patch.change_log.added_rows.append(
         meta.RowBitmap(file=file_path, all_rows=True, num_rows=stats.num_rows))

@@ -36,8 +36,7 @@ class TestLocalRunner:
   @pytest.fixture
   def sample_dataset(self, tmp_path):
     simple_tf_features_dict = f.FeaturesDict({
-        "image":
-        f.Image(shape=(None, None, 3), dtype=np.uint8),
+        "image": f.Image(shape=(None, None, 3), dtype=np.uint8),
     })
     schema = pa.schema([("id", pa.int64()), ("name", pa.string()),
                         ("feat1", TfFeatures(simple_tf_features_dict)),
@@ -298,8 +297,7 @@ class TestLocalRunner:
 
 def _generate_data(ids: Iterable[int]) -> pa.Table:
   return pa.Table.from_pydict({
-      "id":
-      ids,
+      "id": ids,
       "name": [f"name_{i}" for i in ids],
       "feat1": [bytes(f"feat1_{i}", "utf-8") for i in ids],
       "feat2": [bytes(f"feat2_{i}", "utf-8") for i in ids],

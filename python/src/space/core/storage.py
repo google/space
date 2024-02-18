@@ -212,8 +212,7 @@ class Storage(paths.StoragePathsMixin):
 
     metadata = _read_metadata(self._fs, self._location, entry_point)
     self.__init__(  # type: ignore[misc] # pylint: disable=unnecessary-dunder-call
-        self.location, entry_point.metadata_file, metadata,
-        self.current_branch)
+        self.location, entry_point.metadata_file, metadata, self.current_branch)
     logging.info(
         f"Storage reloaded to snapshot: {self._metadata.current_snapshot_id}")
     return True
@@ -299,8 +298,8 @@ class Storage(paths.StoragePathsMixin):
   def _remove_reference(
       self, ref_name: str,
       ref_type: meta.SnapshotReference.ReferenceType.ValueType) -> None:
-    if (ref_name not in self._metadata.refs
-        or self._metadata.refs[ref_name].type != ref_type):
+    if (ref_name not in self._metadata.refs or
+        self._metadata.refs[ref_name].type != ref_type):
       raise errors.VersionNotFoundError(
           f"Reference {ref_name} is not found or has a wrong type "
           "(tag vs branch)")

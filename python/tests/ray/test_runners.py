@@ -101,15 +101,15 @@ class TestRayReadWriteRunner:
           input_data0.sort_by("int64"))
 
       runner.append_from([
-          lambda: iter([input_data1, input_data2]),
-          lambda: iter([input_data3]), lambda: iter([input_data4])
+          lambda: iter([input_data1, input_data2]), lambda: iter([input_data3]),
+          lambda: iter([input_data4])
       ])
 
       assert_equal(
           runner.read_all(batch_size=batch_size).sort_by("int64"),
-          pa.concat_tables([
-              input_data0, input_data1, input_data2, input_data3, input_data4
-          ]).sort_by("int64"))
+          pa.concat_tables(
+              [input_data0, input_data1, input_data2, input_data3,
+               input_data4]).sort_by("int64"))
 
       # Test insert.
       result = runner.insert(generate_data([7, 12]))
@@ -161,7 +161,7 @@ class TestRayReadWriteRunner:
               })
           ]).sort_by("int64"))
 
-  @pytest.mark.parametrize("enable_row_range_block", [(True, ), (False, )])
+  @pytest.mark.parametrize("enable_row_range_block", [(True,), (False,)])
   def test_read_batch_size(self, tmp_path, sample_schema,
                            enable_row_range_block):
     ds = Dataset.create(str(tmp_path / f"dataset_{random_id()}"),
@@ -180,8 +180,7 @@ class TestRayReadWriteRunner:
       assert d.num_rows == 10
 
   @pytest.mark.parametrize("refresh_batch_size", [None, 2])
-  def test_diff_map_batches(self, tmp_path, sample_dataset,
-                            refresh_batch_size):
+  def test_diff_map_batches(self, tmp_path, sample_dataset, refresh_batch_size):
     ds = sample_dataset
 
     view_schema = pa.schema(
@@ -249,8 +248,7 @@ class TestRayReadWriteRunner:
 
     with pytest.raises(
         errors.VersionNotFoundError,
-        match=r".*Target snapshot ID 3 higher than source dataset version 2.*"
-    ):
+        match=r".*Target snapshot ID 3 higher than source dataset version 2.*"):
       ray_runner.refresh(3)
 
     # Test upsert's diff.
@@ -406,11 +404,13 @@ class TestRayReadWriteRunner:
 
     left_fields_ = [
         ds1_schema.field(f).remove_metadata()
-        for f in left_fields or ds1.schema.names if f != "int64"
+        for f in left_fields or ds1.schema.names
+        if f != "int64"
     ]
     right_fields_ = [
         ds2.schema.field(f).remove_metadata()
-        for f in right_fields or ds2.schema.names if f != "int64"
+        for f in right_fields or ds2.schema.names
+        if f != "int64"
     ]
 
     if not swap:
@@ -426,8 +426,7 @@ class TestRayReadWriteRunner:
 
     def generate_expected(values: Iterable[int]) -> pa.Table:
       return pa.Table.from_pydict({
-          "int64":
-          values,
+          "int64": values,
           "float64": [v / 10 for v in values],
           "binary": [f"b{v}".encode("utf-8") for v in values],
           "string": [f"s{v}" for v in values]
@@ -443,8 +442,7 @@ class TestRayReadWriteRunner:
 
       # Sanity checks of addresses.
       address_column = join_values.column("binary").combine_chunks()
-      assert address_column.field("_FILE")[0].as_py().startswith(
-          "data/binary_")
+      assert address_column.field("_FILE")[0].as_py().startswith("data/binary_")
       assert len(address_column.field("_ROW_ID")) == len(indexes)
 
       # Test reading addresses.
@@ -495,9 +493,8 @@ class TestRayReadWriteRunner:
                left_fields=["float64"],
                right_fields=["string"])
 
-    with pytest.raises(
-        errors.UserInputError,
-        match=r".*Join key must be primary key on both sides.*"):
+    with pytest.raises(errors.UserInputError,
+                       match=r".*Join key must be primary key on both sides.*"):
       ds1.join(ds2,
                keys=["string"],
                left_fields=["float64"],
@@ -506,8 +503,7 @@ class TestRayReadWriteRunner:
 
 def generate_data(values: Iterable[int]) -> pa.Table:
   return pa.Table.from_pydict({
-      "int64":
-      values,
+      "int64": values,
       "float64": [v / 10 for v in values],
       "binary": [f"b{v}".encode("utf-8") for v in values]
   })
