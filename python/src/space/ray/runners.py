@@ -297,7 +297,8 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
                      ray_options, self._file_options)
     op.write_from(source_fns)
 
-    return op.finish()
+    return _append_from(self._storage, source_fns, ray_options,
+                        self._file_options)
 
   @StorageMixin.transactional
   def append_array_record(self, pattern: str,

@@ -407,8 +407,7 @@ class TestStorage:
 
     metadata = storage.metadata
     assert len(metadata.refs) == 2
-    assert snapshot_id1 == metadata.current_snapshot_id
-    assert snapshot_id2 == metadata.current_snapshot_id
+    assert snapshot_id1 == snapshot_id2 == metadata.current_snapshot_id
 
     versions = storage.versions().to_pydict()
     versions["tag_or_branch"].sort()

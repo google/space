@@ -119,7 +119,7 @@ class Storage(paths.StoragePathsMixin):
     """Return the physcal schema that uses reference for record fields."""
     return self._physical_schema
 
-  def get_current_snapshot_id(self, branch: str) -> int:
+  def current_snapshot_id(self, branch: str) -> int:
     """Returns the snapshot id for the current branch."""
     if branch != _MAIN_BRANCH:
       return self.lookup_reference(branch).snapshot_id
@@ -326,14 +326,15 @@ class Storage(paths.StoragePathsMixin):
     new_metadata = meta.StorageMetadata()
     new_metadata.CopyFrom(self._metadata)
     new_snapshot_id = self._next_snapshot_id()
-    if branch and branch != _MAIN_BRANCH:
+    if branch != _MAIN_BRANCH:
       branch_snapshot = self.lookup_reference(branch)
       # To block the case delete branch and add a tag during commit
       # TODO: move this check out of commit()
       if branch_snapshot.type != meta.SnapshotReference.BRANCH:
         raise errors.UserInputError("Branch {branch} is no longer exists.")
-      current_snapshot = self.snapshot(branch_snapshot.snapshot_id)
+
       new_metadata.refs[branch].snapshot_id = new_snapshot_id
+      current_snapshot = self.snapshot(branch_snapshot.snapshot_id)
     else:
       new_metadata.current_snapshot_id = new_snapshot_id
       current_snapshot = self.snapshot(self._metadata.current_snapshot_id)
@@ -560,7 +561,7 @@ class Transaction:
     # Check that no other commit has taken place.
     assert self._snapshot_id is not None
     self._storage.reload()
-    current_snapshot_id = self._storage.get_current_snapshot_id(self._branch)
+    current_snapshot_id = self._storage.current_snapshot_id(self._branch)
 
     if self._snapshot_id != current_snapshot_id:
       self._result = JobResult(
@@ -588,7 +589,7 @@ class Transaction:
     # All mutations start with a transaction, so storage is always reloaded for
     # mutations.
     self._storage.reload()
-    self._snapshot_id = self._storage.get_current_snapshot_id(self._branch)
+    self._snapshot_id = self._storage.current_snapshot_id(self._branch)
     logging.info(f"Start transaction {self._txn_id}")
     return self
 
