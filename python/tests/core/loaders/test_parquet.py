@@ -71,4 +71,4 @@ class TestLocalParquetLoadOp:
     ]).combine_chunks().sort_by("int64")
 
     assert not ds.index_files(version="empty")
-    assert ds.index_files(version="after_append") == [file0, file1]
+    assert sorted(ds.index_files(version="after_append")) == [file0, file1]

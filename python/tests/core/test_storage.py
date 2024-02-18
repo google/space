@@ -137,7 +137,7 @@ class TestStorage:
         record_uncompressed_bytes=30)
     patch = rt.Patch(addition=added_manifest_files,
                      storage_statistics_update=added_storage_statistics)
-    storage.commit(patch)
+    storage.commit(patch, "main")
 
     assert storage.snapshot(0) is not None
     new_snapshot = storage.snapshot(1)
@@ -155,7 +155,7 @@ class TestStorage:
         index_manifest_files=["data/index_manifest1"],
         record_manifest_files=["data/record_manifest1"]),
                      storage_statistics_update=added_storage_statistics2)
-    storage.commit(patch)
+    storage.commit(patch, "main")
 
     new_snapshot = storage.snapshot(2)
     assert new_snapshot.manifest_files == meta.ManifestFiles(
@@ -177,7 +177,7 @@ class TestStorage:
                          index_compressed_bytes=-10,
                          index_uncompressed_bytes=-20,
                          record_uncompressed_bytes=-30))
-    storage.commit(patch)
+    storage.commit(patch, "main")
     new_snapshot = storage.snapshot(3)
     assert new_snapshot.manifest_files.index_manifest_files == [
         "data/index_manifest1"
@@ -202,7 +202,7 @@ class TestStorage:
     def commit_add_index_manifest(manifest_path: str):
       patch = rt.Patch(addition=meta.ManifestFiles(
           index_manifest_files=[storage.short_path(manifest_path)]))
-      storage.commit(patch)
+      storage.commit(patch, "main")
 
     manifest_writer = create_index_manifest_writer()
     manifest_writer.write(
@@ -374,4 +374,68 @@ class TestStorage:
         "snapshot_id": [0],
         "tag_or_branch": ["tag2"],
         "create_time": [create_time1]
+    }
+
+  def test_branches(self, tmp_path):
+    location = tmp_path / "dataset"
+    storage = Storage.create(location=str(location),
+                             schema=_SCHEMA,
+                             primary_keys=["int64"],
+                             record_fields=[])
+
+    create_time1 = datetime.utcfromtimestamp(
+        storage.metadata.snapshots[0].create_time.seconds).replace(
+            tzinfo=pytz.utc)
+    assert storage.versions().to_pydict() == {
+        "snapshot_id": [0],
+        "tag_or_branch": [None],
+        "create_time": [create_time1]
+    }
+
+    storage.add_branch("branch1")
+
+    with pytest.raises(errors.UserInputError, match=r".*already exist.*"):
+      storage.add_branch("branch1")
+
+    storage.add_branch("branch2")
+
+    snapshot_id1 = storage.version_to_snapshot_id("branch1")
+    snapshot_id2 = storage.version_to_snapshot_id("branch2")
+
+    metadata = storage.metadata
+    assert len(metadata.refs) == 2
+    assert snapshot_id1 == snapshot_id2 == metadata.current_snapshot_id
+
+    versions = storage.versions().to_pydict()
+    versions["tag_or_branch"].sort()
+    assert versions == {
+        "snapshot_id": [0, 0],
+        "tag_or_branch": ["branch1", "branch2"],
+        "create_time": [create_time1, create_time1]
+    }
+
+    storage.remove_branch("branch1")
+
+    with pytest.raises(errors.UserInputError, match=r".*not found.*"):
+      storage.remove_branch("branch1")
+    assert len(storage.metadata.refs) == 1
+
+    patch = rt.Patch(addition=meta.ManifestFiles(
+        index_manifest_files=["data/index_manifest1"],
+        record_manifest_files=["data/record_manifest1"]),
+                     storage_statistics_update=meta.StorageStatistics(
+                         num_rows=100,
+                         index_compressed_bytes=100,
+                         index_uncompressed_bytes=200,
+                         record_uncompressed_bytes=300))
+    storage.commit(patch, "branch2")
+
+    create_time2 = datetime.utcfromtimestamp(
+        storage.metadata.snapshots[1].create_time.seconds).replace(
+            tzinfo=pytz.utc)
+
+    assert storage.versions().to_pydict() == {
+        "snapshot_id": [1, 0],
+        "tag_or_branch": ["branch2", None],
+        "create_time": [create_time2, create_time1]
     }

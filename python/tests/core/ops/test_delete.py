@@ -42,7 +42,7 @@ class TestFileSetDeleteOp:
     for batch in input_data:
       append_op.write(batch)
 
-    storage.commit(append_op.finish())
+    storage.commit(append_op.finish(), "main")
     old_data_files = storage.data_files()
 
     delete_op = FileSetDeleteOp(
@@ -54,7 +54,7 @@ class TestFileSetDeleteOp:
         _default_file_options)
     patch = delete_op.delete()
     assert patch is not None
-    storage.commit(patch)
+    storage.commit(patch, "main")
 
     # Verify storage metadata after patch.
     new_data_files = storage.data_files()
