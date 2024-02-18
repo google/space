@@ -293,10 +293,6 @@ class RayReadWriterRunner(RayReadOnlyRunner, BaseReadWriteRunner):
     ray_options.max_parallelism = min(len(source_fns),
                                       ray_options.max_parallelism)
 
-    op = RayAppendOp(self._storage.location, self._storage.metadata,
-                     ray_options, self._file_options)
-    op.write_from(source_fns)
-
     return _append_from(self._storage, source_fns, ray_options,
                         self._file_options)
 
