@@ -114,7 +114,7 @@ print(catalog.datasets())
 
 ### Write and Read
 
-Append, delete some data. Each mutation generates a new version of data, represented by an increasing integer ID. We expect to support the [Iceberg](https://iceberg.apache.org/docs/latest/branching/) style tags and branches for better version management.
+Append, delete some data. Each mutation generates a new version of data, represented by an increasing integer ID. Users can add tags to version IDs as alias.
 ```py
 import pyarrow.compute as pc
 from space import RayOptions
@@ -170,10 +170,21 @@ runner.read_all(
 )
 
 # Read the changes between version 0 and 2.
-for change_type, data in runner.diff(0, "after_delete"):
-  print(change_type)
-  print(data)
+for change in runner.diff(0, "after_delete"):
+  print(change.change_type)
+  print(change.data)
   print("===============")
+```
+
+Create a new branch and make changes in the new branch:
+
+```py
+# The default branch is "main"
+ds.add_branch("dev")
+ds.set_current_branch("dev")
+# Make changes in the new branch, the main branch is not updated.
+# Switch back to the main branch.
+ds.set_current_branch("main")
 ```
 
 ### Transform and Materialized Views
@@ -285,7 +296,6 @@ ds.storage.record_manifest()  # Accept filter and snapshot_id
 Space is a new project under active development.
 
 :construction: Ongoing tasks:
-- Iceberg style version branches.
 - Performance benchmark and improvement.
 
 ## Disclaimer
