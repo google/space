@@ -38,9 +38,8 @@ def read_change_data(storage: Storage, start_snapshot_id: int,
   """
   for snapshot_id in ordered_snapshot_ids(storage, start_snapshot_id,
                                           end_snapshot_id):
-    for change in _RayChangeDataReadOp(storage, snapshot_id, ray_options,
-                                       read_options):
-      yield change
+    yield from _RayChangeDataReadOp(storage, snapshot_id, ray_options,
+                                    read_options)
 
 
 class _RayChangeDataReadOp(LocalChangeDataReadOp):

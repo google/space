@@ -93,8 +93,7 @@ def read_change_data(storage: Storage, start_snapshot_id: int,
   """
   for snapshot_id in ordered_snapshot_ids(storage, start_snapshot_id,
                                           end_snapshot_id):
-    for change in LocalChangeDataReadOp(storage, snapshot_id, read_options):
-      yield change
+    yield from LocalChangeDataReadOp(storage, snapshot_id, read_options)
 
 
 class LocalChangeDataReadOp(StoragePathsMixin):
